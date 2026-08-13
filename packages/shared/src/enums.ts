@@ -22,11 +22,23 @@ export const SessionStatus = {
 } as const;
 export type SessionStatus = (typeof SessionStatus)[keyof typeof SessionStatus];
 
-export const BillingMode = {
+/** Вид тарифа: пакет минут за фиксированную цену либо поминутная оплата. */
+export const TariffKind = {
+  PACKAGE: "PACKAGE",
   PER_MINUTE: "PER_MINUTE",
-  FIXED_PACKAGE: "FIXED_PACKAGE",
 } as const;
-export type BillingMode = (typeof BillingMode)[keyof typeof BillingMode];
+export type TariffKind = (typeof TariffKind)[keyof typeof TariffKind];
+
+/** Почему закрылся тарифицированный отрезок сессии. */
+export const SegmentEndReason = {
+  PACKAGE_EXHAUSTED: "PACKAGE_EXHAUSTED",
+  CREDIT_LIMIT: "CREDIT_LIMIT",
+  ZONE_CHANGE: "ZONE_CHANGE",
+  TARIFF_SCHEDULE: "TARIFF_SCHEDULE",
+  STOPPED_BY_STAFF: "STOPPED_BY_STAFF",
+  PAUSED: "PAUSED",
+} as const;
+export type SegmentEndReason = (typeof SegmentEndReason)[keyof typeof SegmentEndReason];
 
 export const TransactionType = {
   TOPUP: "TOPUP",
@@ -34,5 +46,17 @@ export const TransactionType = {
   PRODUCT_SALE: "PRODUCT_SALE",
   REFUND: "REFUND",
   ADJUSTMENT: "ADJUSTMENT",
+  DEBT_WRITE_OFF: "DEBT_WRITE_OFF",
 } as const;
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType];
+
+/** Уровень связи, в котором находится зал. См. docs/offline.md. */
+export const ConnectivityLevel = {
+  /** Норма: облако доступно. */
+  ONLINE: "ONLINE",
+  /** Облако недоступно, локальная сеть жива — аварийный режим через локальный узел. */
+  LOCAL_ONLY: "LOCAL_ONLY",
+  /** Агент изолирован: доигрывает оплаченное время в одиночку. */
+  ISOLATED: "ISOLATED",
+} as const;
+export type ConnectivityLevel = (typeof ConnectivityLevel)[keyof typeof ConnectivityLevel];
