@@ -1,0 +1,18 @@
+{
+  "name": "cyber-fox",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloud SaaS platform for gaming/computer club management (time tracking, billing, bookings, CRM)",
+  "scripts": {
+    "dev:server": "pnpm --filter @cyberfox/server dev",
+    "dev:admin": "pnpm --filter @cyberfox/admin dev",
+    "dev:agent": "pnpm --filter @cyberfox/agent dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
