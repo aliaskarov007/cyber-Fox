@@ -29,6 +29,15 @@ export const TariffKind = {
 } as const;
 export type TariffKind = (typeof TariffKind)[keyof typeof TariffKind];
 
+/** Состояние купленного пакета на аккаунте гостя. */
+export const GuestPackageStatus = {
+  ACTIVE: "ACTIVE",
+  EXHAUSTED: "EXHAUSTED",
+  EXPIRED: "EXPIRED",
+  REFUNDED: "REFUNDED",
+} as const;
+export type GuestPackageStatus = (typeof GuestPackageStatus)[keyof typeof GuestPackageStatus];
+
 /** Почему закрылся тарифицированный отрезок сессии. */
 export const SegmentEndReason = {
   PACKAGE_EXHAUSTED: "PACKAGE_EXHAUSTED",
@@ -44,6 +53,7 @@ export const TransactionType = {
   TOPUP: "TOPUP",
   SESSION_CHARGE: "SESSION_CHARGE",
   PRODUCT_SALE: "PRODUCT_SALE",
+  PACKAGE_PURCHASE: "PACKAGE_PURCHASE",
   REFUND: "REFUND",
   ADJUSTMENT: "ADJUSTMENT",
   DEBT_WRITE_OFF: "DEBT_WRITE_OFF",

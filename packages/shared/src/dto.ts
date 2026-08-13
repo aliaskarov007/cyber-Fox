@@ -1,6 +1,7 @@
 import type {
   ConnectivityLevel,
   ComputerStatus,
+  GuestPackageStatus,
   SegmentEndReason,
   SessionStatus,
   StaffRole,
@@ -18,10 +19,10 @@ export interface ClubDto {
   id: string;
   name: string;
   timezone: string;
-  /** Лимит игры в долг при доступном облаке. По умолчанию 10000 (100 ₸). */
+  /** Лимит игры в долг, в тиын. Действует одинаково онлайн и офлайн. */
   creditLimit: Money;
-  /** Лимит игры в долг без связи с облаком. По умолчанию 5000 (50 ₸). */
-  offlineCreditLimit: Money;
+  /** Срок жизни пакета по умолчанию; задаёт владелец клуба. */
+  packageValidityDays: number;
   /** За сколько минут до конца пакета предупреждать гостя. */
   lowBalanceWarnMinutes: number;
   createdAt: string;
@@ -57,6 +58,8 @@ export interface TariffDto {
   /** Заполнены для PACKAGE. */
   packageMinutes: number | null;
   packagePrice: Money | null;
+  /** Срок жизни пакета; пусто — берём packageValidityDays клуба. */
+  validityDays: number | null;
   /** Для PACKAGE: чем продолжать после исчерпания. Пусто — берём тариф зоны. */
   fallbackTariffId: string | null;
   /** Окно действия по времени суток, например ночной тариф 22:00–08:00. */
@@ -77,15 +80,34 @@ export interface GuestDto {
   createdAt: string;
 }
 
+/**
+ * Купленный пакет минут. Живёт на аккаунте гостя, а не в сессии: переживает
+ * пересадку в другую зону и конец визита. Минуты действительны только в своей зоне.
+ */
+export interface GuestPackageDto {
+  id: string;
+  clubId: string;
+  guestId: string;
+  zoneId: string;
+  sourceTariffId: string;
+  minutesTotal: number;
+  minutesRemaining: number;
+  pricePaid: Money;
+  purchasedAt: string;
+  expiresAt: string;
+  status: GuestPackageStatus;
+}
+
 /** Отрезок сессии с одним тарифом. Сессия — цепочка таких отрезков. */
 export interface SessionSegmentDto {
   id: string;
   sessionId: string;
   tariffId: string;
   kind: TariffKind;
+  /** Для PACKAGE: из какого пакета аккаунта тратились минуты. */
+  guestPackageId: string | null;
   startedAt: string;
   endedAt: string | null;
-  minutesIncluded: number | null;
   minutesUsed: number;
   charged: Money;
   endReason: SegmentEndReason | null;
@@ -128,8 +150,10 @@ export type ServerToAgentEvent =
   | {
       type: "session.tick";
       sessionId: string;
-      /** Остаток минут пакета, если идёт пакетный отрезок. */
+      /** Остаток минут текущего пакета, если идёт пакетный отрезок. */
       packageMinutesLeft: number | null;
+      /** Когда сгорает текущий пакет — показываем гостю, если срок близко. */
+      packageExpiresAt: string | null;
       /** Баланс гостя и на сколько минут его хватит по текущему тарифу. */
       balance: Money;
       minutesAffordable: number | null;
@@ -137,8 +161,10 @@ export type ServerToAgentEvent =
       creditLeft: Money | null;
       accruedCost: Money;
     }
-  /** Пакет закончился, включён поминутный тариф — сессия продолжается. */
+  /** Минуты кончились, включён поминутный тариф — сессия продолжается. */
   | { type: "session.switchedToPerMinute"; sessionId: string; tariffId: string; pricePerMinute: Money }
+  /** Один пакет исчерпан, но в зоне есть следующий — продолжаем на нём. */
+  | { type: "session.switchedToPackage"; sessionId: string; guestPackageId: string; minutesLeft: number }
   | { type: "lock" }
   | { type: "unlock" }
   | { type: "message"; text: string };
