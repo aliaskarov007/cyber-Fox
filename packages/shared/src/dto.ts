@@ -3,6 +3,7 @@ import type {
   ComputerStatus,
   GuestPackageStatus,
   SegmentEndReason,
+  SessionStartedBy,
   SessionStatus,
   StaffRole,
   TariffKind,
@@ -109,6 +110,8 @@ export interface SessionSegmentDto {
   startedAt: string;
   endedAt: string | null;
   minutesUsed: number;
+  /** Сколько минут уже оплачено; ключ идемпотентности при повторной обработке тика. */
+  chargedThroughMinute: number;
   charged: Money;
   endReason: SegmentEndReason | null;
 }
@@ -122,8 +125,12 @@ export interface SessionDto {
   status: SessionStatus;
   startedAt: string;
   endedAt: string | null;
+  /** Когда списывать следующую минуту. Индексируется: списание идёт пачками, не таймером на сессию. */
+  nextChargeAt: string | null;
   totalCharged: Money;
   segments: SessionSegmentDto[];
+  /** Гость вошёл сам за ПК или сотрудник посадил со стойки. */
+  startedBy: SessionStartedBy;
   /** Была ли сессия начата в аварийном режиме без связи с облаком. */
   startedOffline: boolean;
 }
@@ -165,6 +172,18 @@ export type ServerToAgentEvent =
   | { type: "session.switchedToPerMinute"; sessionId: string; tariffId: string; pricePerMinute: Money }
   /** Один пакет исчерпан, но в зоне есть следующий — продолжаем на нём. */
   | { type: "session.switchedToPackage"; sessionId: string; guestPackageId: string; minutesLeft: number }
+  /** Ответ на самостоятельный вход: что показать гостю после ввода PIN. */
+  | {
+      type: "guest.loginResult";
+      ok: boolean;
+      guest: GuestDto | null;
+      /** Минуты гостя в зоне этого ПК — ими можно играть прямо сейчас. */
+      packagesInZone: GuestPackageDto[];
+      /** Минуты в других зонах — показываем с пометкой, что здесь не действуют. */
+      packagesElsewhere: GuestPackageDto[];
+      /** Заполнено при отказе: занятый ПК, долг, бронь, блокировка PIN. */
+      reason: string | null;
+    }
   | { type: "lock" }
   | { type: "unlock" }
   | { type: "message"; text: string };
@@ -172,7 +191,13 @@ export type ServerToAgentEvent =
 export type AgentToServerEvent =
   | { type: "hello"; pairingToken: string; hostname: string }
   | { type: "heartbeat"; computerId: string; connectivity: ConnectivityLevel }
+  /** Гость вводит телефон и PIN на экране блокировки. */
+  | { type: "guest.login"; computerId: string; phone: string; pin: string }
   | { type: "unlock.requested"; computerId: string; tariffId: string; guestId: string | null }
+  /** Гость закрыл сессию сам кнопкой на экране. */
+  | { type: "session.stopRequested"; computerId: string; sessionId: string }
+  /** Кнопка «Позвать администратора». */
+  | { type: "staff.called"; computerId: string }
   /** Досылка отрезков, накопленных без связи с облаком. */
   | { type: "offline.segments"; computerId: string; segments: OfflineOperationDto[] };
 
@@ -181,6 +206,8 @@ export type ServerToAdminEvent =
   | { type: "session.updated"; session: SessionDto }
   /** Гость ушёл в минус — админу стоит подойти и предложить пополнение. */
   | { type: "session.onCredit"; sessionId: string; computerId: string; creditLeft: Money }
+  /** Гость нажал «Позвать администратора» — на кассовом экране появляется вызов. */
+  | { type: "staff.called"; computerId: string; sessionId: string | null }
   | { type: "connectivity.changed"; level: ConnectivityLevel; queuedOperations: number };
 
 /** Операция, выполненная без связи с облаком. UUID — ключ идемпотентности при досылке. */

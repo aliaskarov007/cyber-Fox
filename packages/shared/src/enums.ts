@@ -29,6 +29,13 @@ export const TariffKind = {
 } as const;
 export type TariffKind = (typeof TariffKind)[keyof typeof TariffKind];
 
+/** Кто открыл сессию: гость сам за ПК или сотрудник со стойки. */
+export const SessionStartedBy = {
+  GUEST: "GUEST",
+  STAFF: "STAFF",
+} as const;
+export type SessionStartedBy = (typeof SessionStartedBy)[keyof typeof SessionStartedBy];
+
 /** Состояние купленного пакета на аккаунте гостя. */
 export const GuestPackageStatus = {
   ACTIVE: "ACTIVE",
