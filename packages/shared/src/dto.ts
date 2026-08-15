@@ -16,8 +16,20 @@ import type {
  */
 export type Money = number;
 
+/** Сеть клубов одного владельца. Единица подписки на платформу. */
+export interface TenantDto {
+  id: string;
+  name: string;
+  /**
+   * true — один кошелёк гостя на всю сеть, деньги ходят между залами;
+   * false — свой кошелёк в каждом клубе. Аккаунт и история общие в обоих случаях.
+   */
+  sharedBalance: boolean;
+}
+
 export interface ClubDto {
   id: string;
+  tenantId: string;
   name: string;
   timezone: string;
   /** Лимит игры в долг, в тиын. Действует одинаково онлайн и офлайн. */
@@ -70,20 +82,25 @@ export interface TariffDto {
   isActive: boolean;
 }
 
+/** Аккаунт гостя. Принадлежит сети, а не залу: гость узнан в любом клубе владельца. */
 export interface GuestDto {
   id: string;
-  clubId: string;
+  tenantId: string;
   fullName: string;
+  /** Уникален в пределах сети. */
   phone: string | null;
-  /** Может быть отрицательным — гость доигрывал в долг. */
-  balance: Money;
   bonusPoints: number;
+  /** Баланс кошелька, действующего в текущем клубе. Может быть отрицательным — долг. */
+  balance: Money;
+  /** Клуб кошелька; null — кошелёк общий на всю сеть. */
+  walletClubId: string | null;
   createdAt: string;
 }
 
 /**
  * Купленный пакет минут. Живёт на аккаунте гостя, а не в сессии: переживает
- * пересадку в другую зону и конец визита. Минуты действительны только в своей зоне.
+ * пересадку в другую зону и конец визита. В отличие от кошелька, по сети не ходит —
+ * минуты действительны только в своём клубе и своей зоне.
  */
 export interface GuestPackageDto {
   id: string;
@@ -137,7 +154,9 @@ export interface SessionDto {
 
 export interface StaffUserDto {
   id: string;
-  clubId: string;
+  tenantId: string;
+  /** Клуб сотрудника; null у владельца сети — он видит все залы. */
+  clubId: string | null;
   email: string;
   fullName: string;
   role: StaffRole;
