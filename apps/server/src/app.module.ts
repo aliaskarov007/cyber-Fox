@@ -7,9 +7,11 @@ import { AuthModule } from "./auth/auth.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { GuestsModule } from "./guests/guests.module.js";
+import { NetworkModule } from "./network/network.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProductsModule } from "./products/products.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { ReportsModule } from "./reports/reports.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
 
@@ -24,6 +26,8 @@ import { ShiftsModule } from "./shifts/shifts.module.js";
     SessionsModule,
     ShiftsModule,
     ProductsModule,
+    NetworkModule,
+    ReportsModule,
     RealtimeModule,
   ],
   providers: [

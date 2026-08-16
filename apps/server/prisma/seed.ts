@@ -158,6 +158,58 @@ async function main(): Promise<void> {
     });
   }
 
+  // Второй зал: без него не проверить ни права управляющих, ни сводные отчёты,
+  // ни межклубный взаимозачёт.
+  const second = await prisma.club.upsert({
+    where: { id: "seed-club-2" },
+    update: clubSettings,
+    create: {
+      id: "seed-club-2",
+      tenantId: tenant.id,
+      name: "Cyber-Fox Южный",
+      city: "Алматы",
+      timezone: "Asia/Almaty",
+      ...clubSettings,
+    },
+  });
+
+  const secondZone = await prisma.zone.upsert({
+    where: { clubId_name: { clubId: second.id, name: "Стандарт" } },
+    update: {},
+    create: { clubId: second.id, name: "Стандарт", sortOrder: 1 },
+  });
+
+  const secondMinute = await prisma.tariff.upsert({
+    where: { clubId_zoneId_name: { clubId: second.id, zoneId: secondZone.id, name: "Стандарт поминутно" } },
+    update: { pricePerMinute: kzt(8) },
+    create: {
+      clubId: second.id,
+      zoneId: secondZone.id,
+      name: "Стандарт поминутно",
+      kind: TariffKind.PER_MINUTE,
+      pricePerMinute: kzt(8),
+    },
+  });
+
+  await prisma.zone.update({
+    where: { id: secondZone.id },
+    data: { defaultPerMinuteTariffId: secondMinute.id },
+  });
+
+  for (let i = 1; i <= 20; i++) {
+    const name = `ПК-${String(i).padStart(2, "0")}`;
+    await prisma.computer.upsert({
+      where: { clubId_name: { clubId: second.id, name } },
+      update: {},
+      create: {
+        clubId: second.id,
+        zoneId: secondZone.id,
+        name,
+        pairingToken: `seed-pair-south-${i}`,
+      },
+    });
+  }
+
   const passwordHash = await bcrypt.hash("cyberfox123", 10);
   await prisma.staff.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "owner@cyberfox.kz" } },
@@ -179,6 +231,19 @@ async function main(): Promise<void> {
       clubId: club.id,
       email: "admin@cyberfox.kz",
       fullName: "Администратор зала",
+      passwordHash,
+      role: StaffRole.ADMIN,
+    },
+  });
+
+  await prisma.staff.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: "south@cyberfox.kz" } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      clubId: second.id,
+      email: "south@cyberfox.kz",
+      fullName: "Управляющий Южного",
       passwordHash,
       role: StaffRole.ADMIN,
     },
@@ -210,6 +275,8 @@ async function main(): Promise<void> {
   console.log("  Гость: +77010000001, PIN 1234, баланс 2000 ₸");
   console.log(`  Ночной тариф: ${standardNight.name}`);
   console.log(`  Товаров в баре: ${products.length}, бонусы ${club.bonusPercent}%`);
+  console.log(`  Второй зал: ${second.name} (${second.id}), 20 машин, 8 ₸/мин`);
+  console.log("  Управляющий второго зала: south@cyberfox.kz");
 }
 
 main()
