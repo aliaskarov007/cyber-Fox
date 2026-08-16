@@ -1,0 +1,97 @@
+# Развёртывание Cyber-Fox на одной машине.
+#
+# Поднимает всё, что нужно клубу: база, сервер, кассовый экран за HTTPS и
+# ежедневный бэкап. Настройки — в файле .env рядом (см. deploy/env.example).
+#
+#   cp deploy/env.example .env && ${EDITOR:-nano} .env
+#   docker compose up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cyberfox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте пароль базы в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cyberfox}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # Наружу база не смотрит: к ней ходят только сервер и бэкап по внутренней
+    # сети compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cyberfox}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberfox}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cyberfox}
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+      PORT: 3000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-manual}
+      PAYMENT_CHECKOUT_URL: ${PAYMENT_CHECKOUT_URL:-}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
+      TZ: ${TZ:-Asia/Almaty}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      CYBERFOX_DOMAIN: ${CYBERFOX_DOMAIN:?укажите домен клуба в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # Бэкап базы. Без него первая же потерянная машина означает потерянные
+  # балансы гостей, а их клуб восстановить не сможет ничем.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    # Команда — списком из одной строки: строку compose разбил бы по пробелам
+    # и отдал бы sh по кускам.
+    command:
+      - |
+        while true; do
+          stamp=$$(date +%F-%H%M)
+          # Сначала в файл, потом сжимаем: в конвейере код возврата достаётся
+          # gzip, и упавший pg_dump отчитался бы об успехе.
+          if pg_dump -h db -U $${POSTGRES_USER:-cyberfox} -d $${POSTGRES_DB:-cyberfox} > /tmp/dump.sql; then
+            gzip -c /tmp/dump.sql > /backups/cyberfox-$$stamp.sql.gz
+            echo "бэкап готов: $$stamp ($$(wc -c < /backups/cyberfox-$$stamp.sql.gz) байт)"
+          else
+            # Обрезанный файл хуже отсутствия бэкапа: он выглядит рабочим.
+            echo "БЭКАП НЕ СДЕЛАН: $$stamp"
+          fi
+          rm -f /tmp/dump.sql
+          find /backups -name "cyberfox-*.sql.gz" -mtime +14 -delete
+          sleep 86400
+        done
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

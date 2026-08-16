@@ -1,0 +1,35 @@
+# Внешний вход в систему.
+#
+# Caddy сам получает и продлевает сертификат Let's Encrypt для домена из
+# переменной CYBERFOX_DOMAIN. Отдельный DOMAIN=":80" отключает HTTPS — это
+# режим проверки на своей машине, в зал так ставить нельзя: пароли сотрудников
+# и коды привязки пойдут открытым текстом.
+
+{$CYBERFOX_DOMAIN} {
+	encode gzip
+
+	# API и сокеты — на сервер. Агент подключается по тому же адресу, что и
+	# кассовый экран: клубу не нужно знать про два разных порта.
+	handle /api/* {
+		reverse_proxy server:3000
+	}
+
+	handle /socket.io/* {
+		reverse_proxy server:3000
+	}
+
+	# Всё остальное — статика админки. Маршруты у неё на стороне браузера,
+	# поэтому неизвестный путь отдаём index.html, а не 404.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		# Кассовый экран не должен открываться внутри чужой страницы.
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+	}
+}
