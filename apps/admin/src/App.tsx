@@ -6,11 +6,13 @@ import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
 import { NetworkScreen } from "./NetworkScreen.js";
+import { OnboardingScreen } from "./OnboardingScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { ShiftBar } from "./ShiftBar.js";
+import { SignupScreen } from "./SignupScreen.js";
 import { TariffsScreen } from "./TariffsScreen.js";
 
-type Tab = "hall" | "bar" | "guests" | "tariffs" | "network" | "settings";
+type Tab = "hall" | "bar" | "guests" | "tariffs" | "network" | "onboarding" | "settings";
 
 const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean }> = [
   { id: "hall", label: "Зал" },
@@ -18,6 +20,7 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean }> = [
   { id: "guests", label: "Гости" },
   { id: "tariffs", label: "Тарифы" },
   { id: "network", label: "Сеть", ownerOnly: true },
+  { id: "onboarding", label: "Подключение" },
   { id: "settings", label: "Настройки" },
 ];
 
@@ -27,6 +30,7 @@ export function App() {
   const [clubId, setClubId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("hall");
   const [loading, setLoading] = useState(true);
+  const [signingUp, setSigningUp] = useState(false);
 
   async function load(): Promise<void> {
     if (!getToken()) {
@@ -52,7 +56,13 @@ export function App() {
   }, []);
 
   if (loading) return <div className="login-wrap">Загружаем…</div>;
-  if (!staff) return <LoginScreen onDone={() => void load()} />;
+  if (!staff) {
+    return signingUp ? (
+      <SignupScreen onDone={() => void load()} onBack={() => setSigningUp(false)} />
+    ) : (
+      <LoginScreen onDone={() => void load()} onSignup={() => setSigningUp(true)} />
+    );
+  }
 
   const club = clubs.find((c) => c.id === clubId) ?? null;
 
@@ -124,6 +134,8 @@ export function App() {
         <GuestsScreen club={club} />
       ) : tab === "network" ? (
         <NetworkScreen clubs={clubs} />
+      ) : tab === "onboarding" ? (
+        <OnboardingScreen club={club} isOwner={staff.role === "OWNER"} />
       ) : tab === "settings" ? (
         <SettingsScreen
           club={club}

@@ -52,6 +52,17 @@ export interface Guest {
   hasPin: boolean;
 }
 
+export interface Computer {
+  id: string;
+  clubId: string;
+  zoneId: string;
+  name: string;
+  status: "OFFLINE" | "IDLE" | "IN_USE" | "RESERVED" | "MAINTENANCE";
+  /** Код привязки агента к машине. Показывается при установке. */
+  pairingToken: string | null;
+  lastSeenAt: string | null;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -211,6 +222,8 @@ export const api = {
 
   tariffs: (clubId: string) => request<Tariff[]>(`/clubs/${clubId}/tariffs`),
 
+  computers: (clubId: string) => request<Computer[]>(`/clubs/${clubId}/computers`),
+
   hall: (clubId: string) => request<HallCell[]>(`/clubs/${clubId}/hall`),
 
   searchGuests: (clubId: string, query: string) =>
@@ -337,7 +350,87 @@ export const api = {
 
   hoursReport: (clubId: string, period: { from?: string; to?: string } = {}) =>
     request<HourlyPoint[]>(`/reports/clubs/${clubId}/hours${periodQuery(period)}`),
+
+  // --- Подписка на платформу ---
+
+  signup: (body: SignupBody) =>
+    request<{ accessToken: string; staff: Staff; clubId: string }>("/signup", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  subscription: () => request<SubscriptionInfo>("/subscription"),
+
+  platformInvoices: () => request<Invoice[]>("/subscription/invoices"),
+
+  changePlan: (plan: string) =>
+    request<unknown>("/subscription/plan", { method: "POST", body: JSON.stringify({ plan }) }),
+
+  markInvoicePaid: (invoiceId: string) =>
+    request<unknown>(`/subscription/invoices/${invoiceId}/paid`, { method: "POST" }),
+
+  // --- Перенос данных ---
+
+  importCsv: (clubId: string, kind: "guests" | "computers" | "tariffs", csv: string) =>
+    request<ImportResult>(`/clubs/${clubId}/import/${kind}`, {
+      method: "POST",
+      body: JSON.stringify({ csv }),
+    }),
 };
+
+export interface PlanDefinition {
+  plan: "TRIAL" | "BASIC" | "PRO";
+  title: string;
+  maxComputers: number;
+  pricePerComputer: number;
+  multiClub: boolean;
+}
+
+export interface SubscriptionInfo {
+  subscription: {
+    plan: "TRIAL" | "BASIC" | "PRO";
+    status: "TRIALING" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELED";
+    maxComputers: number;
+    pricePerComputer: number;
+    trialEndsAt: string | null;
+    currentPeriodEnd: string | null;
+    graceEndsAt: string | null;
+  };
+  access: {
+    level: "FULL" | "WARNING" | "READ_ONLY";
+    message: string | null;
+    daysLeft: number | null;
+  };
+  plans: PlanDefinition[];
+}
+
+export interface Invoice {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  computers: number;
+  amount: number;
+  status: "ISSUED" | "PAID" | "OVERDUE" | "VOID";
+  dueAt: string;
+  paidAt: string | null;
+}
+
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  problems: Array<{ line: number; reason: string }>;
+}
+
+export interface SignupBody {
+  clubName: string;
+  city?: string;
+  ownerName: string;
+  email: string;
+  password: string;
+  computers?: number;
+  pricePerMinute?: number;
+}
 
 function periodQuery(period: { from?: string; to?: string }): string {
   const params = new URLSearchParams();

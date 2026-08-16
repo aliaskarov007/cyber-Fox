@@ -2,7 +2,13 @@ import { type FormEvent, useState } from "react";
 
 import { api, setToken } from "./api.js";
 
-export function LoginScreen({ onDone }: { onDone: () => void }) {
+export function LoginScreen({
+  onDone,
+  onSignup,
+}: {
+  onDone: () => void;
+  onSignup: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +62,10 @@ export function LoginScreen({ onDone }: { onDone: () => void }) {
 
         <button className="primary" type="submit" disabled={busy}>
           {busy ? "Проверяем…" : "Войти"}
+        </button>
+
+        <button type="button" className="link-back" onClick={onSignup}>
+          Подключить свой клуб — две недели бесплатно
         </button>
       </form>
     </div>
