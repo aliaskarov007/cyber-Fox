@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
+import { BarScreen } from "./BarScreen.js";
+import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
+import { ShiftBar } from "./ShiftBar.js";
 import { TariffsScreen } from "./TariffsScreen.js";
 
-type Tab = "hall" | "tariffs";
+type Tab = "hall" | "bar" | "guests" | "tariffs";
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "hall", label: "Зал" },
+  { id: "bar", label: "Бар" },
+  { id: "guests", label: "Гости" },
+  { id: "tariffs", label: "Тарифы" },
+];
 
 export function App() {
   const [staff, setStaff] = useState<Staff | null>(null);
@@ -67,15 +77,20 @@ export function App() {
         )}
 
         <nav className="link-tabs">
-          <button aria-current={tab === "hall"} onClick={() => setTab("hall")}>
-            Зал
-          </button>
-          <button aria-current={tab === "tariffs"} onClick={() => setTab("tariffs")}>
-            Тарифы
-          </button>
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              aria-current={tab === item.id}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         <span className="spacer" />
+
+        {club && <ShiftBar club={club} />}
 
         <span className="who">
           {staff.fullName}
@@ -98,6 +113,10 @@ export function App() {
         </main>
       ) : tab === "hall" ? (
         <HallScreen club={club} />
+      ) : tab === "bar" ? (
+        <BarScreen club={club} />
+      ) : tab === "guests" ? (
+        <GuestsScreen club={club} />
       ) : (
         <TariffsScreen club={club} />
       )}

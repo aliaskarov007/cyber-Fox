@@ -50,6 +50,79 @@ export interface Guest {
   hasPin: boolean;
 }
 
+export interface Product {
+  id: string;
+  name: string;
+  category: string | null;
+  price: number;
+  cost: number;
+  stock: number | null;
+  isActive: boolean;
+}
+
+export interface Shift {
+  id: string;
+  staffId: string;
+  openedAt: string;
+  closedAt: string | null;
+  openingFloat: number;
+  cashExpected: number | null;
+  cashCounted: number | null;
+  note: string | null;
+}
+
+export interface ShiftReport {
+  shift: Shift;
+  staffName: string;
+  cashExpected: number;
+  cardTotal: number;
+  balanceTotal: number;
+  revenue: number;
+  sessionsRevenue: number;
+  productsRevenue: number;
+  productsCost: number;
+  topUpsTotal: number;
+  sessionsCount: number;
+  reconciliation: {
+    expected: number;
+    counted: number;
+    difference: number;
+    status: "MATCH" | "SHORTAGE" | "SURPLUS";
+  } | null;
+}
+
+export interface GuestHistory {
+  sessions: Array<{
+    id: string;
+    computerName: string;
+    zoneName: string;
+    startedAt: string;
+    endedAt: string | null;
+    totalCharged: number;
+    startedBy: "GUEST" | "STAFF";
+  }>;
+  transactions: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    comment: string | null;
+    createdAt: string;
+    /** Сколько поминутных списаний схлопнуто в строку визита. */
+    minutes: number | null;
+  }>;
+  packages: Array<{
+    id: string;
+    zoneName: string;
+    minutesTotal: number;
+    minutesRemaining: number;
+    pricePaid: number;
+    purchasedAt: string;
+    expiresAt: string;
+    status: string;
+  }>;
+}
+
 export interface GuestPackage {
   id: string;
   zoneId: string;
@@ -176,7 +249,41 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ computerId }),
     }),
+
+  guestHistory: (clubId: string, guestId: string) =>
+    request<GuestHistory>(`/clubs/${clubId}/guests/${guestId}/history`),
+
+  products: (clubId: string) => request<Product[]>(`/clubs/${clubId}/products`),
+
+  sellProduct: (
+    clubId: string,
+    body: { productId: string; quantity: number; method: string; guestId?: string; sessionId?: string },
+  ) => request<unknown>(`/clubs/${clubId}/products/sell`, { method: "POST", body: JSON.stringify(body) }),
+
+  currentShift: (clubId: string) => request<Shift | null>(`/clubs/${clubId}/shifts/current`),
+
+  shifts: (clubId: string) => request<Shift[]>(`/clubs/${clubId}/shifts`),
+
+  openShift: (clubId: string, openingFloat: number) =>
+    request<Shift>(`/clubs/${clubId}/shifts/open`, {
+      method: "POST",
+      body: JSON.stringify({ openingFloat }),
+    }),
+
+  shiftReport: (clubId: string, shiftId: string) =>
+    request<ShiftReport>(`/clubs/${clubId}/shifts/${shiftId}/report`),
+
+  closeShift: (clubId: string, shiftId: string, cashCounted: number, note?: string) =>
+    request<ShiftReport>(`/clubs/${clubId}/shifts/${shiftId}/close`, {
+      method: "POST",
+      body: JSON.stringify({ cashCounted, note }),
+    }),
 };
+
+/** Тенге, введённые на стойке → тиын для сервера. */
+export function toTiyn(tenge: string): number {
+  return Math.round(Number(tenge.replace(",", ".")) * 100);
+}
 
 /** Тиын → строка в тенге. Все суммы приходят целыми в тиын. */
 export function formatMoney(tiyn: number): string {

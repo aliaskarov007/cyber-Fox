@@ -39,6 +39,72 @@ export interface GuestWithBalance {
   packages: GuestPackage[];
 }
 
+/** Строка истории счёта: либо одна операция, либо визит целиком. */
+export interface HistoryEntry {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  comment: string | null;
+  createdAt: Date;
+  /** Сколько поминутных списаний схлопнуто в эту строку. */
+  minutes: number | null;
+}
+
+/**
+ * Схлопывает поминутные списания в один визит.
+ *
+ * Час игры — это шестьдесят одинаковых строк «Игра −5 ₸»: на стойке по такой
+ * истории ничего не разобрать. Гостю и администратору нужен визит целиком,
+ * а поминутная детализация остаётся в отрезках сессии.
+ */
+export function groupSessionCharges(
+  transactions: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    comment: string | null;
+    createdAt: Date;
+    sessionId: string | null;
+  }>,
+  sessions: Array<{ id: string; computer: { name: string } }>,
+): HistoryEntry[] {
+  const computerBySession = new Map(sessions.map((s) => [s.id, s.computer.name]));
+  const grouped = new Map<string, HistoryEntry>();
+  const entries: HistoryEntry[] = [];
+
+  for (const t of transactions) {
+    if (t.type !== "SESSION_CHARGE" || !t.sessionId) {
+      entries.push({ ...t, minutes: null });
+      continue;
+    }
+
+    const existing = grouped.get(t.sessionId);
+    if (existing) {
+      existing.amount += t.amount;
+      existing.minutes = (existing.minutes ?? 0) + 1;
+      // Список идёт от новых к старым, поэтому баланс визита — самый ранний.
+      existing.balanceAfter = t.balanceAfter;
+      continue;
+    }
+
+    const entry: HistoryEntry = {
+      id: `session:${t.sessionId}`,
+      type: t.type,
+      amount: t.amount,
+      balanceAfter: t.balanceAfter,
+      comment: computerBySession.get(t.sessionId) ?? null,
+      createdAt: t.createdAt,
+      minutes: 1,
+    };
+    grouped.set(t.sessionId, entry);
+    entries.push(entry);
+  }
+
+  return entries;
+}
+
 export function toPublicGuest(guest: Guest): PublicGuest {
   return {
     id: guest.id,
@@ -160,7 +226,9 @@ export class GuestsService {
       this.prisma.transaction.findMany({
         where: { walletId: wallet.id },
         orderBy: { createdAt: "desc" },
-        take: 30,
+        // Берём с запасом: поминутные списания схлопываются в один визит,
+        // поэтому строк на выходе будет заметно меньше.
+        take: 400,
       }),
       this.prisma.guestPackage.findMany({
         where: { guestId: guest.id },
@@ -180,7 +248,7 @@ export class GuestsService {
         totalCharged: s.totalCharged,
         startedBy: s.startedBy,
       })),
-      transactions,
+      transactions: groupSessionCharges(transactions, sessions),
       packages: packages.map((p) => ({
         id: p.id,
         zoneName: p.zone.name,

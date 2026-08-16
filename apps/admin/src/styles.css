@@ -171,6 +171,31 @@ label {
   line-height: 1.4;
 }
 
+/* Состояние смены — в шапке: без открытой смены платежи не привяжутся к кассе. */
+.shift-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 7px 12px;
+}
+
+.shift-chip b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.shift-chip.open {
+  border-color: #1d4a40;
+  color: #5fd6b6;
+}
+
+.shift-chip.closed {
+  border-color: #5a4718;
+  color: #f0c04d;
+}
+
 .link-tabs {
   display: flex;
   gap: 4px;
