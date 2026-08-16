@@ -1,6 +1,9 @@
 import { BrowserWindow, app, globalShortcut, ipcMain } from "electron";
 import { join } from "node:path";
 
+import { type AgentSettings, isConfigured } from "../shared/settings.js";
+import { readSettings, writeSettings } from "./config.js";
+
 /**
  * Агент на игровом ПК.
  *
@@ -10,12 +13,11 @@ import { join } from "node:path";
  * которых достаточно для обкатки в собственном зале.
  */
 
-const SERVER_URL = process.env.CYBERFOX_SERVER ?? "http://localhost:3000";
-const PAIRING_TOKEN = process.env.CYBERFOX_PAIRING_TOKEN ?? "";
-
 let lockWindow: BrowserWindow | null = null;
 /** Экран разблокирован сервером: окно можно закрыть и отдать машину гостю. */
 let unlocked = false;
+/** Пользователь закрывает агента осознанно — только при выходе из системы. */
+let quitting = false;
 
 function createLockWindow(): void {
   lockWindow = new BrowserWindow({
@@ -36,6 +38,13 @@ function createLockWindow(): void {
   lockWindow.setAlwaysOnTop(true, "screen-saver");
   lockWindow.setVisibleOnAllWorkspaces(true);
 
+  // Выключение и перезагрузку Windows агент не держит: смена не должна
+  // заканчиваться спором с машиной, которая отказывается выключаться.
+  lockWindow.on("session-end", () => {
+    quitting = true;
+    app.quit();
+  });
+
   // Пока сессия не начата, окно возвращает себе фокус: свернуть блокировку
   // и сесть играть бесплатно не должно получаться.
   lockWindow.on("blur", () => {
@@ -50,7 +59,21 @@ function createLockWindow(): void {
   else void lockWindow.loadFile(join(__dirname, "../renderer/index.html"));
 }
 
+/*
+ * Второй экземпляр агента — это две блокировки, спорящие за фокус, и два
+ * отчёта об одних и тех же минутах. Оставляем работать первый.
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
 app.whenReady().then(() => {
+  // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
+  // и никто не станет запускать блокировку вручную на каждой из сорока.
+  if (app.isPackaged) {
+    app.setLoginItemSettings({ openAtLogin: true, args: [] });
+  }
+
   createLockWindow();
 
   // Сочетания, которыми чаще всего пробуют выйти из киоска.
@@ -60,11 +83,24 @@ app.whenReady().then(() => {
     });
   }
 
-  ipcMain.handle("agent:config", () => ({
-    serverUrl: SERVER_URL,
-    pairingToken: PAIRING_TOKEN,
-    hostname: process.env.COMPUTERNAME ?? process.env.HOSTNAME ?? "unknown",
-  }));
+  ipcMain.handle("agent:config", () => {
+    const settings = readSettings();
+    return {
+      ...settings,
+      hostname: process.env.COMPUTERNAME ?? process.env.HOSTNAME ?? "unknown",
+      configured: isConfigured(settings),
+    };
+  });
+
+  /*
+   * Настройку машины делает администратор при установке. Перезагружаем окно
+   * вместо переподключения сокета: заново пройти весь путь запуска надёжнее,
+   * чем чинить состояние экрана после смены сервера.
+   */
+  ipcMain.handle("agent:save-config", (_event, settings: AgentSettings) => {
+    writeSettings(settings);
+    lockWindow?.reload();
+  });
 
   /*
    * Обе команды идемпотентны: старт сессии приходит и событием, и первым тиком,
@@ -92,6 +128,16 @@ app.whenReady().then(() => {
   });
 });
 
+/*
+ * Пока экран заблокирован, выйти из агента нельзя: Alt+F4 по окну и «Закрыть»
+ * из панели задач не должны отдавать машину бесплатно. Это не защита от
+ * диспетчера задач — тот закрывает процесс мимо Electron, и разбирается с ним
+ * служба-сторож (см. docs/deploy.md).
+ */
+app.on("before-quit", (event) => {
+  if (!unlocked && !quitting) event.preventDefault();
+});
+
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
@@ -100,3 +146,4 @@ app.on("will-quit", () => {
 app.on("window-all-closed", () => {
   if (!unlocked) createLockWindow();
 });
+

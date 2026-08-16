@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AgentClient, type PairedInfo, type Tick } from "./agent-client.js";
+import type { AgentSettings } from "../shared/settings.js";
+import { AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
 import { LockScreen } from "./LockScreen.js";
 import { SessionOverlay } from "./SessionOverlay.js";
+import { SetupScreen } from "./SetupScreen.js";
 import {
   type JournalState,
   acknowledge,
@@ -21,6 +23,9 @@ const monotonic = (): number => performance.now();
 
 export function App() {
   const client = useMemo(() => new AgentClient(), []);
+  const [config, setConfig] = useState<AgentConfig | null>(null);
+  /** Сервер отказал в привязке: показываем настройку с причиной. */
+  const [rejection, setRejection] = useState<string | null>(null);
   const [paired, setPaired] = useState<PairedInfo | null>(null);
   const [tick, setTick] = useState<Tick | null>(null);
   const [online, setOnline] = useState(false);
@@ -51,8 +56,20 @@ export function App() {
   }, [client]);
 
   useEffect(() => {
+    void window.cyberfox.config().then(setConfig);
+  }, []);
+
+  useEffect(() => {
+    // Ненастроенная машина никуда не подключается: без кода привязки сервер
+    // всё равно не знает, что это за ПК.
+    if (!config?.configured) return;
+
     void client.connect({
-      onPaired: setPaired,
+      onPaired: (info) => {
+        setRejection(null);
+        setPaired(info);
+      },
+      onRejected: setRejection,
       onTick: (next) => {
         setTick(next);
         setLocalMinutes(null);
@@ -98,7 +115,7 @@ export function App() {
         if (isOnline) void flush();
       },
     });
-  }, [client, flush]);
+  }, [client, flush, config]);
 
   /*
    * Локальный таймер на время обрыва. Оплаченная сессия доигрывается без
@@ -133,6 +150,28 @@ export function App() {
           minutesAffordable: tick.packageMinutesLeft === null ? localMinutes : tick.minutesAffordable,
         }
       : tick;
+
+  if (!config) return <div className="screen" />;
+
+  /*
+   * Настройка показывается и при первом запуске, и когда сервер отказал в
+   * привязке: в обоих случаях админу нужно то же самое поле для кода. Гость
+   * этот экран не увидит — машина настраивается до того, как её отдают в зал.
+   */
+  if (!config.configured || rejection) {
+    const save = (settings: AgentSettings): void => {
+      // Окно перезагрузит основной процесс — состояние здесь чинить не нужно.
+      void window.cyberfox.saveConfig(settings);
+    };
+    return (
+      <SetupScreen
+        initial={{ serverUrl: config.serverUrl, pairingToken: config.pairingToken }}
+        hostname={config.hostname}
+        error={rejection}
+        onSave={save}
+      />
+    );
+  }
 
   return (
     <div className="screen">

@@ -2,11 +2,13 @@ import { type Socket, io } from "socket.io-client";
 
 import type { OfflineOperation } from "./offline-journal.js";
 
+import type { AgentSettings } from "../shared/settings.js";
+
 /** Настройки приходят из основного процесса: экран их не хранит. */
-export interface AgentConfig {
-  serverUrl: string;
-  pairingToken: string;
+export interface AgentConfig extends AgentSettings {
   hostname: string;
+  /** Машину уже настроили: есть и адрес сервера, и код привязки. */
+  configured: boolean;
 }
 
 export interface PairedInfo {
@@ -39,6 +41,7 @@ declare global {
   interface Window {
     cyberfox: {
       config: () => Promise<AgentConfig>;
+      saveConfig: (settings: AgentSettings) => Promise<void>;
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
     };
@@ -65,6 +68,8 @@ export class AgentClient {
       minutesLeft: number | null;
     }) => void;
     onConnectionChange: (online: boolean) => void;
+    /** Сервер не принял машину — например, код привязки набран с ошибкой. */
+    onRejected: (reason: string) => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
 
@@ -76,6 +81,14 @@ export class AgentClient {
 
     this.socket.on("connect", () => handlers.onConnectionChange(true));
     this.socket.on("disconnect", () => handlers.onConnectionChange(false));
+    /*
+     * Отказ приходит до разрыва соединения. Без него агент молча переподключался
+     * бы по кругу, а администратор смотрел бы на «подключаемся к серверу» и не
+     * знал, что ошибся в коде.
+     */
+    this.socket.on("pair.rejected", (event: { reason: string }) =>
+      handlers.onRejected(event.reason),
+    );
     this.socket.on("paired", handlers.onPaired);
     this.socket.on("session.tick", handlers.onTick);
     this.socket.on("session.started", handlers.onStarted);

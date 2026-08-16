@@ -79,7 +79,17 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
 
     try {
       if (pairingToken) {
-        const computer = await this.agents.pair(pairingToken, hostname ?? "unknown");
+        /*
+         * Ошибку привязки объясняем агенту до разрыва соединения. Молчаливый
+         * disconnect выглядит на игровом ПК как «сервер недоступен», и админ
+         * при установке ищет проблему в сети, а не в опечатке в коде.
+         */
+        const computer = await this.agents
+          .pair(pairingToken, hostname ?? "unknown")
+          .catch((error: Error) => {
+            client.emit("pair.rejected", { reason: error.message });
+            throw error;
+          });
         client.data.computerId = computer.id;
         client.data.clubId = computer.clubId;
         await client.join(agentRoom(computer.id));

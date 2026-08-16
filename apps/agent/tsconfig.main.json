@@ -4,12 +4,17 @@
     "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "outDir": "dist/main",
-    "rootDir": "src/main",
+    "outDir": "dist",
+    // Общие с экраном правила настроек лежат в src/shared, поэтому корень —
+    // весь src: иначе tsc откажется класть их рядом со сборкой основного
+    // процесса. Раскладка dist/main/main.js при этом не меняется.
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/main"]
+  "include": ["src/main", "src/shared"],
+  // Тесты правил живут рядом с правилами, но в сборку агента не идут.
+  "exclude": ["**/*.spec.ts"]
 }

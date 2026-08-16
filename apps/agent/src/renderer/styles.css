@@ -249,3 +249,33 @@ button:disabled {
     transition: none !important;
   }
 }
+
+/*
+ * Экран настройки машины. Его видит администратор при установке, а не гость,
+ * поэтому здесь обычный размер шрифта и поля, выровненные по левому краю:
+ * адрес сервера и код привязки читают вблизи и вводят с клавиатуры.
+ */
+.setup {
+  width: min(520px, 92vw);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+}
+
+.setup .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.setup .hint b {
+  color: var(--ink);
+  font-family: var(--mono);
+}
+
+.setup input {
+  text-align: left;
+  letter-spacing: normal;
+  font-size: 17px;
+}
