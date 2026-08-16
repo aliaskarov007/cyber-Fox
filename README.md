@@ -11,6 +11,7 @@
 | [docs/billing.md](docs/billing.md) | Зоны, пакеты, долг, кошельки сети, техника списания |
 | [docs/guest-access.md](docs/guest-access.md) | Два пути входа гостя и разрешение конфликтов |
 | [docs/offline.md](docs/offline.md) | Работа без интернета, аварийный режим, синхронизация |
+| [docs/deploy.md](docs/deploy.md) | Пилот в зале: установка, проверки первой смены, чего ещё нет |
 
 ## Состав
 
@@ -80,11 +81,23 @@ CYBERFOX_PAIRING_TOKEN=<код из админки> pnpm dev:agent
 - гость: `+77010000001`, PIN `1234`, баланс 2000 ₸
 - коды привязки машин: `seed-pair-std-1`…`seed-pair-std-40`, `seed-pair-vip-1`…`seed-pair-vip-10`
 
+## Установка в клуб
+
+Всё вместе — база, сервер, кассовый экран за HTTPS и ежедневный бэкап:
+
+```bash
+cp deploy/env.example .env      # домен, пароль базы, JWT_SECRET
+docker compose up -d
+```
+
+Порядок первого дня в зале, проверки первой смены и честный список того, чего
+ещё нет для чужого клуба — в [docs/deploy.md](docs/deploy.md).
+
 ## Проверки
 
 ```bash
 pnpm -r typecheck
-pnpm --filter @cyberfox/server exec vitest run
+pnpm exec vitest run
 ```
 
 Расчёт денег вынесен в чистые функции (`apps/server/src/billing/billing.rules.ts`) и покрыт тестами
