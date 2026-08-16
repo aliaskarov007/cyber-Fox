@@ -19,18 +19,25 @@ async function main(): Promise<void> {
     },
   });
 
+  // Настройки клуба обновляются при повторном сиде: иначе правка лимитов
+  // в этом файле не доезжает до уже созданной базы и молча игнорируется.
+  const clubSettings = {
+    creditLimit: kzt(100),
+    packageValidityDays: 30,
+    lowBalanceWarnMinutes: 10,
+    bonusPercent: 5,
+  };
+
   const club = await prisma.club.upsert({
     where: { id: "seed-club" },
-    update: {},
+    update: clubSettings,
     create: {
       id: "seed-club",
       tenantId: tenant.id,
       name: "Cyber-Fox Центральный",
       city: "Алматы",
       timezone: "Asia/Almaty",
-      creditLimit: kzt(100),
-      packageValidityDays: 30,
-      lowBalanceWarnMinutes: 10,
+      ...clubSettings,
     },
   });
 
@@ -46,37 +53,41 @@ async function main(): Promise<void> {
     create: { clubId: club.id, name: "VIP", sortOrder: 2 },
   });
 
-  const standardMinute = await prisma.tariff.create({
-    data: {
-      clubId: club.id,
-      zoneId: standard.id,
-      name: "Стандарт поминутно",
-      kind: TariffKind.PER_MINUTE,
-      pricePerMinute: kzt(10),
-    },
+  /** Поля тарифа, которые задаёт сид. */
+  interface TariffSeed {
+    kind: TariffKind;
+    pricePerMinute?: number;
+    packageMinutes?: number;
+    packagePrice?: number;
+    fallbackTariffId?: string;
+    activeFromMinute?: number;
+    activeToMinute?: number;
+  }
+
+  /** Тарифы заводятся через upsert: повторный сид не должен плодить дубли. */
+  const upsertTariff = (zoneId: string, name: string, data: TariffSeed) =>
+    prisma.tariff.upsert({
+      where: { clubId_zoneId_name: { clubId: club.id, zoneId, name } },
+      update: data,
+      create: { clubId: club.id, zoneId, name, ...data },
+    });
+
+  const standardMinute = await upsertTariff(standard.id, "Стандарт поминутно", {
+    kind: TariffKind.PER_MINUTE,
+    pricePerMinute: kzt(10),
   });
 
-  const standardNight = await prisma.tariff.create({
-    data: {
-      clubId: club.id,
-      zoneId: standard.id,
-      name: "Стандарт ночь",
-      kind: TariffKind.PER_MINUTE,
-      pricePerMinute: kzt(5),
-      // Ночное окно перебивает круглосуточный тариф с 22:00 до 08:00.
-      activeFromMinute: 22 * 60,
-      activeToMinute: 8 * 60,
-    },
+  const standardNight = await upsertTariff(standard.id, "Стандарт ночь", {
+    kind: TariffKind.PER_MINUTE,
+    pricePerMinute: kzt(5),
+    // Ночное окно перебивает круглосуточный тариф с 22:00 до 08:00.
+    activeFromMinute: 22 * 60,
+    activeToMinute: 8 * 60,
   });
 
-  const vipMinute = await prisma.tariff.create({
-    data: {
-      clubId: club.id,
-      zoneId: vip.id,
-      name: "VIP поминутно",
-      kind: TariffKind.PER_MINUTE,
-      pricePerMinute: kzt(20),
-    },
+  const vipMinute = await upsertTariff(vip.id, "VIP поминутно", {
+    kind: TariffKind.PER_MINUTE,
+    pricePerMinute: kzt(20),
   });
 
   await prisma.zone.update({
@@ -88,28 +99,18 @@ async function main(): Promise<void> {
     data: { defaultPerMinuteTariffId: vipMinute.id },
   });
 
-  await prisma.tariff.create({
-    data: {
-      clubId: club.id,
-      zoneId: standard.id,
-      name: "Пакет 3 часа Стандарт",
-      kind: TariffKind.PACKAGE,
-      packageMinutes: 180,
-      packagePrice: kzt(1500),
-      fallbackTariffId: standardMinute.id,
-    },
+  await upsertTariff(standard.id, "Пакет 3 часа Стандарт", {
+    kind: TariffKind.PACKAGE,
+    packageMinutes: 180,
+    packagePrice: kzt(1500),
+    fallbackTariffId: standardMinute.id,
   });
 
-  await prisma.tariff.create({
-    data: {
-      clubId: club.id,
-      zoneId: vip.id,
-      name: "Пакет 5 часов VIP",
-      kind: TariffKind.PACKAGE,
-      packageMinutes: 300,
-      packagePrice: kzt(5000),
-      fallbackTariffId: vipMinute.id,
-    },
+  await upsertTariff(vip.id, "Пакет 5 часов VIP", {
+    kind: TariffKind.PACKAGE,
+    packageMinutes: 300,
+    packagePrice: kzt(5000),
+    fallbackTariffId: vipMinute.id,
   });
 
   // Зал: 40 машин Стандарт и 10 VIP — типичный размер по итогам обсуждения.
@@ -137,6 +138,23 @@ async function main(): Promise<void> {
         name,
         pairingToken: `seed-pair-vip-${i}`,
       },
+    });
+  }
+
+  // Бар: цена и себестоимость нужны, чтобы в отчёте по смене была маржа.
+  const products = [
+    { name: "Кола 0.5", category: "Напитки", price: kzt(600), cost: kzt(320), stock: 48 },
+    { name: "Энергетик", category: "Напитки", price: kzt(900), cost: kzt(520), stock: 36 },
+    { name: "Кофе", category: "Напитки", price: kzt(500), cost: kzt(150), stock: null },
+    { name: "Чипсы", category: "Снеки", price: kzt(700), cost: kzt(400), stock: 24 },
+    { name: "Шоколад", category: "Снеки", price: kzt(450), cost: kzt(260), stock: 30 },
+    { name: "Лапша", category: "Еда", price: kzt(800), cost: kzt(420), stock: 20 },
+  ];
+  for (const product of products) {
+    await prisma.product.upsert({
+      where: { clubId_name: { clubId: club.id, name: product.name } },
+      update: {},
+      create: { clubId: club.id, ...product },
     });
   }
 
@@ -191,6 +209,7 @@ async function main(): Promise<void> {
   console.log("  Вход: owner@cyberfox.kz / admin@cyberfox.kz, пароль cyberfox123");
   console.log("  Гость: +77010000001, PIN 1234, баланс 2000 ₸");
   console.log(`  Ночной тариф: ${standardNight.name}`);
+  console.log(`  Товаров в баре: ${products.length}, бонусы ${club.bonusPercent}%`);
 }
 
 main()

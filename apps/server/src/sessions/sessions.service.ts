@@ -28,6 +28,7 @@ import { toLocalMoment } from "../common/local-time.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RealtimeBus } from "../realtime/realtime.bus.js";
+import { bonusFor } from "../shifts/shift.rules.js";
 import type { MoveSessionDto, StartSessionDto } from "./sessions.dto.js";
 
 const MINUTE_MS = 60_000;
@@ -337,6 +338,7 @@ export class SessionsService {
       }
 
       case "PAID_MINUTE": {
+        const bonus = bonusFor(decision.amount, session.club.bonusPercent);
         await this.prisma.$transaction(async (tx) => {
           const walletRecord = await this.wallets.resolveWallet(session.guestId!, session.clubId, tx);
           // Расход записывается в клуб, где шла сессия, — это его выручка,
@@ -363,6 +365,15 @@ export class SessionsService {
               nextChargeAt: new Date(chargeAt.getTime() + MINUTE_MS),
             },
           });
+
+          // Бонусы копятся с потраченного, поминутно вместе со списанием:
+          // так гость видит их рост в ту же секунду, что и расход.
+          if (bonus > 0) {
+            await tx.guest.update({
+              where: { id: session.guestId! },
+              data: { bonusPoints: { increment: bonus } },
+            });
+          }
         });
         await this.publishTick(session.id);
         return false;

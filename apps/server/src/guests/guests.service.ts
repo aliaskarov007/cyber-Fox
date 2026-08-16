@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { bonusFor } from "../shifts/shift.rules.js";
 import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
 import { WalletService } from "./wallet.service.js";
 
@@ -137,6 +138,62 @@ export class GuestsService {
     };
   }
 
+  /**
+   * История гостя: визиты, движения по кошельку и купленные пакеты.
+   * Первое, что спрашивают на стойке при разборе спорной суммы.
+   */
+  async history(staff: AuthenticatedStaff, clubId: string, guestId: string) {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+    const wallet = await this.wallets.resolveWallet(guest.id, clubId);
+
+    const [sessions, transactions, packages] = await Promise.all([
+      this.prisma.session.findMany({
+        where: { guestId: guest.id },
+        orderBy: { startedAt: "desc" },
+        take: 20,
+        include: {
+          computer: { select: { name: true } },
+          zone: { select: { name: true } },
+        },
+      }),
+      this.prisma.transaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      }),
+      this.prisma.guestPackage.findMany({
+        where: { guestId: guest.id },
+        orderBy: { purchasedAt: "desc" },
+        take: 20,
+        include: { zone: { select: { name: true } } },
+      }),
+    ]);
+
+    return {
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        computerName: s.computer.name,
+        zoneName: s.zone.name,
+        startedAt: s.startedAt,
+        endedAt: s.endedAt,
+        totalCharged: s.totalCharged,
+        startedBy: s.startedBy,
+      })),
+      transactions,
+      packages: packages.map((p) => ({
+        id: p.id,
+        zoneName: p.zone.name,
+        minutesTotal: p.minutesTotal,
+        minutesRemaining: p.minutesRemaining,
+        pricePaid: p.pricePaid,
+        purchasedAt: p.purchasedAt,
+        expiresAt: p.expiresAt,
+        status: p.status,
+      })),
+    };
+  }
+
   async topUp(
     staff: AuthenticatedStaff,
     clubId: string,
@@ -226,6 +283,16 @@ export class GuestsService {
             method: dto.method as PaymentMethod,
             shiftId: await this.currentShiftId(tx, clubId),
           },
+        });
+      }
+
+      // Бонусы за покупку пакета — то же правило, что и для поминутной игры:
+      // процент от реально потраченного.
+      const bonus = bonusFor(price, club.bonusPercent);
+      if (bonus > 0) {
+        await tx.guest.update({
+          where: { id: guest.id },
+          data: { bonusPoints: { increment: bonus } },
         });
       }
 

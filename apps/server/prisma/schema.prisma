@@ -47,6 +47,8 @@ model Club {
   packageValidityDays Int @default(30)
   /// За сколько минут до конца пакета предупреждать гостя.
   lowBalanceWarnMinutes Int @default(10)
+  /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
+  bonusPercent Int @default(0)
 
   zones     Zone[]
   computers Computer[]
@@ -57,6 +59,8 @@ model Club {
   payments  Payment[]
   shifts    Shift[]
   staff     Staff[]
+  products  Product[]
+  sales     ProductSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -167,6 +171,8 @@ model Tariff {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Два одинаковых названия в одной зоне админ на стойке не различит.
+  @@unique([clubId, zoneId, name])
   @@index([clubId])
   @@index([zoneId])
 }
@@ -193,6 +199,7 @@ model Guest {
   packages GuestPackage[]
   sessions Session[]
   payments Payment[]
+  sales    ProductSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -305,6 +312,7 @@ model Session {
   segments     SessionSegment[]
   payments     Payment[]
   transactions Transaction[]
+  sales        ProductSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -358,11 +366,73 @@ model SessionSegment {
   @@index([sessionId, startedAt])
 }
 
+/// Товар бара: снеки, напитки. Продаётся с того же экрана, что и время.
+model Product {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  name     String
+  category String?
+  /// Цена продажи и себестоимость, в тиын. Себестоимость нужна для маржи в отчёте.
+  price Int
+  cost  Int    @default(0)
+
+  /// Остаток на складе. Пусто — товар без учёта остатков (например, кофе из зерна).
+  stock Int?
+
+  isActive Boolean @default(true)
+
+  sales ProductSale[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clubId, name])
+  @@index([clubId])
+}
+
+/// Проданная позиция. Цена и себестоимость копируются в момент продажи:
+/// изменение прайса завтра не должно переписывать вчерашнюю выручку.
+model ProductSale {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
+
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id])
+
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  quantity      Int
+  priceAtSale   Int
+  costAtSale    Int
+  total         Int
+  method        PaymentMethod
+
+  createdAt DateTime @default(now())
+
+  @@index([clubId, createdAt])
+  @@index([shiftId])
+  @@index([guestId])
+}
+
 enum PaymentMethod {
   CASH
   CARD
   ONLINE
   BALANCE
+  BONUS
 }
 
 /// Приём денег на стойке. Записывается в клуб, где физически принят платёж.
@@ -401,6 +471,8 @@ enum TransactionType {
   REFUND
   ADJUSTMENT
   DEBT_WRITE_OFF
+  BONUS_ACCRUAL
+  BONUS_SPEND
 }
 
 /// Движение по кошельку гостя. Расход записывается в клуб, где шла сессия,
@@ -457,6 +529,7 @@ model Staff {
 
   shifts   Shift[]
   payments Payment[]
+  sales    ProductSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -475,14 +548,22 @@ model Shift {
   openedAt DateTime  @default(now())
   closedAt DateTime?
 
-  /// Сверка кассы на закрытии смены, в тиын.
+  /// Размен в кассе на начало смены, в тиын. Без него сверка не сходится.
+  openingFloat Int @default(0)
+
+  /// Сверка кассы на закрытии, в тиын. Ожидаемое считается системой,
+  /// пересчитанное вводит сотрудник; разница остаётся в истории как есть.
   cashExpected Int?
   cashCounted  Int?
+  note         String?
 
   payments Payment[]
+  sales    ProductSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Открытая смена в клубе должна быть одна: две кассы одновременно не сверить.
   @@index([clubId, openedAt])
+  @@index([clubId, closedAt])
 }

@@ -36,6 +36,15 @@ export class GuestsController {
     return this.guests.getWithBalance(staff, clubId, guestId);
   }
 
+  @Get(":guestId/history")
+  history(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+  ) {
+    return this.guests.history(staff, clubId, guestId);
+  }
+
   @Post(":guestId/topup")
   topUp(
     @CurrentStaff() staff: AuthenticatedStaff,
