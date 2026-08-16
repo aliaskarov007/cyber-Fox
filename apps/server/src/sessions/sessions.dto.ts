@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Matches } from "class-validator";
+import { IsInt, IsOptional, IsString, Matches, Min } from "class-validator";
 
 export class StartSessionDto {
   @IsString()
@@ -8,6 +8,15 @@ export class StartSessionDto {
   @IsOptional()
   @IsString()
   guestId?: string;
+
+  /**
+   * Предоплата для анонимной посадки, в тиын. Обязательна, когда гость не указан:
+   * списывать поминутно не с чего, поэтому деньги берутся вперёд на стойке.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  prepaidAmount?: number;
 
   /**
    * Тариф, которым играть. Пусто — система сама возьмёт минуты пакета гостя

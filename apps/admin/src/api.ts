@@ -229,7 +229,10 @@ export const api = {
       body: JSON.stringify({ tariffId, method }),
     }),
 
-  startSession: (clubId: string, body: { computerId: string; guestId?: string; tariffId?: string }) =>
+  startSession: (
+    clubId: string,
+    body: { computerId: string; guestId?: string; tariffId?: string; prepaidAmount?: number },
+  ) =>
     request<{ id: string }>(`/clubs/${clubId}/sessions`, {
       method: "POST",
       body: JSON.stringify(body),

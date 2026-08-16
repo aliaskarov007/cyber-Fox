@@ -309,6 +309,10 @@ model Session {
   /// Сумма по всем отрезкам, в тиын.
   totalCharged Int @default(0)
 
+  /// Остаток предоплаты для анонимной посадки, в тиын.
+  /// У гостя с аккаунтом деньги живут в кошельке, здесь пусто.
+  prepaidRemaining Int?
+
   segments     SessionSegment[]
   payments     Payment[]
   transactions Transaction[]
@@ -327,6 +331,9 @@ model Session {
 enum SegmentEndReason {
   PACKAGE_EXHAUSTED
   CREDIT_LIMIT
+  /// Закончилась предоплата анонимной посадки. Отдельно от CREDIT_LIMIT:
+  /// кредита у гостя без аккаунта нет, и в отчёте это разные события.
+  PREPAID_EXHAUSTED
   ZONE_CHANGE
   TARIFF_SCHEDULE
   STOPPED_BY_STAFF

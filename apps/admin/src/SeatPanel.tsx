@@ -8,6 +8,7 @@ import {
   type Tariff,
   api,
   formatMoney,
+  toTiyn,
 } from "./api.js";
 
 /**
@@ -31,6 +32,8 @@ export function SeatPanel({
   const [card, setCard] = useState<GuestCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Принятая вперёд сумма для посадки без аккаунта, в тенге. */
+  const [prepaid, setPrepaid] = useState("1000");
 
   const zoneId = cell.computer.zone.id;
   const zoneTariffs = tariffs.filter((t) => t.zoneId === zoneId && t.isActive);
@@ -197,20 +200,42 @@ export function SeatPanel({
           </button>
         ))}
 
-        {/* Анонимная посадка: без кредита и без остатков пакета — только предоплата. */}
-        <button
-          disabled={busy || perMinute.length === 0}
-          onClick={() =>
-            void run(() =>
-              api.startSession(club.id, {
-                computerId: cell.computer.id,
-                tariffId: perMinute[0]?.id,
-              }),
-            )
-          }
-        >
-          Без аккаунта, по предоплате
-        </button>
+        {/*
+          Анонимная посадка: без кредита и без остатков пакета. Деньги берутся
+          вперёд — списывать поминутно у гостя без аккаунта не с чего.
+        */}
+        <div className="section" style={{ borderTop: "none", paddingTop: 0 }}>
+          <h3>Без аккаунта</h3>
+          <div className="actions">
+            <input
+              style={{ width: 120 }}
+              inputMode="decimal"
+              value={prepaid}
+              onChange={(e) => setPrepaid(e.target.value)}
+              aria-label="Принятая сумма в тенге"
+            />
+            <button
+              disabled={busy || perMinute.length === 0 || prepaid.trim() === ""}
+              onClick={() =>
+                void run(() =>
+                  api.startSession(club.id, {
+                    computerId: cell.computer.id,
+                    tariffId: perMinute[0]?.id,
+                    prepaidAmount: toTiyn(prepaid),
+                  }),
+                )
+              }
+            >
+              Принять и посадить
+            </button>
+          </div>
+          {perMinute[0]?.pricePerMinute ? (
+            <div className="note">
+              Хватит примерно на {Math.floor(toTiyn(prepaid || "0") / perMinute[0].pricePerMinute)}{" "}
+              мин по тарифу {formatMoney(perMinute[0].pricePerMinute)}/мин.
+            </div>
+          ) : null}
+        </div>
       </div>
     </>
   );

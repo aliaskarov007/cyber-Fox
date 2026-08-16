@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   ComputerStatus,
+  PaymentMethod,
   type Prisma,
   type Session,
   SegmentEndReason,
@@ -65,6 +66,7 @@ export class SessionsService {
       guestId: dto.guestId ?? null,
       tariffId: dto.tariffId ?? null,
       startedBy: SessionStartedBy.STAFF,
+      prepaidAmount: dto.prepaidAmount ?? null,
     });
   }
 
@@ -79,6 +81,8 @@ export class SessionsService {
     guestId: string | null;
     tariffId: string | null;
     startedBy: SessionStartedBy;
+    /** Предоплата для анонимной посадки, в тиын. */
+    prepaidAmount?: number | null;
   }): Promise<Session> {
     const club = await this.prisma.club.findUniqueOrThrow({ where: { id: params.clubId } });
     const computer = await this.prisma.computer.findUnique({
@@ -164,19 +168,28 @@ export class SessionsService {
       segmentTariffId = fallback.id;
     }
 
+    // Анонимная посадка идёт строго по предоплате: кошелька, с которого списывать
+    // поминутно, у гостя без аккаунта нет, поэтому деньги берутся вперёд на стойке.
+    if (!params.guestId && segmentKind === TariffKind.PER_MINUTE && !params.prepaidAmount) {
+      throw new BadRequestException(
+        "Анонимная посадка возможна только по предоплате: укажите принятую сумму",
+      );
+    }
+
     // Первая минута оплачивается авансом, как и все последующие: гость не
     // доигрывает неоплаченную минуту (docs/billing.md, раздел 5.4).
     if (segmentKind === TariffKind.PER_MINUTE) {
       const tariff = perMinuteTariffs.find((t) => t.id === segmentTariffId);
+      const price = tariff?.pricePerMinute ?? 0;
       const wallet = params.guestId
         ? await this.walletState(params.guestId, params.clubId, club.creditLimit)
-        : null;
-      const price = tariff?.pricePerMinute ?? 0;
-      if (!wallet || wallet.balance - price < -wallet.creditLimit) {
+        : { balance: params.prepaidAmount ?? 0, creditLimit: 0 };
+
+      if (wallet.balance - price < -wallet.creditLimit) {
         throw new BadRequestException(
           params.guestId
             ? "Недостаточно средств для начала сессии"
-            : "Анонимная посадка возможна только по предоплате",
+            : `Предоплаты не хватает даже на минуту: минута стоит ${price / 100} ₸`,
         );
       }
     }
@@ -190,11 +203,29 @@ export class SessionsService {
           guestId: params.guestId,
           startedBy: params.startedBy,
           status: SessionStatus.ACTIVE,
+          prepaidRemaining: params.guestId ? null : (params.prepaidAmount ?? null),
           // Срок первой минуты — сам момент старта: она оплачивается авансом,
           // как и все последующие (docs/billing.md, раздел 5.4).
           nextChargeAt: new Date(),
         },
       });
+
+      // Принятые вперёд наличные попадают в кассу смены — иначе сверка не сойдётся.
+      if (!params.guestId && params.prepaidAmount) {
+        const shift = await tx.shift.findFirst({
+          where: { clubId: params.clubId, closedAt: null },
+          orderBy: { openedAt: "desc" },
+        });
+        await tx.payment.create({
+          data: {
+            clubId: params.clubId,
+            sessionId: created.id,
+            shiftId: shift?.id ?? null,
+            amount: params.prepaidAmount,
+            method: PaymentMethod.CASH,
+          },
+        });
+      }
 
       await tx.sessionSegment.create({
         data: {
@@ -289,9 +320,13 @@ export class SessionsService {
     const packages = session.guestId
       ? await this.loadPackages(session.guestId, session.clubId, session.zoneId)
       : [];
+    // Для расчёта анонимная посадка — тот же кошелёк, только с предоплаченной
+    // суммой и без права уйти в минус. Правила остаются одни на оба случая.
     const wallet = session.guestId
       ? await this.walletState(session.guestId, session.clubId, session.club.creditLimit)
-      : null;
+      : session.prepaidRemaining !== null
+        ? { balance: session.prepaidRemaining, creditLimit: 0 }
+        : null;
 
     const state: SessionBillingState = {
       zoneId: session.zoneId,
@@ -338,18 +373,33 @@ export class SessionsService {
       }
 
       case "PAID_MINUTE": {
-        const bonus = bonusFor(decision.amount, session.club.bonusPercent);
+        const bonus = session.guestId
+          ? bonusFor(decision.amount, session.club.bonusPercent)
+          : 0;
         await this.prisma.$transaction(async (tx) => {
-          const walletRecord = await this.wallets.resolveWallet(session.guestId!, session.clubId, tx);
-          // Расход записывается в клуб, где шла сессия, — это его выручка,
-          // даже если кошелёк общий и пополняли гостя в соседнем зале.
-          await this.wallets.record(tx, {
-            walletId: walletRecord.id,
-            clubId: session.clubId,
-            amount: -decision.amount,
-            type: TransactionType.SESSION_CHARGE,
-            sessionId: session.id,
-          });
+          if (session.guestId) {
+            const walletRecord = await this.wallets.resolveWallet(
+              session.guestId,
+              session.clubId,
+              tx,
+            );
+            // Расход записывается в клуб, где шла сессия, — это его выручка,
+            // даже если кошелёк общий и пополняли гостя в соседнем зале.
+            await this.wallets.record(tx, {
+              walletId: walletRecord.id,
+              clubId: session.clubId,
+              amount: -decision.amount,
+              type: TransactionType.SESSION_CHARGE,
+              sessionId: session.id,
+            });
+          } else {
+            // Анонимная посадка: минута уходит из предоплаты на самой сессии.
+            // Движения по кошельку нет — деньги уже приняты в кассу при старте.
+            await tx.session.update({
+              where: { id: session.id },
+              data: { prepaidRemaining: { decrement: decision.amount } },
+            });
+          }
           await tx.sessionSegment.update({
             where: { id: segment.id },
             data: {
@@ -422,7 +472,13 @@ export class SessionsService {
       }
 
       case "STOP": {
-        await this.finish(session.id, decision.reason);
+        // У анонимной посадки кредита нет: деньги кончились — значит, кончилась
+        // предоплата. В отчёте это должно читаться именно так.
+        const reason =
+          !session.guestId && decision.reason === SegmentEndReason.CREDIT_LIMIT
+            ? SegmentEndReason.PREPAID_EXHAUSTED
+            : decision.reason;
+        await this.finish(session.id, reason);
         return true;
       }
     }
@@ -688,9 +744,12 @@ export class SessionsService {
           return { computer: this.publicComputer(computer), session: null };
         }
 
+        // У анонимной посадки роль баланса играет остаток предоплаты.
         const wallet = session.guestId
           ? await this.walletState(session.guestId, clubId, club.creditLimit)
-          : null;
+          : session.prepaidRemaining !== null
+            ? { balance: session.prepaidRemaining, creditLimit: 0 }
+            : null;
         const segment = session.segments[0] ?? null;
         const pkg = segment?.guestPackageId
           ? await this.prisma.guestPackage.findUnique({ where: { id: segment.guestPackageId } })
@@ -810,7 +869,9 @@ export class SessionsService {
       : null;
     const wallet = session.guestId
       ? await this.walletState(session.guestId, session.clubId, session.club.creditLimit)
-      : null;
+      : session.prepaidRemaining !== null
+        ? { balance: session.prepaidRemaining, creditLimit: 0 }
+        : null;
     const tariff = segment
       ? await this.prisma.tariff.findUnique({ where: { id: segment.tariffId } })
       : null;
