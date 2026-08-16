@@ -1,5 +1,7 @@
 import { type Socket, io } from "socket.io-client";
 
+import type { OfflineOperation } from "./offline-journal.js";
+
 /** Настройки приходят из основного процесса: экран их не хранит. */
 export interface AgentConfig {
   serverUrl: string;
@@ -98,6 +100,17 @@ export class AgentClient {
 
   callStaff(): Promise<{ ok: boolean }> {
     return this.request("staff.call", {});
+  }
+
+  /** Досылка минут, отыгранных без связи с облаком. */
+  replayOffline(operations: OfflineOperation[]): Promise<{
+    ok: boolean;
+    applied?: number;
+    duplicates?: number;
+    rejected?: number;
+    reason?: string;
+  }> {
+    return this.request("offline.replay", { operations });
   }
 
   private request<T>(event: string, payload: unknown): Promise<T> {

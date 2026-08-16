@@ -15,10 +15,13 @@ import {
 export function LockScreen({
   client,
   perMinutePrice,
+  online,
   onStarted,
 }: {
   client: AgentClient;
   perMinutePrice: number | null;
+  /** Без связи с сервером вход невозможен: проверить PIN и баланс некому. */
+  online: boolean;
   onStarted: () => void;
 }) {
   const [phone, setPhone] = useState("");
@@ -119,6 +122,15 @@ export function LockScreen({
       <h1>Вход в клуб</h1>
 
       {error && <div className="error">{error}</div>}
+
+      {/* Проверить PIN и остаток без сервера нельзя — честно говорим об этом,
+          вместо того чтобы принимать ввод и молча отказывать. */}
+      {!online && (
+        <div className="banner warn">
+          Нет связи с сервером — самостоятельный вход временно недоступен. Подойдите к
+          администратору.
+        </div>
+      )}
 
       <label>
         Номер телефона

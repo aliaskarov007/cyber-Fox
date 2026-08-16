@@ -11,7 +11,10 @@ import {
 import type { Server, Socket } from "socket.io";
 
 import type { JwtPayload } from "../auth/auth.types.js";
+import type { OfflineOperationInput } from "../offline/offline.service.js";
+import { OfflineService } from "../offline/offline.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { SessionsService } from "../sessions/sessions.service.js";
 import { AgentService } from "./agent.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
@@ -32,6 +35,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly agents: AgentService,
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
+    private readonly offline: OfflineService,
+    private readonly sessions: SessionsService,
   ) {}
 
   onModuleInit(): void {
@@ -84,6 +89,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
           zoneName: computer.zone.name,
           clubName: computer.club.name,
         });
+
+        // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние
+        // сразу, иначе он до минуты держит блокировку поверх чужой сессии.
+        const activeSessionId = await this.sessions.activeSessionFor(computer.id);
+        if (activeSessionId) {
+          const snapshot = await this.sessions.sessionSnapshot(activeSessionId);
+          if (snapshot) client.emit("session.tick", snapshot);
+        }
         return;
       }
 
@@ -150,6 +163,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     try {
       await this.agents.stopByGuest(computerId, body.sessionId);
       return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message };
+    }
+  }
+
+  /**
+   * Досылка минут, отыгранных без связи с облаком.
+   *
+   * Приходит сразу после восстановления соединения. Идемпотентна по UUID:
+   * обрыв во время отправки не должен списать минуты дважды.
+   */
+  @SubscribeMessage("offline.replay")
+  async replayOffline(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { operations: OfflineOperationInput[] },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    try {
+      const result = await this.offline.ingest(computerId, body.operations ?? []);
+      return { ok: true, ...result };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };
     }

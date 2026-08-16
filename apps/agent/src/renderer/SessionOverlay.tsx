@@ -9,11 +9,14 @@ export function SessionOverlay({
   client,
   tick,
   warnMinutes,
+  offline,
   onStopped,
 }: {
   client: AgentClient;
   tick: Tick;
   warnMinutes: number;
+  /** Связи с сервером нет: часть действий недоступна. */
+  offline: boolean;
   onStopped: () => void;
 }) {
   const onPackage = tick.packageMinutesLeft !== null;
@@ -59,12 +62,16 @@ export function SessionOverlay({
         </div>
       </div>
 
-      {/* Гость завершает сам — списание останавливается сразу, не дожидаясь стойки. */}
-      <button onClick={() => void client.stopSession(tick.sessionId).then(onStopped)}>
-        Завершить сессию
+      {/* Гость завершает сам — списание останавливается сразу, не дожидаясь стойки.
+          Без связи завершить нельзя: сервер не узнает об этом, и время продолжит идти. */}
+      <button
+        disabled={offline}
+        onClick={() => void client.stopSession(tick.sessionId).then(onStopped)}
+      >
+        {offline ? "Завершение недоступно без связи" : "Завершить сессию"}
       </button>
 
-      <button className="ghost" onClick={() => void client.callStaff()}>
+      <button className="ghost" disabled={offline} onClick={() => void client.callStaff()}>
         Позвать администратора
       </button>
     </div>

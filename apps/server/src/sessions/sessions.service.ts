@@ -853,7 +853,23 @@ export class SessionsService {
     return session;
   }
 
-  private async publishTick(sessionId: string): Promise<void> {
+  /**
+   * Состояние сессии для экрана гостя.
+   *
+   * Нужно не только для регулярных тиков: агент, подключившийся при уже идущей
+   * сессии (перезапуск, обновление Windows), обязан узнать о ней сразу, иначе
+   * до минуты держит экран блокировки поверх оплаченной игры.
+   */
+  async sessionSnapshot(sessionId: string): Promise<{
+    clubId: string;
+    computerId: string;
+    sessionId: string;
+    packageMinutesLeft: number | null;
+    balance: number;
+    minutesAffordable: number | null;
+    creditLeft: number | null;
+    accruedCost: number;
+  } | null> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -861,7 +877,7 @@ export class SessionsService {
         segments: { orderBy: { startedAt: "desc" }, take: 1 },
       },
     });
-    if (!session) return;
+    if (!session) return null;
 
     const segment = session.segments[0] ?? null;
     const pkg = segment?.guestPackageId
@@ -877,7 +893,7 @@ export class SessionsService {
       : null;
     const price = tariff?.pricePerMinute ?? 0;
 
-    this.bus.emit("session.tick", {
+    return {
       clubId: session.clubId,
       computerId: session.computerId,
       sessionId: session.id,
@@ -886,7 +902,21 @@ export class SessionsService {
       minutesAffordable: wallet && price > 0 ? minutesAffordable(wallet, price) : null,
       creditLeft: wallet ? creditLeft(wallet) : null,
       accruedCost: session.totalCharged,
+    };
+  }
+
+  /** Активная сессия машины — для агента, подключившегося посреди игры. */
+  async activeSessionFor(computerId: string): Promise<string | null> {
+    const session = await this.prisma.session.findFirst({
+      where: { computerId, status: SessionStatus.ACTIVE },
+      select: { id: true },
     });
+    return session?.id ?? null;
+  }
+
+  private async publishTick(sessionId: string): Promise<void> {
+    const snapshot = await this.sessionSnapshot(sessionId);
+    if (snapshot) this.bus.emit("session.tick", snapshot);
   }
 }
 

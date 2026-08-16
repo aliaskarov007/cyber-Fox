@@ -117,7 +117,8 @@ model Computer {
   hostname     String?
   lastSeenAt   DateTime?
 
-  sessions Session[]
+  sessions          Session[]
+  offlineOperations OfflineOperation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -313,10 +314,15 @@ model Session {
   /// У гостя с аккаунтом деньги живут в кошельке, здесь пусто.
   prepaidRemaining Int?
 
+  /// До какого момента сверены отчёты агента о работе без связи.
+  /// Без этой отметки повторный отчёт за тот же период вернул бы деньги дважды.
+  offlineReconciledAt DateTime?
+
   segments     SessionSegment[]
   payments     Payment[]
   transactions Transaction[]
   sales        ProductSale[]
+  offlineOps   OfflineOperation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -508,6 +514,43 @@ model Transaction {
 
   @@index([walletId, createdAt])
   @@index([clubId, createdAt])
+  @@index([sessionId])
+}
+
+/**
+ * Операция, выполненная без связи с облаком, и досланная после восстановления.
+ *
+ * UUID генерируется на устройстве и служит ключом идемпотентности: повторная
+ * доставка той же пачки ничего не меняет (docs/offline.md, раздел 5).
+ */
+model OfflineOperation {
+  uuid String @id
+
+  computerId String
+  computer   Computer @relation(fields: [computerId], references: [id], onDelete: Cascade)
+
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id])
+
+  /// Монотонный номер устройства — для восстановления порядка внутри пачки.
+  sequence Int
+  kind     String
+
+  /// Минуты, отыгранные локально и подлежащие списанию на сервере.
+  minutes Int @default(0)
+
+  /// Часы устройства и последнее известное время сервера: сверка подкрутки часов.
+  deviceTime          DateTime
+  lastKnownServerTime DateTime?
+
+  /// Когда сервер применил операцию. Пусто — принята, но не применена.
+  appliedAt DateTime?
+  /// Заполняется, если применить не удалось: расхождение попадает в отчёт.
+  rejectedReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([computerId, sequence])
   @@index([sessionId])
 }
 
