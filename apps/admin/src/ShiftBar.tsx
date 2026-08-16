@@ -13,7 +13,8 @@ export function ShiftBar({ club }: { club: Club }) {
   const [open, setOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    const current = await api.currentShift(club.id);
+    // Смены может не быть — тогда сервер отвечает пустым телом.
+    const current = (await api.currentShift(club.id)) ?? null;
     setShift(current);
     setReport(current ? await api.shiftReport(club.id, current.id) : null);
   }, [club.id]);

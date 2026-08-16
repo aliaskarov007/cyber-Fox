@@ -19,6 +19,8 @@ export interface Club {
   creditLimit: number;
   packageValidityDays: number;
   lowBalanceWarnMinutes: number;
+  /** Процент от потраченного, возвращаемый бонусами. 0 — программа выключена. */
+  bonusPercent: number;
 }
 
 export interface Zone {
@@ -188,7 +190,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(message ?? `Ошибка ${response.status}`);
   }
 
-  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+  // Пустое тело — законный ответ: например, «открытой смены нет» приходит как
+  // null без содержимого. Разбирать его как JSON нельзя.
+  const body = await response.text();
+  return (body.length > 0 ? JSON.parse(body) : undefined) as T;
 }
 
 export const api = {
@@ -281,7 +286,123 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ cashCounted, note }),
     }),
+
+  // --- Сеть клубов ---
+
+  tenant: () => request<Tenant>("/network/tenant"),
+
+  updateTenant: (body: { name?: string; sharedBalance?: boolean; moveBalancesToClubId?: string }) =>
+    request<Tenant>("/network/tenant", { method: "PATCH", body: JSON.stringify(body) }),
+
+  createClub: (body: { name: string; city?: string; timezone?: string }) =>
+    request<Club>("/network/clubs", { method: "POST", body: JSON.stringify(body) }),
+
+  updateClub: (
+    clubId: string,
+    body: Partial<{
+      name: string;
+      city: string;
+      creditLimit: number;
+      packageValidityDays: number;
+      lowBalanceWarnMinutes: number;
+      bonusPercent: number;
+    }>,
+  ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  staff: () => request<StaffMember[]>("/network/staff"),
+
+  createStaff: (body: {
+    email: string;
+    fullName: string;
+    password: string;
+    role: string;
+    clubId?: string;
+  }) => request<StaffMember>("/network/staff", { method: "POST", body: JSON.stringify(body) }),
+
+  updateStaff: (
+    staffId: string,
+    body: Partial<{ fullName: string; password: string; role: string; clubId: string; isActive: boolean }>,
+  ) => request<StaffMember>(`/network/staff/${staffId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  // --- Отчёты ---
+
+  networkReport: (period: { from?: string; to?: string } = {}) =>
+    request<ClubSummary[]>(`/reports/network${periodQuery(period)}`),
+
+  settlement: (period: { from?: string; to?: string } = {}) =>
+    request<Settlement>(`/reports/settlement${periodQuery(period)}`),
+
+  computerReport: (clubId: string, period: { from?: string; to?: string } = {}) =>
+    request<ComputerPerformance[]>(`/reports/clubs/${clubId}/computers${periodQuery(period)}`),
+
+  hoursReport: (clubId: string, period: { from?: string; to?: string } = {}) =>
+    request<HourlyPoint[]>(`/reports/clubs/${clubId}/hours${periodQuery(period)}`),
 };
+
+function periodQuery(period: { from?: string; to?: string }): string {
+  const params = new URLSearchParams();
+  if (period.from) params.set("from", period.from);
+  if (period.to) params.set("to", period.to);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  sharedBalance: boolean;
+}
+
+export interface StaffMember {
+  id: string;
+  clubId: string | null;
+  email: string;
+  fullName: string;
+  role: "OWNER" | "ADMIN" | "STAFF";
+  isActive: boolean;
+}
+
+export interface ClubSummary {
+  clubId: string;
+  clubName: string;
+  revenue: number;
+  sessionsRevenue: number;
+  productsRevenue: number;
+  productsMargin: number;
+  sessionsCount: number;
+  busyMinutes: number;
+  computers: number;
+  occupancy: number;
+}
+
+export interface ComputerPerformance {
+  computerId: string;
+  computerName: string;
+  zoneName: string;
+  revenue: number;
+  minutes: number;
+  sessions: number;
+  occupancy: number;
+  revenuePerBusyHour: number;
+}
+
+export interface HourlyPoint {
+  hour: number;
+  revenue: number;
+  sessions: number;
+}
+
+export interface Settlement {
+  sharedBalance: boolean;
+  guestFundsChange: number;
+  rows: Array<{
+    clubId: string;
+    clubName: string;
+    collected: number;
+    consumed: number;
+    balance: number;
+  }>;
+}
 
 /** Тенге, введённые на стойке → тиын для сервера. */
 export function toTiyn(tenge: string): number {

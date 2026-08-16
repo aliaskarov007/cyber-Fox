@@ -5,16 +5,20 @@ import { BarScreen } from "./BarScreen.js";
 import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
+import { NetworkScreen } from "./NetworkScreen.js";
+import { SettingsScreen } from "./SettingsScreen.js";
 import { ShiftBar } from "./ShiftBar.js";
 import { TariffsScreen } from "./TariffsScreen.js";
 
-type Tab = "hall" | "bar" | "guests" | "tariffs";
+type Tab = "hall" | "bar" | "guests" | "tariffs" | "network" | "settings";
 
-const TABS: Array<{ id: Tab; label: string }> = [
+const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean }> = [
   { id: "hall", label: "Зал" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
   { id: "tariffs", label: "Тарифы" },
+  { id: "network", label: "Сеть", ownerOnly: true },
+  { id: "settings", label: "Настройки" },
 ];
 
 export function App() {
@@ -77,7 +81,8 @@ export function App() {
         )}
 
         <nav className="link-tabs">
-          {TABS.map((item) => (
+          {/* Сводка по сети — забота владельца; управляющему она не нужна. */}
+          {TABS.filter((item) => !item.ownerOnly || staff.role === "OWNER").map((item) => (
             <button
               key={item.id}
               aria-current={tab === item.id}
@@ -117,6 +122,15 @@ export function App() {
         <BarScreen club={club} />
       ) : tab === "guests" ? (
         <GuestsScreen club={club} />
+      ) : tab === "network" ? (
+        <NetworkScreen clubs={clubs} />
+      ) : tab === "settings" ? (
+        <SettingsScreen
+          club={club}
+          staff={staff}
+          clubs={clubs}
+          onClubsChanged={() => void load()}
+        />
       ) : (
         <TariffsScreen club={club} />
       )}
