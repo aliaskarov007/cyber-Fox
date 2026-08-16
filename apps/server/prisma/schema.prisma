@@ -24,12 +24,89 @@ model Tenant {
   /// Аккаунт и история визитов общие в обоих случаях.
   sharedBalance Boolean @default(false)
 
-  clubs  Club[]
-  guests Guest[]
-  staff  Staff[]
+  clubs        Club[]
+  guests       Guest[]
+  staff        Staff[]
+  subscription Subscription?
+  invoices     Invoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum SubscriptionPlan {
+  /// Бесплатный пробный период после самостоятельной регистрации.
+  TRIAL
+  /// Один зал.
+  BASIC
+  /// Сеть залов и сводные отчёты.
+  PRO
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  /// Срок оплаты прошёл, но зал ещё работает: льготный период.
+  PAST_DUE
+  /// Льготный период кончился — новые сессии не запускаются.
+  SUSPENDED
+  CANCELED
+}
+
+/**
+ * Подписка сети на платформу. Единица продажи — сеть, а не зал:
+ * владелец платит один раз за все свои клубы.
+ */
+model Subscription {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  plan   SubscriptionPlan   @default(TRIAL)
+  status SubscriptionStatus @default(TRIALING)
+
+  /// Сколько машин разрешено подключить. Превышение блокирует заведение новых.
+  maxComputers Int @default(10)
+  /// Цена за машину в месяц, в тиын.
+  pricePerComputer Int @default(0)
+
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  /// До какого момента зал работает после просрочки.
+  graceEndsAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum InvoiceStatus {
+  ISSUED
+  PAID
+  OVERDUE
+  VOID
+}
+
+/// Счёт сети за пользование платформой.
+model Invoice {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+  /// Машин на момент выставления — по ним считается сумма.
+  computers Int
+  /// Сумма в тиын.
+  amount Int
+  status InvoiceStatus @default(ISSUED)
+
+  issuedAt DateTime  @default(now())
+  dueAt    DateTime
+  paidAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, issuedAt])
 }
 
 model Club {

@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import type {
   CreateComputerDto,
   CreateTariffDto,
@@ -19,6 +20,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: ClubAccessService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
 
   // --- Зоны ---
@@ -84,6 +86,8 @@ export class CatalogService {
   ): Promise<Computer> {
     await this.access.requireClub(staff, clubId);
     await this.requireZone(clubId, dto.zoneId);
+    // Лимит машин — то, за что платит сеть, поэтому проверяем до создания.
+    await this.subscriptions.assertCanAddComputer(staff.tenantId);
 
     return this.prisma.computer.create({
       data: {

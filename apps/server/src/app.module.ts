@@ -4,6 +4,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "./auth/auth.module.js";
+import { SubscriptionModule } from "./billing-platform/subscription.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { GuestsModule } from "./guests/guests.module.js";
@@ -14,12 +15,14 @@ import { RealtimeModule } from "./realtime/realtime.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
+import { SignupModule } from "./signup/signup.module.js";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    SubscriptionModule,
     AuthModule,
     CatalogModule,
     GuestsModule,
@@ -28,6 +31,7 @@ import { ShiftsModule } from "./shifts/shifts.module.js";
     ProductsModule,
     NetworkModule,
     ReportsModule,
+    SignupModule,
     RealtimeModule,
   ],
   providers: [

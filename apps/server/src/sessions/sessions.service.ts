@@ -29,6 +29,7 @@ import { toLocalMoment } from "../common/local-time.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RealtimeBus } from "../realtime/realtime.bus.js";
+import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type { MoveSessionDto, StartSessionDto } from "./sessions.dto.js";
 
@@ -62,6 +63,7 @@ export class SessionsService {
     private readonly access: ClubAccessService,
     private readonly wallets: WalletService,
     private readonly bus: RealtimeBus,
+    private readonly subscriptions: SubscriptionService,
   ) {}
 
   // --- Старт ---
@@ -97,6 +99,10 @@ export class SessionsService {
     prepaidAmount?: number | null;
   }): Promise<Session> {
     const club = await this.prisma.club.findUniqueOrThrow({ where: { id: params.clubId } });
+    // Подписка проверяется только при старте: уже идущие сессии доигрывают
+    // при любом её состоянии — гость заплатил клубу, а не нам.
+    await this.subscriptions.assertCanStartSession(club.tenantId);
+
     const computer = await this.prisma.computer.findUnique({
       where: { id: params.computerId },
     });
