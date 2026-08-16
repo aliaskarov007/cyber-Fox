@@ -8,6 +8,7 @@ import { SubscriptionModule } from "./billing-platform/subscription.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { GuestsModule } from "./guests/guests.module.js";
+import { ImportModule } from "./import/import.module.js";
 import { NetworkModule } from "./network/network.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProductsModule } from "./products/products.module.js";
@@ -32,6 +33,7 @@ import { SignupModule } from "./signup/signup.module.js";
     NetworkModule,
     ReportsModule,
     SignupModule,
+    ImportModule,
     RealtimeModule,
   ],
   providers: [
