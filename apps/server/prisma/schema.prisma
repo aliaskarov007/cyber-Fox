@@ -29,6 +29,7 @@ model Tenant {
   staff        Staff[]
   subscription Subscription?
   invoices     Invoice[]
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -79,6 +80,67 @@ model Subscription {
   updatedAt DateTime @updatedAt
 }
 
+/// Зачем создан платёж: пополнение счёта гостя или оплата нашего счёта клубом.
+enum PaymentPurpose {
+  GUEST_TOPUP
+  SUBSCRIPTION_INVOICE
+}
+
+enum PaymentIntentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  EXPIRED
+}
+
+/**
+ * Намерение оплаты — то, что мы показали плательщику, и то, чего ждём от
+ * провайдера. Отдельная сущность нужна ровно потому, что подтверждение придёт
+ * позже, отдельным запросом, и может прийти несколько раз.
+ */
+model PaymentIntent {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Клуб, чья касса принимает деньги. Пусто для оплаты подписки.
+  clubId String?
+  club   Club?   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  purpose PaymentPurpose
+  status  PaymentIntentStatus @default(PENDING)
+
+  /// Сумма в тиын. Сверяется с суммой из подтверждения провайдера.
+  amount Int
+
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  /// Имя провайдера: kaspi, cloudpayments, manual.
+  provider String
+  /// Идентификатор платежа на стороне провайдера; по нему приходит подтверждение.
+  providerRef String? @unique
+  /// Ссылка на страницу оплаты. Хранится, чтобы повторный показ платежа
+  /// возвращал тот же QR, а не пустоту.
+  checkoutUrl String?
+
+  /// Ключ идемпотентности запроса на создание: повторный клик по кнопке
+  /// не должен плодить платежи.
+  idempotencyKey String @unique
+
+  paidAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tenantId, createdAt])
+  @@index([status, expiresAt])
+}
+
 enum InvoiceStatus {
   ISSUED
   PAID
@@ -103,6 +165,8 @@ model Invoice {
   issuedAt DateTime  @default(now())
   dueAt    DateTime
   paidAt   DateTime?
+
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
 
@@ -138,6 +202,7 @@ model Club {
   staff     Staff[]
   products  Product[]
   sales     ProductSale[]
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -278,6 +343,7 @@ model Guest {
   sessions Session[]
   payments Payment[]
   sales    ProductSale[]
+  paymentIntents PaymentIntent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

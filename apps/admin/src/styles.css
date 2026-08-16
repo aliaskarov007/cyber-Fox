@@ -642,3 +642,12 @@ td.num {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* Ссылка на оплату: длинная, её читают глазами и копируют. */
+.checkout-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent-ink);
+  word-break: break-all;
+  margin-top: 6px;
+}

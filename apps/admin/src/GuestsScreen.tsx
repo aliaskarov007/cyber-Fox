@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import {
+  type Checkout,
   type Club,
   type Guest,
   type GuestCard,
@@ -110,6 +111,7 @@ function GuestCardPanel({
   const [card, setCard] = useState<GuestCard | null>(null);
   const [history, setHistory] = useState<GuestHistory | null>(null);
   const [amount, setAmount] = useState("1000");
+  const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,9 +190,66 @@ function GuestCardPanel({
               }
             }}
           >
-            Пополнить наличными
+            Наличными
+          </button>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                setCheckout(await api.createOnlineTopUp(club.id, guestId, toTiyn(amount)));
+              } catch (cause) {
+                setError((cause as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Онлайн
           </button>
         </div>
+
+        {checkout && (
+          <div className="notice">
+            {checkout.url ? (
+              <>
+                Ссылка на оплату {formatMoney(checkout.amount)}: гость открывает её с телефона.
+                {/* Деньги зачислятся сами, когда провайдер подтвердит оплату. */}
+                <div className="checkout-link">{checkout.url}</div>
+              </>
+            ) : (
+              <>
+                Провайдер оплаты не подключён — примите перевод и отметьте платёж вручную.
+              </>
+            )}
+            <div className="actions" style={{ marginTop: 8 }}>
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    const result = await api.confirmPayment(checkout.intentId);
+                    if (!result.applied && result.reason) setError(result.reason);
+                    setCheckout(null);
+                    await load();
+                    onChanged();
+                  } catch (cause) {
+                    setError((cause as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Оплата поступила
+              </button>
+              <button disabled={busy} onClick={() => setCheckout(null)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {card.packages.length > 0 && (

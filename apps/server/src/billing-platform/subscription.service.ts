@@ -121,30 +121,12 @@ export class SubscriptionService {
     });
   }
 
-  /** Отметка об оплате. Пока вручную: приём платежей — отдельная задача. */
-  async markInvoicePaid(tenantId: string, invoiceId: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
-    if (!invoice || invoice.tenantId !== tenantId) {
-      throw new BadRequestException("Счёт не найден");
-    }
-
-    const paid = await this.prisma.invoice.update({
-      where: { id: invoiceId },
-      data: { status: InvoiceStatus.PAID, paidAt: new Date() },
-    });
-
-    const subscription = await this.forTenant(tenantId);
-    await this.prisma.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        status: SubscriptionStatus.ACTIVE,
-        currentPeriodEnd: invoice.periodEnd,
-        graceEndsAt: null,
-      },
-    });
-
-    return paid;
-  }
+  /*
+   * Отметки «оплачено» здесь нет намеренно. Счёт за подписку клуб платит нам,
+   * поэтому закрывать его может только подтверждённый платёж
+   * (PaymentsService.applySuccess) — иначе владелец отмечает свой же счёт
+   * оплаченным и пользуется платформой бесплатно.
+   */
 
   private async issueInvoice(
     tenantId: string,

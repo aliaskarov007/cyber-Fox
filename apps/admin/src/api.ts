@@ -366,8 +366,21 @@ export const api = {
   changePlan: (plan: string) =>
     request<unknown>("/subscription/plan", { method: "POST", body: JSON.stringify({ plan }) }),
 
-  markInvoicePaid: (invoiceId: string) =>
-    request<unknown>(`/subscription/invoices/${invoiceId}/paid`, { method: "POST" }),
+  // --- Касса: онлайн-оплата ---
+
+  createOnlineTopUp: (clubId: string, guestId: string, amount: number) =>
+    request<Checkout>(`/clubs/${clubId}/guests/${guestId}/online-topup`, {
+      method: "POST",
+      body: JSON.stringify({ amount }),
+    }),
+
+  confirmPayment: (intentId: string) =>
+    request<{ applied: boolean; reason: string | null }>(`/payments/${intentId}/confirm`, {
+      method: "POST",
+    }),
+
+  payInvoice: (invoiceId: string) =>
+    request<Checkout>(`/subscription/invoices/${invoiceId}/pay`, { method: "POST" }),
 
   // --- Перенос данных ---
 
@@ -420,6 +433,15 @@ export interface ImportResult {
   updated: number;
   skipped: number;
   problems: Array<{ line: number; reason: string }>;
+}
+
+export interface Checkout {
+  intentId: string;
+  amount: number;
+  /** Ссылка на оплату; пусто — провайдер не настроен, платят на стойке. */
+  url: string | null;
+  qrPayload: string | null;
+  provider: string;
 }
 
 export interface SignupBody {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post } from "@nestjs/common";
 import { StaffRole, SubscriptionPlan } from "@prisma/client";
 import { IsEnum } from "class-validator";
 
@@ -36,11 +36,5 @@ export class SubscriptionController {
   @Post("plan")
   changePlan(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: ChangePlanDto) {
     return this.subscriptions.changePlan(staff, dto.plan);
-  }
-
-  @Roles(StaffRole.OWNER)
-  @Post("invoices/:invoiceId/paid")
-  markPaid(@CurrentStaff() staff: AuthenticatedStaff, @Param("invoiceId") invoiceId: string) {
-    return this.subscriptions.markInvoicePaid(staff.tenantId, invoiceId);
   }
 }

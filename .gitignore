@@ -13,3 +13,6 @@ apps/agent/out/
 apps/agent/release/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Проверочные скрипты: гоняются по живой базе руками, в репозиторий не идут
+/*.mjs

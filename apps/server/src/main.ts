@@ -4,7 +4,9 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module.js";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // Сырое тело нужно вебхуку платежей: подпись считается по байтам запроса,
+  // и пересобранный JSON её ломает.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix("api");
   app.enableCors({ origin: true, credentials: true });

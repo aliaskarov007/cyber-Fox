@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  type Checkout,
   type Club,
   type Computer,
   type ImportResult,
@@ -129,6 +130,7 @@ function SubscriptionBlock({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [checkout, setCheckout] = useState<Checkout | null>(null);
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -184,6 +186,23 @@ function SubscriptionBlock({
         })}
       </div>
 
+      {checkout && (
+        <div className="notice">
+          {checkout.url ? (
+            <>
+              Счёт на {formatMoney(checkout.amount)}: откройте ссылку и оплатите картой. Подписка
+              продлится сама, как только банк подтвердит платёж — отмечать вручную не нужно.
+              <div className="checkout-link">{checkout.url}</div>
+            </>
+          ) : (
+            <>Оплата картой пока не подключена — напишите нам, выставим счёт на компанию.</>
+          )}
+          <div className="actions" style={{ marginTop: 8 }}>
+            <button onClick={() => setCheckout(null)}>Скрыть</button>
+          </div>
+        </div>
+      )}
+
       {invoices.length > 0 && (
         <div className="table-wrap">
           <table>
@@ -216,10 +235,11 @@ function SubscriptionBlock({
                     <td>
                       {invoice.status !== "PAID" && (
                         <button
+                          className="primary"
                           disabled={busy}
-                          onClick={() => void run(() => api.markInvoicePaid(invoice.id))}
+                          onClick={() => void run(async () => setCheckout(await api.payInvoice(invoice.id)))}
                         >
-                          Отметить оплаченным
+                          Оплатить
                         </button>
                       )}
                     </td>
