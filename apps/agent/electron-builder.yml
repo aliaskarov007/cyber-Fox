@@ -1,0 +1,51 @@
+# Установщик агента для игровых машин.
+#
+#   pnpm --filter @cyberfox/agent pack:win
+#
+# Собирается на Windows. Из Linux сборка тоже возможна (electron-builder умеет
+# делать это через wine), но подписать исполняемый файл там нечем, а
+# неподписанный агент Windows встречает предупреждением SmartScreen на каждой
+# из сорока машин.
+
+appId: kz.cyberfox.agent
+productName: Cyber-Fox Agent
+copyright: Cyber-Fox
+
+# Версия указана явно, потому что в этом репозитории плоская раскладка
+# зависимостей (node-linker=hoisted): electron лежит в корне монорепозитория,
+# а сборщик ищет его в node_modules самого приложения и не находит.
+# При обновлении electron в package.json обновите и здесь.
+electronVersion: 33.4.11
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # Агент не запрашивает прав администратора: блокировка ему их не требует,
+  # а лишний запрос UAC при каждом входе в систему сделал бы автозапуск
+  # бесполезным.
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  # Ставим на всю машину: за одним ПК в зале сидят разные пользователи
+  # Windows, и агент должен встречать каждого.
+  perMachine: true
+  oneClick: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  shortcutName: Cyber-Fox
+  # После установки агент запускается сразу: администратор тут же вводит код
+  # привязки и видит, что машина появилась в зале.
+  runAfterFinish: true
+  installerLanguages:
+    - ru_RU
+  language: "1049"
