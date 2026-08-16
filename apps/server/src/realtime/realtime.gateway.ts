@@ -94,6 +94,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         // сразу, иначе он до минуты держит блокировку поверх чужой сессии.
         const activeSessionId = await this.sessions.activeSessionFor(computer.id);
         if (activeSessionId) {
+          // Время молчания не начисляем: оно не подтверждено. Реально отыгранное
+          // придёт отдельным отчётом агента.
+          await this.sessions.resumeAfterSilence(activeSessionId);
           const snapshot = await this.sessions.sessionSnapshot(activeSessionId);
           if (snapshot) client.emit("session.tick", snapshot);
         }

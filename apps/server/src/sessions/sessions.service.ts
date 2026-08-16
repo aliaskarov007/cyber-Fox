@@ -41,6 +41,18 @@ const MINUTE_MS = 60_000;
  */
 const MAX_CATCH_UP_MINUTES = 24 * 60;
 
+/**
+ * Сколько ждать сердцебиение агента, прежде чем считать машину замолчавшей.
+ * Агент шлёт его раз в 30 секунд, так что три пропуска — уже не случайность.
+ */
+const AGENT_GRACE_MS = 95_000;
+
+/**
+ * Через сколько молчания сессия закрывается сама. Машину выключили или
+ * унесли — держать место занятым в карте зала нельзя.
+ */
+const AGENT_LOST_MS = 30 * 60_000;
+
 @Injectable()
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
@@ -273,17 +285,39 @@ export class SessionsService {
   async chargeDueSessions(now = new Date()): Promise<number> {
     const due = await this.prisma.session.findMany({
       where: { status: SessionStatus.ACTIVE, nextChargeAt: { lte: now } },
-      select: { id: true },
+      select: { id: true, computer: { select: { id: true, name: true, lastSeenAt: true } } },
       take: 500,
     });
 
     let processed = 0;
-    for (const { id } of due) {
+    for (const session of due) {
+      const silentFor = session.computer.lastSeenAt
+        ? now.getTime() - session.computer.lastSeenAt.getTime()
+        : Number.POSITIVE_INFINITY;
+
+      /*
+       * Деньги списываются только за время, подтверждённое агентом.
+       *
+       * Пока машина молчит, сервер не знает, играет ли на ней кто-нибудь: она
+       * может быть выключена, а связь — оборвана. Начислять вслепую значит
+       * брать с гостя за время, которого не было, поэтому срок списания просто
+       * ждёт, и минуты за молчание не набегают.
+       */
+      if (silentFor > AGENT_GRACE_MS) {
+        if (silentFor > AGENT_LOST_MS) {
+          this.logger.warn(
+            `${session.computer.name}: агент молчит дольше получаса, закрываем сессию`,
+          );
+          await this.finish(session.id, SegmentEndReason.AGENT_LOST);
+        }
+        continue;
+      }
+
       try {
-        await this.chargeOneMinute(id, now);
+        await this.chargeOneMinute(session.id, now);
         processed += 1;
       } catch (error) {
-        this.logger.error(`Не удалось списать минуту сессии ${id}`, error as Error);
+        this.logger.error(`Не удалось списать минуту сессии ${session.id}`, error as Error);
       }
     }
     return processed;
@@ -912,6 +946,49 @@ export class SessionsService {
       select: { id: true },
     });
     return session?.id ?? null;
+  }
+
+  /**
+   * Агент вернулся на связь. Срок списания сдвигается на текущий момент:
+   * накопившееся за молчание не начисляется, потому что не подтверждено.
+   * Реально отыгранное придёт отдельным отчётом агента.
+   */
+  async resumeAfterSilence(sessionId: string): Promise<void> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { status: true, nextChargeAt: true },
+    });
+    if (!session || session.status !== SessionStatus.ACTIVE) return;
+
+    const now = new Date();
+    if (session.nextChargeAt && session.nextChargeAt < now) {
+      await this.prisma.session.update({
+        where: { id: sessionId },
+        data: { nextChargeAt: now },
+      });
+    }
+  }
+
+  /**
+   * Списание минут, подтверждённых агентом за время без связи.
+   *
+   * Отматываем срок назад ровно на отчитанные минуты и отдаём работу обычному
+   * движку: он применит те же правила, что и онлайн, включая тарифы по времени
+   * суток и остановку на кредитном лимите.
+   */
+  async chargeConfirmedMinutes(sessionId: string, minutes: number): Promise<void> {
+    if (minutes <= 0) return;
+
+    /*
+     * Отматываем на (minutes − 1): движок списывает и в начальный момент, и в
+     * конечный, поэтому сдвиг ровно на minutes дал бы на минуту больше.
+     * Для одной минуты срок совпадает с текущим моментом — одно списание.
+     */
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: { nextChargeAt: new Date(Date.now() - (minutes - 1) * MINUTE_MS) },
+    });
+    await this.chargeOneMinute(sessionId);
   }
 
   private async publishTick(sessionId: string): Promise<void> {

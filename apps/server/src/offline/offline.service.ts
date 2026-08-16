@@ -1,11 +1,10 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { SegmentEndReason, SessionStatus, TransactionType } from "@prisma/client";
+import { SegmentEndReason, SessionStatus } from "@prisma/client";
 
-import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
 
-/** Операция, накопленная агентом без связи с облаком. */
+/** Отчёт агента о времени, отыгранном без связи с облаком. */
 export interface OfflineOperationInput {
   /** Сгенерирован на устройстве; повторная доставка ничего не меняет. */
   uuid: string;
@@ -18,7 +17,6 @@ export interface OfflineOperationInput {
   /** Оплаченное время кончилось локально и экран заблокирован. */
   endedLocally?: boolean;
   deviceTime: string;
-  /** Последний тик от сервера — граница, после которой начался обрыв. */
   lastKnownServerTime: string | null;
 }
 
@@ -26,23 +24,22 @@ export interface IngestResult {
   applied: number;
   duplicates: number;
   rejected: number;
-  /** Сколько минут вернули гостю как начисленные сверх реально отыгранных. */
-  refundedMinutes: number;
+  /** Сколько минут списано по подтверждению агента. */
+  chargedMinutes: number;
   notes: string[];
 }
 
 /**
  * Приём отчётов агента о работе без связи с облаком.
  *
- * Разделение ответственности здесь принципиальное. **Деньги считает сервер**:
- * срок списания хранится в базе, и после перезапуска движок сам досчитывает
- * пропущенные минуты. Агент об этом не знает и повторно ничего не начисляет —
- * иначе каждая минута обрыва списывалась бы дважды.
+ * Правило одно: **сервер начисляет только за подтверждённое время**. Пока
+ * машина молчит, срок списания стоит на месте — мы не знаем, играет ли кто-то
+ * за ней или её выключили вместе с роутером. Отчёт агента и есть подтверждение:
+ * он говорит, сколько минут машина действительно отыграла, и ровно столько
+ * списывается (docs/offline.md, раздел 5).
  *
- * **Агент владеет фактом игры**: только он знает, что машину выключили или что
- * оплаченное время кончилось раньше, чем сервер вернулся. Его отчёт нужен,
- * чтобы вернуть гостю деньги за время, которого не было
- * (docs/offline.md, раздел 5).
+ * Из этого правила следует, что переплаты не возникает и возвращать нечего:
+ * система скорее недосчитает за время сбоя, чем возьмёт с гостя лишнее.
  */
 @Injectable()
 export class OfflineService {
@@ -51,7 +48,6 @@ export class OfflineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
-    private readonly wallets: WalletService,
   ) {}
 
   async ingest(computerId: string, operations: OfflineOperationInput[]): Promise<IngestResult> {
@@ -62,7 +58,7 @@ export class OfflineService {
       applied: 0,
       duplicates: 0,
       rejected: 0,
-      refundedMinutes: 0,
+      chargedMinutes: 0,
       notes: [],
     };
 
@@ -70,6 +66,8 @@ export class OfflineService {
     const ordered = [...operations].sort((a, b) => a.sequence - b.sequence);
 
     for (const operation of ordered) {
+      // Ключ идемпотентности: обрыв во время отправки заставит агента прислать
+      // ту же пачку снова, и списывать минуты второй раз нельзя.
       const existing = await this.prisma.offlineOperation.findUnique({
         where: { uuid: operation.uuid },
       });
@@ -93,7 +91,7 @@ export class OfflineService {
         },
       });
 
-      const outcome = await this.reconcile(operation);
+      const outcome = await this.apply(operation);
       if (outcome.rejected) {
         result.rejected += 1;
         result.notes.push(outcome.rejected);
@@ -105,7 +103,7 @@ export class OfflineService {
       }
 
       result.applied += 1;
-      result.refundedMinutes += outcome.refundedMinutes;
+      result.chargedMinutes += operation.minutes;
       if (outcome.note) result.notes.push(outcome.note);
       await this.prisma.offlineOperation.update({
         where: { uuid: operation.uuid },
@@ -115,121 +113,48 @@ export class OfflineService {
 
     if (result.applied > 0 || result.rejected > 0) {
       this.logger.log(
-        `ПК ${computer.name}: сверено ${result.applied}, дублей ${result.duplicates}, ` +
-          `отклонено ${result.rejected}, возвращено минут ${result.refundedMinutes}`,
+        `ПК ${computer.name}: принято ${result.applied}, дублей ${result.duplicates}, ` +
+          `отклонено ${result.rejected}, списано минут ${result.chargedMinutes}`,
       );
     }
 
     return result;
   }
 
-  /**
-   * Сверяет отчёт агента с тем, что успел списать сервер за время обрыва.
-   *
-   * Границей служит последний тик, полученный агентом: всё, что сервер начислил
-   * после него, относится к периоду без связи.
-   */
-  private async reconcile(
+  private async apply(
     operation: OfflineOperationInput,
-  ): Promise<{ rejected?: string; note?: string; refundedMinutes: number }> {
+  ): Promise<{ rejected?: string; note?: string }> {
     const session = await this.prisma.session.findUnique({
       where: { id: operation.sessionId },
       include: { computer: { select: { name: true } } },
     });
     if (!session) {
-      return { rejected: "Сессия не найдена: возможно, удалена на сервере", refundedMinutes: 0 };
+      return { rejected: "Сессия не найдена: возможно, удалена на сервере" };
     }
 
-    const reported = operation.lastKnownServerTime
-      ? new Date(operation.lastKnownServerTime)
-      : null;
-    if (!reported) {
+    if (session.status !== SessionStatus.ACTIVE) {
+      // Сессию закрыли на сервере, пока зал работал автономно. Побеждает более
+      // раннее закрытие: отыгранное после него не начисляем, но фиксируем
+      // в журнале — расхождение попадёт в отчёт.
       return {
-        rejected: "Агент не знает времени последней синхронизации: сверить период нечем",
-        refundedMinutes: 0,
+        rejected: `${session.computer.name}: сессия уже закрыта на сервере, ${operation.minutes} мин не списаны`,
       };
     }
 
-    /*
-     * Период сверки начинается позже отчётной границы, если этот отрезок уже
-     * сверяли. Иначе повторный отчёт за то же время — а он неизбежен при обрыве
-     * до подтверждения — вернул бы гостю деньги второй раз.
-     */
-    const boundary =
-      session.offlineReconciledAt && session.offlineReconciledAt > reported
-        ? session.offlineReconciledAt
-        : reported;
+    await this.sessions.chargeConfirmedMinutes(session.id, operation.minutes);
 
-    // Минуты, списанные сервером за ещё не сверенный период без связи.
-    const chargesAfter = await this.prisma.transaction.findMany({
-      where: {
-        sessionId: session.id,
-        type: TransactionType.SESSION_CHARGE,
-        createdAt: { gt: boundary },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const excess = chargesAfter.slice(operation.minutes);
-    let refundedMinutes = 0;
-
-    if (excess.length > 0) {
-      // Сервер начислил больше, чем машина реально играла: ПК выключили или
-      // оплаченное время кончилось раньше. Разницу возвращаем гостю.
-      const amount = excess.reduce((sum, t) => sum - t.amount, 0);
-      refundedMinutes = excess.length;
-
-      if (session.guestId && amount > 0) {
-        await this.prisma.$transaction(async (tx) => {
-          const wallet = await this.wallets.resolveWallet(session.guestId!, session.clubId, tx);
-          await this.wallets.record(tx, {
-            walletId: wallet.id,
-            clubId: session.clubId,
-            amount,
-            type: TransactionType.REFUND,
-            sessionId: session.id,
-            comment: `Возврат за ${excess.length} мин: машина не играла во время обрыва связи`,
-          });
-          await tx.session.update({
-            where: { id: session.id },
-            data: { totalCharged: { decrement: amount } },
-          });
-        });
-      } else if (session.prepaidRemaining !== null && amount > 0) {
-        // Анонимная посадка: возвращаем в остаток предоплаты.
-        await this.prisma.session.update({
-          where: { id: session.id },
-          data: {
-            prepaidRemaining: { increment: amount },
-            totalCharged: { decrement: amount },
-          },
-        });
+    if (operation.endedLocally) {
+      const stillActive = await this.prisma.session.findUnique({
+        where: { id: session.id },
+        select: { status: true },
+      });
+      if (stillActive?.status === SessionStatus.ACTIVE) {
+        await this.sessions.finish(session.id, SegmentEndReason.CREDIT_LIMIT);
       }
+      return { note: `${session.computer.name}: оплаченное время кончилось без связи` };
     }
 
-    // Отмечаем период как сверенный — до текущего момента.
-    await this.prisma.session.update({
-      where: { id: session.id },
-      data: { offlineReconciledAt: new Date() },
-    });
-
-    // Оплаченное время кончилось локально — сессию пора закрыть, если сервер
-    // этого ещё не сделал.
-    if (operation.endedLocally && session.status === SessionStatus.ACTIVE) {
-      await this.sessions.finish(session.id, SegmentEndReason.CREDIT_LIMIT);
-      return {
-        note: `${session.computer.name}: сессия закрыта по отчёту агента`,
-        refundedMinutes,
-      };
-    }
-
-    return {
-      note:
-        refundedMinutes > 0
-          ? `${session.computer.name}: возвращено ${refundedMinutes} мин, начисленных сверх отыгранного`
-          : undefined,
-      refundedMinutes,
-    };
+    return {};
   }
 
   /** Расхождения после автономной работы: отдельный отчёт для разбора. */
