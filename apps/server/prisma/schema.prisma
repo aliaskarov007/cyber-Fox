@@ -1,0 +1,488 @@
+// Схема Cyber-Fox. Модель соответствует docs/billing.md и docs/guest-access.md.
+//
+// Два сквозных правила:
+//   1. Всё принадлежит сети (Tenant) и почти всё — конкретному клубу (clubId).
+//      Разделение по клубам — то, что позже пустит в систему чужих владельцев.
+//   2. Деньги хранятся целыми числами в тиын (1/100 ₸). Поминутная цена часто
+//      получается делением часовой, и дробные значения за смену расходятся с кассой.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Сеть клубов одного владельца. Единица подписки на платформу.
+model Tenant {
+  id   String @id @default(uuid())
+  name String
+
+  /// true — один кошелёк гостя на всю сеть; false — свой кошелёк в каждом клубе.
+  /// Аккаунт и история визитов общие в обоих случаях.
+  sharedBalance Boolean @default(false)
+
+  clubs  Club[]
+  guests Guest[]
+  staff  Staff[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Club {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name     String
+  city     String?
+  timezone String @default("Asia/Almaty")
+
+  /// Лимит игры в долг, в тиын. Действует одинаково онлайн и офлайн.
+  creditLimit Int @default(10000)
+  /// Срок жизни пакета по умолчанию; задаёт владелец клуба.
+  packageValidityDays Int @default(30)
+  /// За сколько минут до конца пакета предупреждать гостя.
+  lowBalanceWarnMinutes Int @default(10)
+
+  zones     Zone[]
+  computers Computer[]
+  tariffs   Tariff[]
+  wallets   GuestWallet[]
+  packages  GuestPackage[]
+  sessions  Session[]
+  payments  Payment[]
+  shifts    Shift[]
+  staff     Staff[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/// Зона зала: VIP, Стандарт, PS5. Тарифы принадлежат зоне.
+model Zone {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  name      String
+  sortOrder Int    @default(0)
+
+  /// Тариф, подхватываемый когда минуты пакета кончились.
+  /// Ссылка необязательная: зону заводят раньше, чем её тарифы.
+  defaultPerMinuteTariffId String? @unique
+  defaultPerMinuteTariff   Tariff? @relation("ZoneDefaultTariff", fields: [defaultPerMinuteTariffId], references: [id])
+
+  computers Computer[]
+  tariffs   Tariff[]   @relation("ZoneTariffs")
+  packages  GuestPackage[]
+  sessions  Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clubId, name])
+  @@index([clubId])
+}
+
+enum ComputerStatus {
+  OFFLINE
+  IDLE
+  IN_USE
+  RESERVED
+  MAINTENANCE
+}
+
+model Computer {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  zoneId String
+  zone   Zone   @relation(fields: [zoneId], references: [id])
+
+  name   String
+  status ComputerStatus @default(OFFLINE)
+
+  /// Код привязки: агент предъявляет его при первом подключении.
+  pairingToken String?   @unique
+  hostname     String?
+  lastSeenAt   DateTime?
+
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clubId, name])
+  @@index([clubId])
+  @@index([zoneId])
+}
+
+enum TariffKind {
+  PACKAGE
+  PER_MINUTE
+}
+
+model Tariff {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  zoneId String
+  zone   Zone   @relation("ZoneTariffs", fields: [zoneId], references: [id])
+
+  name String
+  kind TariffKind
+
+  /// Для PER_MINUTE: цена минуты в тиын.
+  pricePerMinute Int?
+  /// Для PACKAGE: сколько минут и за сколько.
+  packageMinutes Int?
+  packagePrice   Int?
+  /// Срок жизни пакета; пусто — берём packageValidityDays клуба.
+  validityDays   Int?
+
+  /// Для PACKAGE: чем продолжать после исчерпания.
+  /// Пусто — берём defaultPerMinuteTariffId зоны.
+  fallbackTariffId String?
+  fallbackTariff   Tariff?  @relation("TariffFallback", fields: [fallbackTariffId], references: [id])
+  fallbackFor      Tariff[] @relation("TariffFallback")
+
+  /// Окно действия по времени суток, минуты от полуночи. Пусто — круглосуточно.
+  activeFromMinute Int?
+  activeToMinute   Int?
+  /// Дни недели, 1 = понедельник. Пусто — все дни.
+  daysOfWeek Int[]
+
+  isActive Boolean @default(true)
+
+  defaultForZone Zone?          @relation("ZoneDefaultTariff")
+  packages       GuestPackage[]
+  segments       SessionSegment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId])
+  @@index([zoneId])
+}
+
+/// Аккаунт гостя. Принадлежит сети, а не залу: гость узнан в любом клубе владельца.
+model Guest {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  fullName String
+  /// Уникален в пределах сети.
+  phone    String
+
+  /// PIN для самостоятельного входа за игровым ПК. Хранится хешем.
+  pinHash String?
+  /// Счётчик неверных попыток и блокировка ввода; см. docs/guest-access.md.
+  failedPinAttempts Int       @default(0)
+  pinLockedUntil    DateTime?
+
+  bonusPoints Int @default(0)
+
+  wallets  GuestWallet[]
+  packages GuestPackage[]
+  sessions Session[]
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+}
+
+/// Кошелёк гостя. clubId пуст — кошелёк общий на всю сеть (Tenant.sharedBalance).
+model GuestWallet {
+  id      String @id @default(uuid())
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  clubId String?
+  club   Club?   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// В тиын. Может быть отрицательным — гость доигрывал в долг.
+  balance Int @default(0)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Один кошелёк на пару (гость, клуб); общий кошелёк — единственный с clubId = null.
+  @@unique([guestId, clubId])
+  @@index([guestId])
+}
+
+enum GuestPackageStatus {
+  ACTIVE
+  EXHAUSTED
+  EXPIRED
+  REFUNDED
+}
+
+/// Купленные минуты на аккаунте гостя. По сети не ходят: привязаны к клубу и зоне.
+model GuestPackage {
+  id      String @id @default(uuid())
+  clubId  String
+  club    Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  zoneId  String
+  zone    Zone   @relation(fields: [zoneId], references: [id])
+
+  sourceTariffId String
+  sourceTariff   Tariff @relation(fields: [sourceTariffId], references: [id])
+
+  minutesTotal     Int
+  minutesRemaining Int
+  pricePaid        Int
+
+  purchasedAt DateTime           @default(now())
+  expiresAt   DateTime
+  status      GuestPackageStatus @default(ACTIVE)
+
+  segments SessionSegment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Подбор пакета при старте сессии: своя зона, активные, ближайший к сгоранию первым.
+  @@index([guestId, zoneId, status, expiresAt])
+  @@index([clubId])
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+  CANCELLED
+}
+
+enum SessionStartedBy {
+  GUEST
+  STAFF
+}
+
+model Session {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  computerId String
+  computer   Computer @relation(fields: [computerId], references: [id])
+  zoneId     String
+  zone       Zone     @relation(fields: [zoneId], references: [id])
+
+  /// Пусто — анонимная посадка: без аккаунта, строго по предоплате.
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
+
+  status    SessionStatus    @default(ACTIVE)
+  startedBy SessionStartedBy
+  /// Начата в аварийном режиме без связи с облаком.
+  startedOffline Boolean @default(false)
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  /// Когда списывать следующую минуту. Индексируется: рабочий выбирает
+  /// просроченные сессии пачками, таймера на сессию нет. См. docs/billing.md, раздел 8.
+  nextChargeAt DateTime?
+
+  /// Сумма по всем отрезкам, в тиын.
+  totalCharged Int @default(0)
+
+  segments     SessionSegment[]
+  payments     Payment[]
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Рабочий списания: выбрать активные сессии, у которых подошёл срок.
+  @@index([status, nextChargeAt])
+  @@index([clubId, startedAt])
+  @@index([computerId])
+  @@index([guestId])
+}
+
+enum SegmentEndReason {
+  PACKAGE_EXHAUSTED
+  CREDIT_LIMIT
+  ZONE_CHANGE
+  TARIFF_SCHEDULE
+  STOPPED_BY_STAFF
+  STOPPED_BY_GUEST
+  PAUSED
+}
+
+/// Отрезок сессии с одним тарифом. Сессия — цепочка таких отрезков.
+/// После закрытия неизменяем: на этом стоит безопасность агрегатов в отчётах.
+model SessionSegment {
+  id        String  @id @default(uuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  tariffId String
+  tariff   Tariff     @relation(fields: [tariffId], references: [id])
+  kind     TariffKind
+
+  /// Для PACKAGE: из какого пакета аккаунта тратились минуты.
+  guestPackageId String?
+  guestPackage   GuestPackage? @relation(fields: [guestPackageId], references: [id])
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  minutesUsed Int @default(0)
+  /// Сколько минут уже оплачено; ключ идемпотентности списания.
+  /// Сдвигается в той же транзакции, что и баланс.
+  chargedThroughMinute Int @default(0)
+  charged              Int @default(0)
+
+  endReason SegmentEndReason?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId, startedAt])
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  BALANCE
+}
+
+/// Приём денег на стойке. Записывается в клуб, где физически принят платёж.
+model Payment {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
+
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id])
+
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  /// В тиын.
+  amount Int
+  method PaymentMethod
+
+  createdAt DateTime @default(now())
+
+  @@index([clubId, createdAt])
+  @@index([shiftId])
+}
+
+enum TransactionType {
+  TOPUP
+  SESSION_CHARGE
+  PACKAGE_PURCHASE
+  PRODUCT_SALE
+  REFUND
+  ADJUSTMENT
+  DEBT_WRITE_OFF
+}
+
+/// Движение по кошельку гостя. Расход записывается в клуб, где шла сессия,
+/// пополнение — в клуб, где принят платёж. Разница между ними и есть
+/// межклубный взаимозачёт при общем кошельке (docs/billing.md, раздел 9.3).
+model Transaction {
+  id       String      @id @default(uuid())
+  walletId String
+  wallet   GuestWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  /// Клуб, которому принадлежит событие: касса при пополнении, зал при расходе.
+  clubId String
+
+  sessionId String?
+  session   Session? @relation(fields: [sessionId], references: [id])
+
+  type TransactionType
+  /// В тиын: положительная — приход, отрицательная — расход.
+  amount Int
+  /// Баланс кошелька после операции; нужен для разбора спорных смен.
+  balanceAfter Int
+
+  comment String?
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([clubId, createdAt])
+  @@index([sessionId])
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+model Staff {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Клуб сотрудника; пусто у владельца сети — он видит все залы.
+  clubId String?
+  club   Club?   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  email        String
+  fullName     String
+  passwordHash String
+  /// PIN для входа в кассовый экран в аварийном режиме.
+  pinHash  String?
+  role     StaffRole
+  isActive Boolean   @default(true)
+
+  shifts   Shift[]
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([clubId])
+}
+
+model Shift {
+  id      String @id @default(uuid())
+  clubId  String
+  club    Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id])
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  /// Сверка кассы на закрытии смены, в тиын.
+  cashExpected Int?
+  cashCounted  Int?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId, openedAt])
+}

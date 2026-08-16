@@ -11,3 +11,5 @@ coverage/
 apps/server/generated/
 apps/agent/out/
 apps/agent/release/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
