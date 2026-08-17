@@ -560,6 +560,11 @@ td.num {
   overflow-x: auto;
 }
 
+/* Выключенный тариф виден, но не спорит за внимание с работающими. */
+tr.muted td {
+  opacity: 0.55;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

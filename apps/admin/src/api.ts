@@ -46,6 +46,25 @@ export interface Tariff {
   isActive: boolean;
 }
 
+/**
+ * Что отправляет форма тарифа.
+ *
+ * null здесь значит «очистить поле»: при смене вида тарифа старые значения надо
+ * стереть, иначе у поминутного останутся минуты пакета. Проверки сервера
+ * помечены @IsOptional и null пропускают, а Prisma по нему обнуляет колонку.
+ */
+export interface TariffInput {
+  name: string;
+  zoneId: string;
+  kind: "PACKAGE" | "PER_MINUTE";
+  pricePerMinute?: number | null;
+  packageMinutes?: number | null;
+  packagePrice?: number | null;
+  validityDays?: number | null;
+  activeFromMinute?: number | null;
+  activeToMinute?: number | null;
+}
+
 export interface Guest {
   id: string;
   fullName: string;
@@ -223,6 +242,15 @@ export const api = {
   zones: (clubId: string) => request<Zone[]>(`/clubs/${clubId}/zones`),
 
   tariffs: (clubId: string) => request<Tariff[]>(`/clubs/${clubId}/tariffs`),
+
+  createTariff: (clubId: string, body: TariffInput) =>
+    request<Tariff>(`/clubs/${clubId}/tariffs`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateTariff: (clubId: string, tariffId: string, body: Partial<TariffInput> & { isActive?: boolean }) =>
+    request<Tariff>(`/clubs/${clubId}/tariffs/${tariffId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   computers: (clubId: string) => request<Computer[]>(`/clubs/${clubId}/computers`),
 
