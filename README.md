@@ -13,6 +13,7 @@
 | [docs/offline.md](docs/offline.md) | Работа без интернета, аварийный режим, синхронизация |
 | [docs/deploy.md](docs/deploy.md) | Пилот в зале: установка, проверки первой смены, чего ещё нет |
 | [docs/install-windows.md](docs/install-windows.md) | Установка на Windows и работа в локальной сети клуба |
+| [docs/pilot-checklist.md](docs/pilot-checklist.md) | Чеклист дня установки: три машины, от Docker до первой смены |
 
 ## Состав
 

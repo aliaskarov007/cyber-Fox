@@ -12,7 +12,16 @@ import { ShiftBar } from "./ShiftBar.js";
 import { SignupScreen } from "./SignupScreen.js";
 import { TariffsScreen } from "./TariffsScreen.js";
 
-type Tab = "hall" | "bar" | "guests" | "tariffs" | "network" | "onboarding" | "settings";
+/** Вкладки верхнего меню. Экспортируется, чтобы экраны могли отправить админа
+ *  туда, где продолжается начатое: «заведите машины» → «Настройки». */
+export type Tab =
+  | "hall"
+  | "bar"
+  | "guests"
+  | "tariffs"
+  | "network"
+  | "onboarding"
+  | "settings";
 
 const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean }> = [
   { id: "hall", label: "Зал" },
@@ -127,7 +136,7 @@ export function App() {
           <div className="notice">Нет доступных клубов.</div>
         </main>
       ) : tab === "hall" ? (
-        <HallScreen club={club} />
+        <HallScreen club={club} onGoTo={setTab} />
       ) : tab === "bar" ? (
         <BarScreen club={club} />
       ) : tab === "guests" ? (

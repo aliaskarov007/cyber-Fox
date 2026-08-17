@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { Tab } from "./App.js";
 import { type Club, type HallCell, type Tariff, api, formatMoney } from "./api.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
@@ -33,16 +34,21 @@ const STATE_CLASS: Record<string, string> = {
   IDLE: "idle",
 };
 
-export function HallScreen({ club }: { club: Club }) {
+export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) => void }) {
   const [hall, setHall] = useState<HallCell[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  /** Зал загружен хотя бы раз: до этого пустая карта — не пустой клуб. */
+  const [loaded, setLoaded] = useState(false);
+
   const refresh = useCallback(async () => {
     setHall(await api.hall(club.id));
+    setLoaded(true);
   }, [club.id]);
 
   useEffect(() => {
+    setLoaded(false);
     void refresh();
     void api.tariffs(club.id).then(setTariffs);
   }, [club.id, refresh]);
@@ -97,6 +103,8 @@ export function HallScreen({ club }: { club: Club }) {
           <div className="label">Начислено по активным</div>
         </div>
       </div>
+
+      {loaded && hall.length === 0 && <FirstSteps onGoTo={onGoTo} />}
 
       {zones.map(([zoneId, zone]) => (
         <section className="zone-block" key={zoneId}>
@@ -173,5 +181,66 @@ export function HallScreen({ club }: { club: Club }) {
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * Первые шаги в пустом клубе.
+ *
+ * Сразу после регистрации карта зала пуста, и владелец не знает, с чего
+ * начать: машины заводятся в настройках, коды привязки живут на отдельном
+ * экране, тарифы — на третьем. Список исчезает сам, как только появляется
+ * первая машина, поэтому убирать его руками не нужно.
+ */
+function FirstSteps({ onGoTo }: { onGoTo: (tab: Tab) => void }) {
+  /*
+   * Отметок «сделано» здесь нет намеренно. При регистрации клуб уже получает
+   * зону «Основной зал» и поминутный тариф-заготовку, так что галочка по факту
+   * их существования сказала бы «готово» про то, чего владелец даже не видел.
+   */
+  const steps: Array<{ title: string; hint: string; tab: Tab; action: string }> = [
+    {
+      title: "Заведите машины зала",
+      hint: "Зона «Основной зал» уже создана — переименуйте её или добавьте вторую, например VIP, и заведите машины.",
+      tab: "settings",
+      action: "В настройки",
+    },
+    {
+      title: "Поставьте свои цены",
+      hint: "Поминутный тариф-заготовка уже есть. Исправьте цену и добавьте пакеты — отдельно для каждой зоны.",
+      tab: "tariffs",
+      action: "К тарифам",
+    },
+    {
+      title: "Поставьте агентов на игровые ПК",
+      hint: "Там же напечатаны коды привязки — по одному на машину — и переносятся гости из прежней системы.",
+      tab: "onboarding",
+      action: "К подключению",
+    },
+  ];
+
+  return (
+    <section className="zone-block first-steps">
+      <div className="zone-head">
+        <h2>С чего начать</h2>
+      </div>
+
+      <div className="notice">
+        В клубе пока нет ни одной машины. Три шага ниже — всё, что нужно, чтобы посадить
+        первого гостя.
+      </div>
+
+      <div className="rows">
+        {steps.map((step) => (
+          <div className="row step" key={step.title}>
+            <span className="k">
+              <b>{step.title}</b>
+              <span className="note">{step.hint}</span>
+            </span>
+            <button onClick={() => onGoTo(step.tab)}>{step.action}</button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

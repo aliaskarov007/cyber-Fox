@@ -651,3 +651,29 @@ td.num {
   word-break: break-all;
   margin-top: 6px;
 }
+
+/*
+ * Первые шаги в пустом клубе. Показываются один раз — пока в зале нет машин, —
+ * поэтому не конкурируют за внимание с картой зала в обычной работе.
+ */
+.first-steps .row.step {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* Заголовок шага читается как основной текст, а не как подпись слева. */
+.first-steps .row.step .k {
+  display: grid;
+  gap: 3px;
+  color: var(--ink);
+}
+
+.first-steps .row.step .note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.first-steps .row.step button {
+  white-space: nowrap;
+}
