@@ -22,7 +22,7 @@
 В PowerShell:
 
 ```powershell
-git clone <репозиторий> cyber-fox
+git clone https://github.com/aliaskarov007/cyber-Fox.git cyber-fox
 cd cyber-fox
 Copy-Item deploy\env.example .env
 notepad .env

@@ -123,7 +123,7 @@ VPS. Схема одна и та же, разница только в адрес
 На мини-ПК с Windows:
 
 ```powershell
-git clone <репозиторий> cyber-fox
+git clone https://github.com/aliaskarov007/cyber-Fox.git cyber-fox
 cd cyber-fox
 Copy-Item deploy\env.example .env
 notepad .env
