@@ -18,6 +18,20 @@ describe("адрес сервера", () => {
     expect(normalizeServerUrl("cyberfox.kz")).toMatch(/^https:/);
   });
 
+  it("для сервера в локальной сети подставляет http", () => {
+    // На 192.168.* сертификат не выдаётся: https там не соединится вовсе, а
+    // причину администратор будет искать в сети.
+    expect(normalizeServerUrl("192.168.1.50:8080")).toBe("http://192.168.1.50:8080");
+    expect(normalizeServerUrl("10.0.0.5:8080")).toBe("http://10.0.0.5:8080");
+    expect(normalizeServerUrl("172.20.1.1")).toBe("http://172.20.1.1");
+    expect(normalizeServerUrl("localhost:3000")).toBe("http://localhost:3000");
+  });
+
+  it("внешний IP локальным не считает", () => {
+    expect(normalizeServerUrl("172.15.0.1")).toMatch(/^https:/);
+    expect(normalizeServerUrl("8.8.8.8")).toMatch(/^https:/);
+  });
+
   it("оставляет явно указанную схему", () => {
     expect(normalizeServerUrl("http://192.168.1.10:3000")).toBe("http://192.168.1.10:3000");
   });

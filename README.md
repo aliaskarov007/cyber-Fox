@@ -12,6 +12,7 @@
 | [docs/guest-access.md](docs/guest-access.md) | Два пути входа гостя и разрешение конфликтов |
 | [docs/offline.md](docs/offline.md) | Работа без интернета, аварийный режим, синхронизация |
 | [docs/deploy.md](docs/deploy.md) | Пилот в зале: установка, проверки первой смены, чего ещё нет |
+| [docs/install-windows.md](docs/install-windows.md) | Установка на Windows и работа в локальной сети клуба |
 
 ## Состав
 
@@ -92,6 +93,15 @@ docker compose up -d
 
 Порядок первого дня в зале, проверки первой смены и честный список того, чего
 ещё нет для чужого клуба — в [docs/deploy.md](docs/deploy.md).
+
+Пилот в локальной сети клуба, без домена и HTTPS — сервер прямо в зале:
+
+```powershell
+docker compose -f docker-compose.yml -f deploy\lan.yml up -d
+```
+
+Под Windows это `deploy\windows\start.cmd`; подробности —
+[docs/install-windows.md](docs/install-windows.md).
 
 ## Проверки
 
