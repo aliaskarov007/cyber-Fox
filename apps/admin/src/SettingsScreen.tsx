@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { type Club, type Staff, type StaffMember, type Tenant, api, formatMoney, toTiyn } from "./api.js";
+import { ComputersSection } from "./ComputersSection.js";
+import { ZonesSection } from "./ZonesSection.js";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Владелец сети",
@@ -54,6 +56,10 @@ export function SettingsScreen({
       {done && <div className="notice">{done}</div>}
 
       <ClubSettings club={club} onSaved={(msg) => void run(async () => onClubsChanged(), msg)} />
+
+      {/* Зоны выше машин: машина заводится в зону, а не наоборот. */}
+      <ZonesSection club={club} onChanged={() => onClubsChanged()} />
+      <ComputersSection club={club} />
 
       {isOwner && tenant && (
         <>

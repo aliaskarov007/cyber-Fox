@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type Club, type Guest, type Product, api, formatMoney } from "./api.js";
+import { ProductsSection } from "./ProductsSection.js";
 
 /**
  * Бар. Продажа — самая частая операция после посадки, поэтому товар продаётся
@@ -71,6 +72,10 @@ export function BarScreen({ club }: { club: Club }) {
     <main>
       {done && <div className="notice">Продано: {done}</div>}
       {error && <div className="error">{error}</div>}
+
+      {/* Правка товаров живёт рядом с продажей: цену меняют у стойки и в смену,
+          а не в отдельном разделе настроек, куда администратор не заходит. */}
+      <ProductsSection club={club} products={products} onChanged={() => void refresh()} />
 
       {categories.map(([category, items]) => (
         <section className="zone-block" key={category}>

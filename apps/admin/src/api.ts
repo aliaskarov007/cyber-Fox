@@ -94,6 +94,15 @@ export interface Product {
   isActive: boolean;
 }
 
+/** Что отправляет форма товара. Деньги в тиын, остаток пустой — учёта нет. */
+export interface ProductInput {
+  name: string;
+  category?: string;
+  price: number;
+  cost?: number;
+  stock?: number;
+}
+
 export interface Shift {
   id: string;
   staffId: string;
@@ -252,7 +261,29 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  createZone: (clubId: string, body: { name: string; sortOrder?: number }) =>
+    request<Zone>(`/clubs/${clubId}/zones`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateZone: (
+    clubId: string,
+    zoneId: string,
+    body: Partial<{ name: string; sortOrder: number; defaultPerMinuteTariffId: string }>,
+  ) =>
+    request<Zone>(`/clubs/${clubId}/zones/${zoneId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
   computers: (clubId: string) => request<Computer[]>(`/clubs/${clubId}/computers`),
+
+  createComputer: (clubId: string, body: { name: string; zoneId: string }) =>
+    request<Computer>(`/clubs/${clubId}/computers`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateComputer: (clubId: string, computerId: string, body: Partial<{ name: string; zoneId: string }>) =>
+    request<Computer>(`/clubs/${clubId}/computers/${computerId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   hall: (clubId: string) => request<HallCell[]>(`/clubs/${clubId}/hall`),
 
@@ -264,6 +295,22 @@ export const api = {
 
   createGuest: (clubId: string, body: { fullName: string; phone: string; pin?: string }) =>
     request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+
+  createProduct: (clubId: string, body: ProductInput) =>
+    request<Product>(`/clubs/${clubId}/products`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateProduct: (clubId: string, productId: string, body: Partial<ProductInput> & { isActive?: boolean }) =>
+    request<Product>(`/clubs/${clubId}/products/${productId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  /** PIN гостя для самостоятельного входа за игровым ПК. Хранится хешем. */
+  setGuestPin: (clubId: string, guestId: string, pin: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/guests/${guestId}/pin`, {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    }),
 
   topUp: (clubId: string, guestId: string, amount: number, method: string) =>
     request<{ balance: number }>(`/clubs/${clubId}/guests/${guestId}/topup`, {

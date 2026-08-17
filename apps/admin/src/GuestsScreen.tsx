@@ -10,6 +10,8 @@ import {
   formatMoney,
   toTiyn,
 } from "./api.js";
+import { GuestNewForm } from "./GuestNewForm.js";
+import { GuestPinForm } from "./GuestPinForm.js";
 
 const TRANSACTION_LABEL: Record<string, string> = {
   TOPUP: "Пополнение",
@@ -38,12 +40,17 @@ export function GuestsScreen({ club }: { club: Club }) {
   return (
     <main>
       <div className="section" style={{ borderTop: "none", paddingTop: 0, marginBottom: 16 }}>
-        <input
-          placeholder="Телефон или имя"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ maxWidth: 420 }}
-        />
+        <div className="actions">
+          <input
+            placeholder="Телефон или имя"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ maxWidth: 420 }}
+          />
+          {/* Гостя заводят при первом визите, прямо на стойке: искать его до
+              этого бессмысленно, а карточка нужна сразу для посадки. */}
+          <GuestNewForm club={club} onCreated={(id) => setSelectedId(id)} />
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -147,6 +154,19 @@ function GuestCardPanel({
           нельзя.
         </div>
       )}
+
+      <div className="section">
+        <h3>Вход за машиной</h3>
+        <GuestPinForm
+          club={club}
+          guestId={guestId}
+          hasPin={card.guest.hasPin}
+          onChanged={() => {
+            void load();
+            onChanged();
+          }}
+        />
+      </div>
 
       <div className="section">
         <h3>Счёт</h3>
