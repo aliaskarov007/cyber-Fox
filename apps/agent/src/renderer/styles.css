@@ -307,3 +307,157 @@ button:disabled {
   letter-spacing: normal;
   font-size: 17px;
 }
+
+/* --- Оболочка: то, что видит гость во время оплаченной игры --- */
+
+/*
+ * Экран игры устроен иначе, чем блокировка: там всё в узкой карточке по центру,
+ * здесь полки во всю ширину, потому что обложки — главное содержимое.
+ */
+.playing {
+  width: 100vw;
+  min-height: 100vh;
+  padding: 18px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-self: start;
+}
+
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.session-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.session-value {
+  font-size: 30px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.session-bar.warn .session-value {
+  color: var(--warn);
+}
+
+.session-bar.debt .session-value {
+  color: var(--danger);
+}
+
+.session-unit,
+.session-money {
+  color: var(--muted);
+}
+
+/* Кнопки уходят вправо: гость смотрит на время, а не на «Завершить». */
+.session-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.shell-search {
+  align-self: flex-start;
+  width: min(420px, 100%);
+  font-size: 16px;
+}
+
+.shelf-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Полка прокручивается вбок: длинный список не должен растягивать страницу. */
+.shelf-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.tile {
+  flex: none;
+  width: 168px;
+  padding: 0;
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tile-art {
+  width: 168px;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid transparent;
+  display: grid;
+  place-items: center;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.tile:hover .tile-art,
+.tile:focus-visible .tile-art {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+}
+
+.tile-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Игра без обложки не выпадает из ряда: первая буква вместо картинки. */
+.tile-letter {
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tile-name {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.shell-hint,
+.shell-empty-hint {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.shell-empty {
+  display: grid;
+  gap: 10px;
+  padding: 48px 0;
+  max-width: 52ch;
+}
+
+.shell-empty-title {
+  font-size: 22px;
+  font-weight: 600;
+}

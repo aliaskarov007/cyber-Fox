@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ClubApp } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -44,7 +44,8 @@ export class LibraryService {
 
   async create(staff: AuthenticatedStaff, clubId: string, dto: CreateAppDto): Promise<ClubApp> {
     await this.access.requireClub(staff, clubId);
-    const app = await this.prisma.clubApp.create({
+    await this.requireOwnZone(clubId, dto.zoneId);
+    const app = await this.named(() => this.prisma.clubApp.create({
       data: {
         clubId,
         name: dto.name.trim(),
@@ -56,7 +57,7 @@ export class LibraryService {
         zoneId: dto.zoneId ?? null,
         sortOrder: dto.sortOrder ?? 0,
       },
-    });
+    }));
     this.bus.emit("library.changed", { clubId });
     return app;
   }
@@ -70,8 +71,9 @@ export class LibraryService {
     await this.access.requireClub(staff, clubId);
     const existing = await this.prisma.clubApp.findUnique({ where: { id: appId } });
     if (!existing || existing.clubId !== clubId) throw new NotFoundException("Игра не найдена");
+    await this.requireOwnZone(clubId, dto.zoneId);
 
-    const app = await this.prisma.clubApp.update({
+    const app = await this.named(() => this.prisma.clubApp.update({
       where: { id: appId },
       data: {
         ...dto,
@@ -81,7 +83,7 @@ export class LibraryService {
         category: dto.category === undefined ? undefined : dto.category.trim() || null,
         coverUrl: dto.coverUrl === undefined ? undefined : dto.coverUrl.trim() || null,
       },
-    });
+    }));
     this.bus.emit("library.changed", { clubId });
     return app;
   }
@@ -98,5 +100,33 @@ export class LibraryService {
     await this.prisma.clubApp.delete({ where: { id: appId } });
     this.bus.emit("library.changed", { clubId });
     return { ok: true };
+  }
+
+  /*
+   * Название игры в клубе уникально. Без перехвата совпадение выглядело бы
+   * пятисотой ошибкой, и владелец, переименовывая игру в уже занятое имя, видел
+   * бы «что-то пошло не так» вместо причины.
+   */
+  private async named<T>(action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2002") {
+        throw new ConflictException("Игра с таким названием в клубе уже есть");
+      }
+      throw error;
+    }
+  }
+
+  /*
+   * Чужая зона внешним ключом не отсекается: он проверяет лишь существование
+   * зоны, а не то, что она из этого клуба. Игра с чужой зоной не показалась бы
+   * никому — forZone сначала фильтрует по клубу, — и владелец искал бы пропажу
+   * в оболочке, а не в поле, которое сам заполнил.
+   */
+  private async requireOwnZone(clubId: string, zoneId: string | null | undefined): Promise<void> {
+    if (!zoneId) return;
+    const zone = await this.prisma.zone.findUnique({ where: { id: zoneId } });
+    if (!zone || zone.clubId !== clubId) throw new NotFoundException("Зона не найдена");
   }
 }

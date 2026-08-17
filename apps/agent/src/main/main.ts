@@ -1,4 +1,5 @@
-import { BrowserWindow, app, globalShortcut, ipcMain } from "electron";
+import { BrowserWindow, app, globalShortcut, ipcMain, shell } from "electron";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
@@ -148,13 +149,54 @@ ipcMain.handle("agent:save-config", (_event, settings: AgentSettings) => {
  * каждое такое сообщение — значит моргать окном поверх чужой игры.
  */
 
-/** Сервер разрешил игру: снимаем киоск и уводим окно с глаз. */
+/*
+ * Сервер разрешил игру: снимаем киоск, но окно оставляем на экране.
+ *
+ * Раньше агент сворачивался, и гость оставался наедине с рабочим столом:
+ * ярлыки искал сам, а всё остальное в Windows было открыто. Теперь на его
+ * месте оболочка с полками игр, а свернётся окно только когда игра запущена.
+ */
 ipcMain.handle("agent:unlock", () => {
   if (unlocked) return;
   unlocked = true;
   lockWindow?.setKiosk(false);
   lockWindow?.setAlwaysOnTop(false);
-  lockWindow?.minimize();
+  lockWindow?.setFullScreen(true);
+  // Окно создаётся несворачиваемым, иначе блокировку убирали бы одной кнопкой.
+  // На время оплаченной сессии сворачивание нужно: под ним запускается игра.
+  lockWindow?.setMinimizable(true);
+});
+
+/**
+ * Запуск игры с полки.
+ *
+ * Программа отвязывается от агента: перезапуск оболочки не должен убивать
+ * запущенную игру, а закрытая игра — оставлять висеть процесс агента.
+ */
+ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: string; args: string[] }) => {
+  if (!unlocked) return { ok: false, reason: "Сессия не оплачена" };
+
+  try {
+    if (app.kind === "URI") {
+      await shell.openExternal(app.target);
+    } else {
+      const child = spawn(app.target, app.args ?? [], { detached: true, stdio: "ignore" });
+      child.unref();
+    }
+    // Уводим оболочку с дороги: игра открывается поверх, а вернуться к полкам
+    // можно тем же сочетанием, что показано на экране.
+    lockWindow?.minimize();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: asText(error) };
+  }
+});
+
+/** Вернуться к полкам, не закрывая игру. */
+ipcMain.handle("agent:shell", () => {
+  if (!unlocked) return;
+  lockWindow?.restore();
+  lockWindow?.focus();
 });
 
 /** Время кончилось: возвращаем блокировку поверх игры. */
@@ -162,6 +204,7 @@ ipcMain.handle("agent:lock", () => {
   if (!unlocked && lockWindow?.isVisible()) return;
   unlocked = false;
   lockWindow?.restore();
+  lockWindow?.setMinimizable(false);
   lockWindow?.setKiosk(true);
   lockWindow?.setAlwaysOnTop(true, "screen-saver");
   lockWindow?.focus();
@@ -196,6 +239,20 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error(`Сочетание ${accelerator} не перехвачено: ${asText(error)}`);
     }
+  }
+
+  /*
+   * Возврат к полкам поверх запущенной игры. Сочетание редкое намеренно: часто
+   * используемое гость нажмёт случайно и свернёт себе катку.
+   */
+  try {
+    globalShortcut.register("Control+Alt+Home", () => {
+      if (!unlocked) return;
+      lockWindow?.restore();
+      lockWindow?.focus();
+    });
+  } catch (error) {
+    console.error(`Возврат к полкам не перехвачен: ${asText(error)}`);
   }
 });
 

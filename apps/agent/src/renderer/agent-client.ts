@@ -2,6 +2,7 @@ import { type Socket, io } from "socket.io-client";
 
 import type { OfflineOperation } from "./offline-journal.js";
 
+import type { LibraryApp } from "../shared/library.js";
 import type { AgentSettings } from "../shared/settings.js";
 
 /** Настройки приходят из основного процесса: экран их не хранит. */
@@ -46,6 +47,11 @@ declare global {
       saveConfig: (settings: AgentSettings) => Promise<void>;
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
+      launch: (app: {
+        kind: string;
+        target: string;
+        args: string[];
+      }) => Promise<{ ok: boolean; reason?: string }>;
     };
   }
 }
@@ -72,6 +78,8 @@ export class AgentClient {
     onConnectionChange: (online: boolean) => void;
     /** Сервер не принял машину — например, код привязки набран с ошибкой. */
     onRejected: (reason: string) => void;
+    /** Каталог клуба изменился: полки надо перечитать. */
+    onLibraryChanged: () => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
 
@@ -103,6 +111,7 @@ export class AgentClient {
     this.socket.on("session.started", handlers.onStarted);
     this.socket.on("session.switched", handlers.onSwitched);
     this.socket.on("lock", handlers.onLock);
+    this.socket.on("library.changed", handlers.onLibraryChanged);
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
@@ -118,6 +127,11 @@ export class AgentClient {
 
   stopSession(sessionId: string): Promise<{ ok: boolean; reason?: string }> {
     return this.request("session.stop", { sessionId });
+  }
+
+  /** Полки этой машины: общие игры клуба плюс игры её зоны. */
+  library(): Promise<{ ok: boolean; apps: LibraryApp[] }> {
+    return this.request("library.fetch", {});
   }
 
   callStaff(): Promise<{ ok: boolean }> {

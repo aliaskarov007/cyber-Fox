@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AgentSettings } from "../shared/settings.js";
 import { AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
+import type { LibraryApp } from "../shared/library.js";
 import { LockScreen } from "./LockScreen.js";
-import { SessionOverlay } from "./SessionOverlay.js";
+import { Shell } from "./Shell.js";
+import { SessionBar } from "./SessionBar.js";
 import { SetupScreen } from "./SetupScreen.js";
 import {
   type JournalState,
@@ -33,10 +35,18 @@ export function App() {
   const [online, setOnline] = useState(false);
   const [switchNote, setSwitchNote] = useState<string | null>(null);
   const [queued, setQueued] = useState(0);
+  /** Полки оболочки: приходят с сервера и обновляются по его же сигналу. */
+  const [apps, setApps] = useState<LibraryApp[]>([]);
+  const [launchError, setLaunchError] = useState<string | null>(null);
   /** Локальный остаток на время обрыва: показываем его вместо серверного. */
   const [localMinutes, setLocalMinutes] = useState<number | null>(null);
   const started = useRef(false);
   const journal = useRef<JournalState>(emptyJournal());
+
+  const loadLibrary = useCallback(async () => {
+    const result = await client.library().catch(() => null);
+    if (result?.ok) setApps(result.apps);
+  }, [client]);
 
   /** Досылка накопленного. Очередь чистится только по подтверждению сервера. */
   const flush = useCallback(async () => {
@@ -84,7 +94,11 @@ export function App() {
       onPaired: (info) => {
         setRejection(null);
         setPaired(info);
+        // Полки нужны раньше, чем гость сядет: пустая оболочка в момент старта
+        // сессии выглядит как сломанная система.
+        void loadLibrary();
       },
+      onLibraryChanged: () => void loadLibrary(),
       onRejected: setRejection,
       onTick: (next) => {
         setTick(next);
@@ -216,6 +230,48 @@ export function App() {
     );
   }
 
+  /*
+   * Оплаченная сессия показывает полки, а не только таймер: до этого гость
+   * оставался на рабочем столе Windows и искал ярлыки сам. Таймер уезжает в
+   * узкую строку сверху, чтобы не отнимать место у обложек.
+   */
+  if (displayTick) {
+    return (
+      <div className="playing">
+        <SessionBar
+          client={client}
+          tick={displayTick}
+          warnMinutes={WARN_MINUTES}
+          offline={!online}
+          note={switchNote}
+          error={launchError}
+          onStopped={() => {
+            started.current = false;
+            setTick(null);
+            setLocalMinutes(null);
+            void window.cyberfox.lock();
+          }}
+        />
+        <Shell
+          apps={apps}
+          onLaunch={(app) => {
+            setLaunchError(null);
+            void window.cyberfox
+              .launch({ kind: app.kind, target: app.target, args: app.args })
+              .then((result) => {
+                if (!result.ok) {
+                  setLaunchError(
+                    `Не удалось запустить «${app.name}»: ${result.reason ?? "неизвестная причина"}. ` +
+                      "Скажите администратору.",
+                  );
+                }
+              });
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="screen">
       <div className="pc-id">
@@ -234,20 +290,7 @@ export function App() {
         </div>
       )}
 
-      {displayTick ? (
-        <SessionOverlay
-          client={client}
-          tick={displayTick}
-          warnMinutes={WARN_MINUTES}
-          offline={!online}
-          onStopped={() => {
-            started.current = false;
-            setTick(null);
-            setLocalMinutes(null);
-            void window.cyberfox.lock();
-          }}
-        />
-      ) : (
+      {(
         <LockScreen
           client={client}
           perMinutePrice={null}

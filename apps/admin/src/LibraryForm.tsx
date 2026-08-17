@@ -50,8 +50,13 @@ export function LibraryForm({
         args: args.trim() === "" ? [] : args.trim().split(/\s+/),
         // Пустая зона означает «во всех», а не «зона не выбрана».
         zoneId: zoneId === "" ? null : zoneId,
-        ...(category.trim() === "" ? {} : { category: category.trim() }),
-        ...(preview ? { coverUrl: preview } : {}),
+        /*
+         * Пустые поля отправляются пустой строкой, а не пропускаются. Сервер
+         * различает «не присылали» и «прислали пусто»: пропуск оставил бы
+         * прежнее значение, и очистить полку или обложку было бы нечем.
+         */
+        category: category.trim(),
+        coverUrl: preview ?? "",
       };
       if (editing) await api.updateApp(club.id, editing.id, body);
       else await api.createApp(club.id, body);

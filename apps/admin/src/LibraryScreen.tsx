@@ -18,9 +18,14 @@ export function LibraryScreen({ club }: { club: Club }) {
   const [error, setError] = useState<string | null>(null);
 
   async function load(): Promise<void> {
-    const [nextApps, nextZones] = await Promise.all([api.apps(club.id), api.zones(club.id)]);
-    setApps(nextApps);
-    setZones(nextZones);
+    try {
+      const [nextApps, nextZones] = await Promise.all([api.apps(club.id), api.zones(club.id)]);
+      setApps(nextApps);
+      setZones(nextZones);
+    } catch (cause) {
+      // Молчаливый пустой экран здесь неотличим от «каталог пуст».
+      setError((cause as Error).message);
+    }
   }
 
   useEffect(() => {
