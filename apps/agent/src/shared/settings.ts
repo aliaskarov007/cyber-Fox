@@ -10,9 +10,18 @@ export interface AgentSettings {
   serverUrl: string;
   /** Код привязки конкретной машины — выдаётся в админке. */
   pairingToken: string;
+  /**
+   * Ключ клуба для бездисковых залов. Один на весь клуб, поэтому его можно
+   * положить в общий образ: машины различаются по MAC, а не по настройкам.
+   */
+  enrollmentKey: string;
 }
 
-export const EMPTY_SETTINGS: AgentSettings = { serverUrl: "", pairingToken: "" };
+export const EMPTY_SETTINGS: AgentSettings = {
+  serverUrl: "",
+  pairingToken: "",
+  enrollmentKey: "",
+};
 
 /**
  * Адрес внутри локальной сети клуба: IP из частных диапазонов или localhost.
@@ -57,8 +66,13 @@ export function normalizePairingToken(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, "");
 }
 
+/**
+ * Машина готова подключаться, если известен адрес и хотя бы один способ себя
+ * назвать: код привязки для обычного ПК или ключ клуба для бездискового.
+ */
 export function isConfigured(settings: AgentSettings): boolean {
-  return settings.serverUrl.length > 0 && settings.pairingToken.length > 0;
+  if (settings.serverUrl.length === 0) return false;
+  return settings.pairingToken.length > 0 || settings.enrollmentKey.length > 0;
 }
 
 /** Что не так с введённым — сообщением, которое читает администратор. */
@@ -69,6 +83,8 @@ export function validate(settings: AgentSettings): string | null {
   } catch {
     return "Адрес сервера не похож на ссылку";
   }
-  if (settings.pairingToken.length === 0) return "Укажите код привязки этой машины";
+  if (settings.pairingToken.length === 0 && settings.enrollmentKey.length === 0) {
+    return "Укажите код привязки этой машины или ключ клуба";
+  }
   return null;
 }

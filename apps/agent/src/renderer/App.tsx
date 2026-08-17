@@ -165,7 +165,11 @@ export function App() {
     };
     return (
       <SetupScreen
-        initial={{ serverUrl: config.serverUrl, pairingToken: config.pairingToken }}
+        initial={{
+          serverUrl: config.serverUrl,
+          pairingToken: config.pairingToken,
+          enrollmentKey: config.enrollmentKey,
+        }}
         hostname={config.hostname}
         error={rejection}
         onSave={save}

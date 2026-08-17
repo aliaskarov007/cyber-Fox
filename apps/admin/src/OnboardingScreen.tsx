@@ -76,6 +76,8 @@ export function OnboardingScreen({ club, isOwner }: { club: Club; isOwner: boole
           связывает программу с конкретным ПК — вводить его повторно не нужно.
         </div>
 
+        {isOwner && <DisklessKey club={club} />}
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -251,6 +253,47 @@ function SubscriptionBlock({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Ключ клуба для бездисковых залов.
+ *
+ * Там все ПК грузятся с одного образа, и код привязки в него не положишь: он
+ * у каждой машины свой, а настройки в профиле стираются при перезагрузке.
+ * Поэтому в образ кладётся один ключ на клуб, а машины различаются по MAC
+ * сетевой карты — без уникального MAC загрузка по сети невозможна.
+ */
+function DisklessKey({ club }: { club: Club }) {
+  const [shown, setShown] = useState(false);
+
+  const file = `{
+  "serverUrl": "${window.location.origin}",
+  "enrollmentKey": "${club.enrollmentKey}"
+}`;
+
+  return (
+    <div className="notice">
+      <b>Зал на бездисковой загрузке (CCBoot и подобные)</b>
+      <div className="note" style={{ marginTop: 6 }}>
+        Коды привязки здесь не нужны: положите файл <code>cyberfox.json</code> рядом с агентом в
+        общий образ, и машины подключатся сами, различаясь по MAC сетевой карты. Новая машина
+        появится в зале при первой загрузке.
+      </div>
+
+      {shown ? (
+        <>
+          <div className="checkout-link" style={{ marginTop: 8, whiteSpace: "pre" }}>{file}</div>
+          <div className="note" style={{ marginTop: 6 }}>
+            Ключ пускает машину в этот клуб — держите образ там, куда нет доступа у гостей.
+          </div>
+        </>
+      ) : (
+        <div className="actions" style={{ marginTop: 8 }}>
+          <button onClick={() => setShown(true)}>Показать ключ клуба</button>
+        </div>
+      )}
+    </div>
   );
 }
 

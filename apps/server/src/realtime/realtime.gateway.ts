@@ -71,13 +71,31 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
    * агент — по коду привязки машины.
    */
   async handleConnection(client: Socket): Promise<void> {
-    const { token, pairingToken, hostname } = client.handshake.auth as {
+    const { token, pairingToken, enrollmentKey, macAddress, hostname } = client.handshake.auth as {
       token?: string;
       pairingToken?: string;
+      enrollmentKey?: string;
+      macAddress?: string;
       hostname?: string;
     };
 
     try {
+      /*
+       * Бездисковый зал: код привязки в общий образ не положишь, поэтому машина
+       * предъявляет ключ клуба и свой MAC. Ветка идёт первой — если в образе
+       * лежит ключ, он и есть способ подключения.
+       */
+      if (enrollmentKey) {
+        const computer = await this.agents
+          .enroll(enrollmentKey, macAddress ?? "", hostname ?? "")
+          .catch((error: Error) => {
+            client.emit("pair.rejected", { reason: error.message });
+            throw error;
+          });
+        await this.attachAgent(client, computer);
+        return;
+      }
+
       if (pairingToken) {
         /*
          * Ошибку привязки объясняем агенту до разрыва соединения. Молчаливый
@@ -90,26 +108,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
             client.emit("pair.rejected", { reason: error.message });
             throw error;
           });
-        client.data.computerId = computer.id;
-        client.data.clubId = computer.clubId;
-        await client.join(agentRoom(computer.id));
-        client.emit("paired", {
-          computerId: computer.id,
-          computerName: computer.name,
-          zoneName: computer.zone.name,
-          clubName: computer.club.name,
-        });
-
-        // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние
-        // сразу, иначе он до минуты держит блокировку поверх чужой сессии.
-        const activeSessionId = await this.sessions.activeSessionFor(computer.id);
-        if (activeSessionId) {
-          // Время молчания не начисляем: оно не подтверждено. Реально отыгранное
-          // придёт отдельным отчётом агента.
-          await this.sessions.resumeAfterSilence(activeSessionId);
-          const snapshot = await this.sessions.sessionSnapshot(activeSessionId);
-          if (snapshot) client.emit("session.tick", snapshot);
-        }
+        await this.attachAgent(client, computer);
         return;
       }
 
@@ -132,6 +131,37 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     } catch (error) {
       this.logger.warn(`Соединение отклонено: ${(error as Error).message}`);
       client.disconnect(true);
+    }
+  }
+
+  /**
+   * Общая часть обоих способов подключения агента: по коду привязки и по
+   * ключу бездискового зала. Различается только опознание машины — дальше и
+   * комната, и восстановление сессии одинаковы.
+   */
+  private async attachAgent(
+    client: Socket,
+    computer: { id: string; clubId: string; name: string; zone: { name: string }; club: { name: string } },
+  ): Promise<void> {
+    client.data.computerId = computer.id;
+    client.data.clubId = computer.clubId;
+    await client.join(agentRoom(computer.id));
+    client.emit("paired", {
+      computerId: computer.id,
+      computerName: computer.name,
+      zoneName: computer.zone.name,
+      clubName: computer.club.name,
+    });
+
+    // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние
+    // сразу, иначе он до минуты держит блокировку поверх чужой сессии.
+    const activeSessionId = await this.sessions.activeSessionFor(computer.id);
+    if (activeSessionId) {
+      // Время молчания не начисляем: оно не подтверждено. Реально отыгранное
+      // придёт отдельным отчётом агента.
+      await this.sessions.resumeAfterSilence(activeSessionId);
+      const snapshot = await this.sessions.sessionSnapshot(activeSessionId);
+      if (snapshot) client.emit("session.tick", snapshot);
     }
   }
 

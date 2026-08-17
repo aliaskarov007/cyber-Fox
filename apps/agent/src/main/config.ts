@@ -1,56 +1,87 @@
 import { app } from "electron";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 
+import { pickMac } from "../shared/machine.js";
 import { type AgentSettings, EMPTY_SETTINGS } from "../shared/settings.js";
 
 /**
- * Настройки агента на диске.
+ * Настройки агента: откуда берутся и почему именно оттуда.
  *
- * Раньше адрес сервера и код привязки приходили только из переменных окружения.
- * Для разработки это удобно, но на игровую машину так ничего не поставишь:
- * администратор не будет заводить переменные среды на сорока ПК. Поэтому
- * настройки живут в файле рядом с профилем приложения, а вводятся один раз
- * с экрана самого агента.
+ * Источников три, и они перекрывают друг друга сверху вниз:
+ *
+ *   1. Переменные окружения — разработка и массовая раскатка из образа машины.
+ *   2. Файл рядом с программой — то, что переживает перезагрузку бездискового
+ *      ПК. Профиль пользователя там стирается вместе с кэшем записи, а папка
+ *      программы — часть общего образа, и админ кладёт файл туда один раз.
+ *   3. Файл в профиле — обычная машина с диском, настроенная руками с экрана.
+ *
+ * Порядок именно такой: общий образ задаёт зал целиком, а ручная настройка
+ * остаётся возможной там, где образа нет.
  */
 
-function settingsPath(): string {
+/** Имя файла настроек в папке программы — его кладут в образ. */
+const IMAGE_FILE = "cyberfox.json";
+
+function profilePath(): string {
   return join(app.getPath("userData"), "settings.json");
 }
 
-/**
- * Переменные окружения перекрывают файл.
- *
- * Порядок именно такой: разработчик поднимает агента против localhost, не
- * трогая сохранённые настройки, а массовая установка задаёт общий для зала
- * адрес сервера один раз — через переменную среды в образе машины.
- */
-export function readSettings(): AgentSettings {
-  const file = settingsPath();
-  let stored = EMPTY_SETTINGS;
+function imagePath(): string {
+  // dirname(exe) — папка установки; в разработке это папка electron, там файла
+  // просто не будет, и источник молча пропускается.
+  return join(dirname(app.getPath("exe")), IMAGE_FILE);
+}
 
-  if (existsSync(file)) {
-    try {
-      const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<AgentSettings>;
-      stored = {
-        serverUrl: typeof parsed.serverUrl === "string" ? parsed.serverUrl : "",
-        pairingToken: typeof parsed.pairingToken === "string" ? parsed.pairingToken : "",
-      };
-    } catch {
-      // Битый файл не должен оставлять зал без блокировки: агент просто
-      // попросит настроить себя заново.
-      stored = EMPTY_SETTINGS;
-    }
+function readFile(file: string): Partial<AgentSettings> {
+  if (!existsSync(file)) return {};
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as Partial<AgentSettings>;
+  } catch {
+    // Битый файл не должен оставлять зал без блокировки: агент просто попросит
+    // настроить себя заново.
+    return {};
   }
+}
+
+const text = (value: unknown): string => (typeof value === "string" ? value : "");
+
+export function readSettings(): AgentSettings {
+  const image = readFile(imagePath());
+  const profile = readFile(profilePath());
+
+  const pick = (key: keyof AgentSettings, env: string | undefined): string =>
+    env ?? (text(profile[key]) || text(image[key]) || EMPTY_SETTINGS[key]);
 
   return {
-    serverUrl: process.env.CYBERFOX_SERVER ?? stored.serverUrl,
-    pairingToken: process.env.CYBERFOX_PAIRING_TOKEN ?? stored.pairingToken,
+    serverUrl: pick("serverUrl", process.env.CYBERFOX_SERVER),
+    pairingToken: pick("pairingToken", process.env.CYBERFOX_PAIRING_TOKEN),
+    enrollmentKey: pick("enrollmentKey", process.env.CYBERFOX_ENROLLMENT_KEY),
   };
 }
 
+/** Ручная настройка пишется в профиль: папка программы бывает только для чтения. */
 export function writeSettings(settings: AgentSettings): void {
-  const file = settingsPath();
+  const file = profilePath();
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+/**
+ * MAC, которым машина представляется серверу.
+ *
+ * В бездисковом зале это единственный устойчивый признак: имя, профиль и
+ * настройки у всех машин общие, потому что образ один.
+ */
+export function machineMac(): string {
+  const adapters = Object.entries(networkInterfaces()).flatMap(([name, list]) =>
+    (list ?? []).map((entry) => ({
+      name,
+      mac: entry.mac,
+      internal: entry.internal,
+      family: String(entry.family),
+    })),
+  );
+  return pickMac(adapters) ?? "";
 }

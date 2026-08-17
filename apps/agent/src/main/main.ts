@@ -2,7 +2,7 @@ import { BrowserWindow, app, globalShortcut, ipcMain } from "electron";
 import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
-import { readSettings, writeSettings } from "./config.js";
+import { machineMac, readSettings, writeSettings } from "./config.js";
 
 /**
  * Агент на игровом ПК.
@@ -88,6 +88,9 @@ app.whenReady().then(() => {
     return {
       ...settings,
       hostname: process.env.COMPUTERNAME ?? process.env.HOSTNAME ?? "unknown",
+      // В бездисковом зале имя и настройки у машин общие, поэтому себя они
+      // называют MAC-адресом.
+      macAddress: machineMac(),
       configured: isConfigured(settings),
     };
   });

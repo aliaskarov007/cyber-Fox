@@ -7,7 +7,9 @@ import type { AgentSettings } from "../shared/settings.js";
 /** Настройки приходят из основного процесса: экран их не хранит. */
 export interface AgentConfig extends AgentSettings {
   hostname: string;
-  /** Машину уже настроили: есть и адрес сервера, и код привязки. */
+  /** MAC сетевой карты: им машина называет себя в бездисковом зале. */
+  macAddress: string;
+  /** Машину уже настроили: есть адрес сервера и способ себя назвать. */
   configured: boolean;
 }
 
@@ -74,7 +76,14 @@ export class AgentClient {
     const config = await window.cyberfox.config();
 
     this.socket = io(config.serverUrl, {
-      auth: { pairingToken: config.pairingToken, hostname: config.hostname },
+      auth: {
+        // Ключ клуба и код привязки — два способа опознания. Сервер смотрит
+        // сначала на ключ: если он есть, машина из бездискового зала.
+        enrollmentKey: config.enrollmentKey || undefined,
+        macAddress: config.macAddress,
+        pairingToken: config.pairingToken || undefined,
+        hostname: config.hostname,
+      },
       transports: ["websocket"],
       reconnection: true,
     });

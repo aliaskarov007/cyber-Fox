@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type AgentSettings,
   isConfigured,
   normalizePairingToken,
   normalizeServerUrl,
@@ -52,22 +53,38 @@ describe("код привязки", () => {
 });
 
 describe("готовность к работе", () => {
-  it("настроенной машиной считается только полностью заполненная", () => {
-    expect(isConfigured({ serverUrl: "https://a.kz", pairingToken: "abc" })).toBe(true);
-    expect(isConfigured({ serverUrl: "https://a.kz", pairingToken: "" })).toBe(false);
-    expect(isConfigured({ serverUrl: "", pairingToken: "abc" })).toBe(false);
+  const settings = (over: Partial<AgentSettings> = {}): AgentSettings => ({
+    serverUrl: "https://a.kz",
+    pairingToken: "",
+    enrollmentKey: "",
+    ...over,
+  });
+
+  it("обычной машине хватает кода привязки", () => {
+    expect(isConfigured(settings({ pairingToken: "abc" }))).toBe(true);
+  });
+
+  it("бездисковой машине хватает ключа клуба", () => {
+    // В общий образ кладут только его: код привязки у каждой машины свой.
+    expect(isConfigured(settings({ enrollmentKey: "ключ" }))).toBe(true);
+  });
+
+  it("без адреса или способа себя назвать машина не готова", () => {
+    expect(isConfigured(settings())).toBe(false);
+    expect(isConfigured(settings({ serverUrl: "", pairingToken: "abc" }))).toBe(false);
   });
 
   it("объясняет, чего не хватает", () => {
-    expect(validate({ serverUrl: "", pairingToken: "abc" })).toBe("Укажите адрес сервера");
-    expect(validate({ serverUrl: "https://a.kz", pairingToken: "" })).toBe(
-      "Укажите код привязки этой машины",
+    expect(validate(settings({ serverUrl: "", pairingToken: "abc" }))).toBe(
+      "Укажите адрес сервера",
     );
-    expect(validate({ serverUrl: "https://a.kz", pairingToken: "abc" })).toBeNull();
+    expect(validate(settings())).toBe("Укажите код привязки этой машины или ключ клуба");
+    expect(validate(settings({ pairingToken: "abc" }))).toBeNull();
+    expect(validate(settings({ enrollmentKey: "ключ" }))).toBeNull();
   });
 
   it("ловит адрес, который не разбирается в ссылку", () => {
-    expect(validate({ serverUrl: "https://", pairingToken: "abc" })).toBe(
+    expect(validate(settings({ serverUrl: "https://", pairingToken: "abc" }))).toBe(
       "Адрес сервера не похож на ссылку",
     );
   });

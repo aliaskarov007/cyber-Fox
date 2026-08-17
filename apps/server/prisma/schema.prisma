@@ -191,6 +191,11 @@ model Club {
   /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
   bonusPercent Int @default(0)
 
+  /// Ключ клуба для бездисковых залов. Один на весь клуб, кладётся в общий
+  /// образ рядом с агентом: машины называют себя MAC-адресом, а этот ключ
+  /// говорит серверу, к какому клубу они относятся.
+  enrollmentKey String @unique @default(uuid())
+
   zones     Zone[]
   computers Computer[]
   tariffs   Tariff[]
@@ -257,7 +262,11 @@ model Computer {
   /// Код привязки: агент предъявляет его при первом подключении.
   pairingToken String?   @unique
   hostname     String?
-  lastSeenAt   DateTime?
+  /// MAC сетевой карты. На бездисковых машинах это единственный устойчивый
+  /// признак: образ у всех общий, а настройки в профиле стираются при
+  /// перезагрузке. Сама загрузка по сети без уникального MAC невозможна.
+  macAddress String?
+  lastSeenAt DateTime?
 
   sessions          Session[]
   offlineOperations OfflineOperation[]
@@ -266,6 +275,7 @@ model Computer {
   updatedAt DateTime @updatedAt
 
   @@unique([clubId, name])
+  @@unique([clubId, macAddress])
   @@index([clubId])
   @@index([zoneId])
 }

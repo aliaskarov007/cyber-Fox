@@ -21,6 +21,8 @@ export interface Club {
   lowBalanceWarnMinutes: number;
   /** Процент от потраченного, возвращаемый бонусами. 0 — программа выключена. */
   bonusPercent: number;
+  /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
+  enrollmentKey: string;
 }
 
 export interface Zone {

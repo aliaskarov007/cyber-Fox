@@ -7,12 +7,9 @@ import type { AgentSettings } from "../shared/settings.js";
  * экрану: настройки подключения, их сохранение и две команды блокировки.
  */
 contextBridge.exposeInMainWorld("cyberfox", {
-  config: (): Promise<{
-    serverUrl: string;
-    pairingToken: string;
-    hostname: string;
-    configured: boolean;
-  }> => ipcRenderer.invoke("agent:config"),
+  config: (): Promise<
+    AgentSettings & { hostname: string; macAddress: string; configured: boolean }
+  > => ipcRenderer.invoke("agent:config"),
   saveConfig: (settings: AgentSettings): Promise<void> =>
     ipcRenderer.invoke("agent:save-config", settings),
   unlock: (): Promise<void> => ipcRenderer.invoke("agent:unlock"),

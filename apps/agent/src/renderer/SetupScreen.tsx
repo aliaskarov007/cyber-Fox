@@ -42,6 +42,8 @@ export function SetupScreen({
     const settings: AgentSettings = {
       serverUrl: normalizeServerUrl(serverUrl),
       pairingToken: normalizePairingToken(pairingToken),
+      // Ключ клуба вводят не здесь, а кладут в образ; сохранённый не теряем.
+      enrollmentKey: initial.enrollmentKey,
     };
     const complaint = validate(settings);
     if (complaint) {

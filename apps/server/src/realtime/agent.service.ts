@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   ComputerStatus,
   GuestPackageStatus,
@@ -9,10 +9,12 @@ import {
 import bcrypt from "bcryptjs";
 
 import { minutesAffordable, pickPerMinuteTariff } from "../billing/billing.rules.js";
+import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import { toLocalMoment } from "../common/local-time.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
+import { normalizeMac } from "./agent.rules.js";
 
 /** Сколько неверных попыток PIN подряд до блокировки ввода. */
 const MAX_PIN_ATTEMPTS = 5;
@@ -36,10 +38,13 @@ export interface GuestLoginResult {
  */
 @Injectable()
 export class AgentService {
+  private readonly logger = new Logger(AgentService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
     private readonly wallets: WalletService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
 
   /** Первое подключение агента: машина узнаётся по коду привязки. */
@@ -65,6 +70,92 @@ export class AgentService {
     });
 
     return computer;
+  }
+
+  /**
+   * Подключение машины бездискового зала.
+   *
+   * Там все ПК грузятся с одного образа, и код привязки в него не положишь: он
+   * у каждой машины свой, а настройки в профиле стираются при перезагрузке.
+   * Поэтому в образ кладётся один ключ на клуб, а различает машины MAC — без
+   * уникального MAC сама загрузка по сети невозможна, так что признак надёжный.
+   *
+   * Незнакомая машина заводится сама: сорок ПК иначе пришлось бы вносить
+   * руками, сверяя MAC-адреса с наклейками на корпусах.
+   */
+  async enroll(enrollmentKey: string, macAddress: string, hostname: string) {
+    const mac = normalizeMac(macAddress);
+    if (!mac) throw new BadRequestException("Агент не сообщил MAC-адрес");
+
+    const club = await this.prisma.club.findUnique({
+      where: { enrollmentKey },
+      include: { zones: { orderBy: { sortOrder: "asc" }, take: 1 } },
+    });
+    if (!club) throw new NotFoundException("Неизвестный ключ клуба");
+
+    const known = await this.prisma.computer.findUnique({
+      where: { clubId_macAddress: { clubId: club.id, macAddress: mac } },
+      include: { club: true, zone: true },
+    });
+    if (known) {
+      await this.prisma.computer.update({
+        where: { id: known.id },
+        data: {
+          hostname,
+          lastSeenAt: new Date(),
+          status:
+            known.status === ComputerStatus.IN_USE
+              ? ComputerStatus.IN_USE
+              : ComputerStatus.IDLE,
+        },
+      });
+      return known;
+    }
+
+    const zone = club.zones[0];
+    if (!zone) {
+      throw new BadRequestException("В клубе нет ни одной зоны — заведите её перед подключением");
+    }
+
+    // Лимит подписки проверяем и здесь: иначе бездисковый зал молча заводил бы
+    // машины сверх оплаченных, просто загрузившись.
+    await this.subscriptions.assertCanAddComputer(club.tenantId);
+
+    const created = await this.prisma.computer.create({
+      data: {
+        clubId: club.id,
+        zoneId: zone.id,
+        name: await this.freeName(club.id, hostname),
+        macAddress: mac,
+        hostname,
+        status: ComputerStatus.IDLE,
+        lastSeenAt: new Date(),
+      },
+      include: { club: true, zone: true },
+    });
+
+    this.logger.log(
+      `Бездисковый зал: подключилась новая машина ${created.name} (${mac}) в «${club.name}»`,
+    );
+    return created;
+  }
+
+  /**
+   * Имя для новой машины.
+   *
+   * Берём имя из Windows — в бездисковом зале оно у каждой машины своё и обычно
+   * совпадает с наклейкой на корпусе. Занятое имя дополняем MAC-хвостом, чтобы
+   * подключение не падало из-за совпадения.
+   */
+  private async freeName(clubId: string, hostname: string): Promise<string> {
+    const wanted = hostname.trim() || "Новая машина";
+    const taken = await this.prisma.computer.findUnique({
+      where: { clubId_name: { clubId, name: wanted } },
+    });
+    if (!taken) return wanted;
+
+    const suffix = Math.random().toString(16).slice(2, 6);
+    return `${wanted}-${suffix}`;
   }
 
   async heartbeat(computerId: string): Promise<void> {
