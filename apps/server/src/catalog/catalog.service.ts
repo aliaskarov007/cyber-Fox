@@ -168,7 +168,7 @@ export class CatalogService {
   /**
    * Предупреждения, которые дешевле выдать при настройке, чем разбирать потом на стойке.
    */
-  private validateTariff(dto: CreateTariffDto, creditLimit: number): void {
+  private validateTariff(dto: Partial<CreateTariffDto>, creditLimit: number): void {
     if (dto.kind === TariffKind.PER_MINUTE) {
       if (!dto.pricePerMinute) {
         throw new BadRequestException("Для поминутного тарифа нужна цена минуты");

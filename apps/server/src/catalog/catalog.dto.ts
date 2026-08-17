@@ -1,3 +1,4 @@
+import { PartialType } from "@nestjs/mapped-types";
 import { TariffKind } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
@@ -121,7 +122,13 @@ export class CreateTariffDto {
   daysOfWeek?: number[];
 }
 
-export class UpdateTariffDto extends CreateTariffDto {
+/*
+ * Правка тарифа частичная. Наследование от CreateTariffDto без PartialType
+ * оставляло бы обязательными название, зону и вид: касса выключает тариф одним
+ * полем isActive, и такой запрос отклонялся бы с требованием прислать всё
+ * остальное.
+ */
+export class UpdateTariffDto extends PartialType(CreateTariffDto) {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
