@@ -40,6 +40,34 @@ body {
   padding: 32px;
 }
 
+/*
+ * Экран сбоя. Читает его не гость, а администратор, поэтому здесь важна не
+ * крупность, а то, что текст вообще есть: молчащая тёмная заливка неотличима
+ * от выключенного монитора.
+ */
+.failure {
+  gap: 14px;
+}
+
+.failure-title {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.failure-reason {
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.failure-hint {
+  color: var(--muted);
+}
+
 .pc-id {
   text-align: center;
   display: grid;

@@ -13,6 +13,15 @@ import { machineMac, readSettings, writeSettings } from "./config.js";
  * которых достаточно для обкатки в собственном зале.
  */
 
+/*
+ * Видеоускорение выключено намеренно. На бездисковых клиентах и на машинах с
+ * общим драйвером Electron рисует чёрное окно вместо интерфейса, и отличить
+ * это от «агент не запустился» на месте нечем. Экран блокировки — статичный
+ * текст, ускорять в нём нечего, а игры идут мимо агента и его настройки не
+ * касаются.
+ */
+app.disableHardwareAcceleration();
+
 let lockWindow: BrowserWindow | null = null;
 /** Экран разблокирован сервером: окно можно закрыть и отдать машину гостю. */
 let unlocked = false;
@@ -54,9 +63,44 @@ function createLockWindow(): void {
     }
   });
 
+  /*
+   * Любой сбой запуска экрана заканчивался чёрным окном: фон экрана блокировки
+   * тёмный, и пустая заливка выглядит как выключенный монитор. Администратор в
+   * зале не может отличить её ни от зависшей машины, ни от неверного адреса
+   * сервера. Поэтому каждый известный сбой выводится словами прямо на экран.
+   */
+  lockWindow.webContents.on("did-fail-load", (_event, code, description) => {
+    showFailure(`Экран агента не загрузился: ${description} (${code})`);
+  });
+
+  lockWindow.webContents.on("preload-error", (_event, path, error) => {
+    showFailure(`Не поднялся мост настроек: ${error.message}\n${path}`);
+  });
+
+  lockWindow.webContents.on("render-process-gone", (_event, details) => {
+    showFailure(`Экран агента упал: ${details.reason}`);
+  });
+
   const devServer = process.env.VITE_DEV_SERVER_URL;
   if (devServer) void lockWindow.loadURL(devServer);
   else void lockWindow.loadFile(join(__dirname, "../renderer/index.html"));
+}
+
+/**
+ * Сообщение о сбое вместо чёрного экрана.
+ *
+ * Страница собирается здесь, а не берётся файлом из сборки: сбой мог случиться
+ * как раз потому, что файлы экрана не читаются.
+ */
+function showFailure(message: string): void {
+  const page = `<!doctype html><meta charset="utf-8"><body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#0e1015;color:#f2f4f8;font:16px/1.5 system-ui,sans-serif">
+    <div style="max-width:52ch;padding:32px">
+      <div style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#d2453c">Cyber-Fox · сбой запуска</div>
+      <pre style="white-space:pre-wrap;font:14px/1.6 ui-monospace,Menlo,Consolas,monospace;margin:16px 0 24px">${message.replace(/[<&]/g, (c) => (c === "<" ? "&lt;" : "&amp;"))}</pre>
+      <div style="color:#949cad">Покажите этот текст тому, кто ставил систему. Машина в зал в таком виде не выдаётся.</div>
+    </div>
+  </body>`;
+  void lockWindow?.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
 }
 
 /*

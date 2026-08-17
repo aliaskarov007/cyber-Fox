@@ -24,6 +24,8 @@ const monotonic = (): number => performance.now();
 export function App() {
   const client = useMemo(() => new AgentClient(), []);
   const [config, setConfig] = useState<AgentConfig | null>(null);
+  /** Настройки не удалось прочитать: показываем причину вместо пустого экрана. */
+  const [configError, setConfigError] = useState<string | null>(null);
   /** Сервер отказал в привязке: показываем настройку с причиной. */
   const [rejection, setRejection] = useState<string | null>(null);
   const [paired, setPaired] = useState<PairedInfo | null>(null);
@@ -55,8 +57,22 @@ export function App() {
     }
   }, [client]);
 
+  /*
+   * Мост настроек живёт в preload и в редких сборках не поднимается. Раньше
+   * обращение к нему падало молча, а на экране оставалась тёмная заливка,
+   * неотличимая от выключенного монитора. Теперь причина видна словами.
+   */
   useEffect(() => {
-    void window.cyberfox.config().then(setConfig);
+    if (typeof window.cyberfox?.config !== "function") {
+      setConfigError("Не поднялся мост настроек агента (preload).");
+      return;
+    }
+    window.cyberfox
+      .config()
+      .then(setConfig)
+      .catch((error: unknown) => {
+        setConfigError(error instanceof Error ? error.message : String(error));
+      });
   }, []);
 
   useEffect(() => {
@@ -151,7 +167,30 @@ export function App() {
         }
       : tick;
 
-  if (!config) return <div className="screen" />;
+  if (configError) {
+    return (
+      <div className="screen failure">
+        <div className="failure-title">Cyber-Fox · сбой запуска</div>
+        <pre className="failure-reason">{configError}</pre>
+        <div className="failure-hint">
+          Покажите этот текст тому, кто ставил систему. Машина в зал в таком виде не выдаётся.
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Настройки читаются доли секунды, но экран всё это время не пустой: тёмная
+   * заливка без единого слова выглядит как чёрный экран, и в зале её принимают
+   * за сломанную машину.
+   */
+  if (!config) {
+    return (
+      <div className="screen failure">
+        <div className="failure-hint">Cyber-Fox: запускаем экран…</div>
+      </div>
+    );
+  }
 
   /*
    * Настройка показывается и при первом запуске, и когда сервер отказал в
