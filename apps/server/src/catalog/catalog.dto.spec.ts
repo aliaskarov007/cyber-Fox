@@ -2,7 +2,7 @@ import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { describe, expect, it } from "vitest";
 
-import { CreateTariffDto, UpdateTariffDto } from "./catalog.dto.js";
+import { CreateTariffDto, UpdateComputerDto, UpdateTariffDto, UpdateZoneDto } from "./catalog.dto.js";
 
 /**
  * Проверки самих правил разбора запроса.
@@ -38,6 +38,21 @@ describe("правка тарифа", () => {
   it("бережёт проверки полей, которые всё же прислали", () => {
     expect(errorsFor(UpdateTariffDto, { pricePerMinute: 0 })).toContain("min");
     expect(errorsFor(UpdateTariffDto, { activeFromMinute: 1440 })).toContain("max");
+  });
+});
+
+/*
+ * Правки зоны и машины касса тоже шлёт одним полем: выбор тарифа в строке зоны
+ * и перенос машины в другую зону. Ошибка, найденная на тарифах, ловится здесь
+ * до того, как повторится.
+ */
+describe("правка одним полем", () => {
+  it("зона: только тариф на исчерпание пакета", () => {
+    expect(errorsFor(UpdateZoneDto, { defaultPerMinuteTariffId: "tariff-1" })).toEqual([]);
+  });
+
+  it("машина: только новая зона", () => {
+    expect(errorsFor(UpdateComputerDto, { zoneId: "zone-2" })).toEqual([]);
   });
 });
 

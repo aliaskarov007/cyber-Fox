@@ -208,6 +208,7 @@ model Club {
   products  Product[]
   sales     ProductSale[]
   paymentIntents PaymentIntent[]
+  apps      ClubApp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,12 +234,60 @@ model Zone {
   tariffs   Tariff[]   @relation("ZoneTariffs")
   packages  GuestPackage[]
   sessions  Session[]
+  apps      ClubApp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([clubId, name])
   @@index([clubId])
+}
+
+/// Чем запускается игра: программой на диске машины или ссылкой вида
+/// steam://rungameid/730, которую откроет уже установленный клиент.
+enum AppLaunchKind {
+  EXECUTABLE
+  URI
+}
+
+/// Игра или программа на полке оболочки.
+///
+/// Каталог принадлежит клубу, а не машине: в бездисковом зале образ у всех
+/// общий, и путь до игры на всех машинах одинаковый. Добавленная в кассе игра
+/// появляется у всего зала сразу, без правки образа.
+model ClubApp {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// Зона, если игра только для неё: на VIP-машинах бывает свой набор.
+  /// Пусто — во всех зонах клуба.
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  name     String
+  /// Полка, на которой игра стоит в оболочке: «Шутеры», «Программы».
+  category String?
+
+  kind AppLaunchKind @default(EXECUTABLE)
+  /// Путь к программе на машине зала либо ссылка запуска.
+  target String
+  /// Аргументы командной строки, если игра их требует.
+  args String[] @default([])
+
+  /// Обложка. Хранится ссылкой, а не файлом: у Steam-игр она берётся с их же
+  /// раздачи, и складывать гигабайты картинок в базу клуба незачем.
+  coverUrl String?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clubId, name])
+  @@index([clubId])
+  @@index([zoneId])
 }
 
 enum ComputerStatus {

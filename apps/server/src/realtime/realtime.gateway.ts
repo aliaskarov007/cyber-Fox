@@ -16,12 +16,19 @@ import { OfflineService } from "../offline/offline.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
 import { AgentService } from "./agent.service.js";
+import { LibraryService } from "../library/library.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
 const adminRoom = (clubId: string): string => `admin:${clubId}`;
 /** Комната конкретного игрового ПК. */
 const agentRoom = (computerId: string): string => `agent:${computerId}`;
+/*
+ * Комната всех машин клуба. Нужна для того, что касается зала целиком —
+ * например правки каталога игр: рассылать её по одной машине значит знать
+ * сорок идентификаторов там, где хватает одного клуба.
+ */
+const clubAgentsRoom = (clubId: string): string => `agents:${clubId}`;
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
@@ -37,6 +44,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly offline: OfflineService,
     private readonly sessions: SessionsService,
+    private readonly library: LibraryService,
   ) {}
 
   onModuleInit(): void {
@@ -63,6 +71,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     });
     this.bus.on("staff.called", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("staff.called", e);
+    });
+    /*
+     * Каталог изменился — машинам уходит только сигнал. Список они забирают
+     * сами: у зон он разный, и рассылать всем всё значило бы слать VIP-полку
+     * туда, где её показывать не собирались.
+     */
+    this.bus.on("library.changed", (e) => {
+      this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
     });
   }
 
@@ -141,11 +157,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
    */
   private async attachAgent(
     client: Socket,
-    computer: { id: string; clubId: string; name: string; zone: { name: string }; club: { name: string } },
+    computer: {
+      id: string;
+      clubId: string;
+      zoneId: string;
+      name: string;
+      zone: { name: string };
+      club: { name: string };
+    },
   ): Promise<void> {
     client.data.computerId = computer.id;
     client.data.clubId = computer.clubId;
+    client.data.zoneId = computer.zoneId;
     await client.join(agentRoom(computer.id));
+    await client.join(clubAgentsRoom(computer.clubId));
     client.emit("paired", {
       computerId: computer.id,
       computerName: computer.name,
@@ -230,6 +255,34 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     } catch (error) {
       return { ok: false, reason: (error as Error).message };
     }
+  }
+
+  /**
+   * Каталог игр для этой машины: общие игры клуба плюс игры её зоны.
+   *
+   * Запрашивает агент — при подключении и по сигналу об изменении. Так каталог
+   * не рассылается тем, кто его сейчас не показывает, и приходит свежим ровно
+   * тогда, когда оболочка собирается его рисовать.
+   */
+  @SubscribeMessage("library.fetch")
+  async fetchLibrary(@ConnectedSocket() client: Socket) {
+    const clubId = client.data.clubId as string | undefined;
+    const zoneId = client.data.zoneId as string | undefined;
+    if (!clubId || !zoneId) return { ok: false, apps: [] };
+
+    const apps = await this.library.forZone(clubId, zoneId);
+    return {
+      ok: true,
+      apps: apps.map((app) => ({
+        id: app.id,
+        name: app.name,
+        category: app.category,
+        kind: app.kind,
+        target: app.target,
+        args: app.args,
+        coverUrl: app.coverUrl,
+      })),
+    };
   }
 
   @SubscribeMessage("staff.call")

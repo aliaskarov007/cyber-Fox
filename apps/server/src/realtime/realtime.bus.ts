@@ -32,6 +32,11 @@ export interface RealtimeEvents {
   };
   "computer.status": { clubId: string; computerId: string; status: string };
   "staff.called": { clubId: string; computerId: string; sessionId: string | null };
+  /*
+   * Каталог игр клуба изменился. Машины забирают его заново сами: пересылать
+   * список всем сорока при каждой правке дороже, чем сказать «обнови».
+   */
+  "library.changed": { clubId: string };
 }
 
 @Injectable()

@@ -138,7 +138,7 @@ export function App() {
       ) : tab === "hall" ? (
         <HallScreen club={club} onGoTo={setTab} />
       ) : tab === "bar" ? (
-        <BarScreen club={club} />
+        <BarScreen club={club} staff={staff} />
       ) : tab === "guests" ? (
         <GuestsScreen club={club} />
       ) : tab === "network" ? (

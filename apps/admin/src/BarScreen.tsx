@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { type Club, type Guest, type Product, api, formatMoney } from "./api.js";
+import { type Club, type Guest, type Product, type Staff, api, formatMoney } from "./api.js";
 import { ProductsSection } from "./ProductsSection.js";
 
 /**
  * Бар. Продажа — самая частая операция после посадки, поэтому товар продаётся
  * в два касания: выбрать позицию, выбрать способ оплаты.
  */
-export function BarScreen({ club }: { club: Club }) {
+export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
+  /** Товары заводит владелец или управляющий: сервер закрывает правку ролью. */
+  const canManage = staff.role === "OWNER" || staff.role === "ADMIN";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -75,7 +78,9 @@ export function BarScreen({ club }: { club: Club }) {
 
       {/* Правка товаров живёт рядом с продажей: цену меняют у стойки и в смену,
           а не в отдельном разделе настроек, куда администратор не заходит. */}
-      <ProductsSection club={club} products={products} onChanged={() => void refresh()} />
+      {canManage && (
+        <ProductsSection club={club} products={products} onChanged={() => void refresh()} />
+      )}
 
       {categories.map(([category, items]) => (
         <section className="zone-block" key={category}>

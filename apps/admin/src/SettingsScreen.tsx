@@ -23,6 +23,8 @@ export function SettingsScreen({
   onClubsChanged: () => void;
 }) {
   const isOwner = staff.role === "OWNER";
+  /** Зоны, машины и товары сервер разрешает править владельцу и управляющему. */
+  const canManageHall = staff.role === "OWNER" || staff.role === "ADMIN";
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [people, setPeople] = useState<StaffMember[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +59,18 @@ export function SettingsScreen({
 
       <ClubSettings club={club} onSaved={(msg) => void run(async () => onClubsChanged(), msg)} />
 
-      {/* Зоны выше машин: машина заводится в зону, а не наоборот. */}
-      <ZonesSection club={club} onChanged={() => onClubsChanged()} />
-      <ComputersSection club={club} />
+      {/*
+       * Зоны и машины правит владелец или управляющий: сервер закрывает эти
+       * запросы ролью. Администратору зала кнопки не показываем вовсе — нажатие,
+       * которое всегда возвращает отказ, хуже отсутствующей кнопки.
+       * Зоны выше машин: машина заводится в зону, а не наоборот.
+       */}
+      {canManageHall && (
+        <>
+          <ZonesSection club={club} onChanged={() => onClubsChanged()} />
+          <ComputersSection club={club} />
+        </>
+      )}
 
       {isOwner && tenant && (
         <>
