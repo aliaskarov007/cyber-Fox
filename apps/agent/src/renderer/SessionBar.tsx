@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
 
 /**
@@ -27,6 +29,12 @@ export function SessionBar({
   error: string | null;
   onStopped: () => void;
 }) {
+  /*
+   * Молчащая кнопка заставляет гостя жать её ещё несколько раз, а на стойке это
+   * выглядит как четыре вызова с одной машины.
+   */
+  const [called, setCalled] = useState(false);
+
   const onPackage = tick.packageMinutesLeft !== null;
   const left = onPackage ? tick.packageMinutesLeft! : (tick.minutesAffordable ?? 0);
   const inDebt = tick.balance < 0;
@@ -49,8 +57,16 @@ export function SessionBar({
         </div>
 
         <div className="session-actions">
-          <button className="ghost" disabled={offline} onClick={() => void client.callStaff()}>
-            Позвать администратора
+          <button
+            className="ghost"
+            disabled={offline || called}
+            onClick={() => {
+              setCalled(true);
+              void client.callStaff();
+              setTimeout(() => setCalled(false), 60_000);
+            }}
+          >
+            {called ? "Администратор идёт" : "Позвать администратора"}
           </button>
           {/* Без связи завершить нельзя: сервер не узнает об этом, и время
               продолжит идти. */}

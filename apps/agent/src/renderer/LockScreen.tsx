@@ -27,6 +27,9 @@ export function LockScreen({
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
+  /* Молчащая кнопка вызова заставляет гостя жать её ещё несколько раз, а на
+     стойке это выглядит как несколько вызовов с одной машины. */
+  const [called, setCalled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
 
@@ -163,8 +166,17 @@ export function LockScreen({
         <div className="note">Поминутный тариф этой зоны — {formatMoney(perMinutePrice)}/мин.</div>
       )}
 
-      <button className="ghost" type="button" onClick={() => void client.callStaff()}>
-        Позвать администратора
+      <button
+        className="ghost"
+        type="button"
+        disabled={called}
+        onClick={() => {
+          setCalled(true);
+          void client.callStaff();
+          setTimeout(() => setCalled(false), 60_000);
+        }}
+      >
+        {called ? "Администратор идёт" : "Позвать администратора"}
       </button>
     </form>
   );

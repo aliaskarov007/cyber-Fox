@@ -747,3 +747,46 @@ tr.muted td {
 .first-steps .row.step button {
   white-space: nowrap;
 }
+
+/* --- Вызовы администратора --- */
+
+/*
+ * Полоса не прячется сама: уведомление на несколько секунд бесполезно на
+ * стойке, где администратор в этот момент стоит спиной к монитору.
+ */
+.calls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.call {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: #2b2411;
+  border: 1px solid #5a4718;
+  color: #f0c04d;
+}
+
+.call-name {
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.call-time {
+  font-family: var(--mono);
+  opacity: 0.75;
+}
+
+.call button {
+  margin-left: auto;
+}
+
+/* Та же машина подсвечена и на карте зала. */
+.pc.calling {
+  border-color: #5a4718;
+  box-shadow: 0 0 0 2px rgba(240, 192, 77, 0.35);
+}

@@ -4,6 +4,7 @@ import type { Tab } from "./App.js";
 import { type Club, type HallCell, type Tariff, api, formatMoney } from "./api.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
+import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
 /** Состояние плитки: то, что админ должен считывать взглядом, не читая текст. */
@@ -53,9 +54,18 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
     void api.tariffs(club.id).then(setTariffs);
   }, [club.id, refresh]);
 
+  /*
+   * Вызовы администратора живут отдельно от карты: они не состояние машины, а
+   * просьба человека, и снимает их администратор сам, когда подошёл.
+   */
+  const [calls, setCalls] = useState<Record<string, number>>({});
+
   // Экран догоняет состояние сам, а не только по событиям: если сокет отвалится,
   // карта зала не должна застыть.
-  useRealtime(() => void refresh());
+  useRealtime(
+    () => void refresh(),
+    (computerId) => setCalls((current) => ({ ...current, [computerId]: Date.now() })),
+  );
   useEffect(() => {
     const timer = setInterval(() => void refresh(), 20_000);
     return () => clearInterval(timer);
@@ -104,6 +114,24 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
         </div>
       </div>
 
+      <StaffCalls
+        calls={Object.entries(calls)
+          .map(([computerId, at]) => ({
+            computerId,
+            at,
+            computerName:
+              hall.find((c) => c.computer.id === computerId)?.computer.name ?? "Машина зала",
+          }))
+          .sort((a, b) => b.at - a.at)}
+        onAnswer={(computerId) =>
+          setCalls((current) => {
+            const next = { ...current };
+            delete next[computerId];
+            return next;
+          })
+        }
+      />
+
       {loaded && hall.length === 0 && <FirstSteps onGoTo={onGoTo} />}
 
       {zones.map(([zoneId, zone]) => (
@@ -121,7 +149,9 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
               return (
                 <button
                   key={cell.computer.id}
-                  className="pc"
+                  /* Позвавшая машина видна и на карте: администратор смотрит на
+                     зал, а не на полосу вызовов. */
+                  className={`pc ${calls[cell.computer.id] ? "calling" : ""}`}
                   data-state={state}
                   onClick={() => setSelectedId(cell.computer.id)}
                 >
