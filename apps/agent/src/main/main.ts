@@ -111,69 +111,97 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
 
-app.whenReady().then(() => {
-  // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
-  // и никто не станет запускать блокировку вручную на каждой из сорока.
-  if (app.isPackaged) {
-    app.setLoginItemSettings({ openAtLogin: true, args: [] });
-  }
+/*
+ * Ответы экрану регистрируются до готовности приложения и до окна.
+ *
+ * Раньше они стояли последними в обработчике whenReady, после автозапуска и
+ * перехвата сочетаний клавиш. Любой сбой в тех строках оставлял окно уже
+ * открытым, но без единого обработчика, и экран получал «No handler registered
+ * for agent:config» вместо настроек. Регистрация ничего не требует от системы,
+ * поэтому ей незачем зависеть от того, что делается раньше.
+ */
+ipcMain.handle("agent:config", () => {
+  const settings = readSettings();
+  return {
+    ...settings,
+    hostname: process.env.COMPUTERNAME ?? process.env.HOSTNAME ?? "unknown",
+    // В бездисковом зале имя и настройки у машин общие, поэтому себя они
+    // называют MAC-адресом.
+    macAddress: machineMac(),
+    configured: isConfigured(settings),
+  };
+});
 
+/*
+ * Настройку машины делает администратор при установке. Перезагружаем окно
+ * вместо переподключения сокета: заново пройти весь путь запуска надёжнее,
+ * чем чинить состояние экрана после смены сервера.
+ */
+ipcMain.handle("agent:save-config", (_event, settings: AgentSettings) => {
+  writeSettings(settings);
+  lockWindow?.reload();
+});
+
+/*
+ * Обе команды идемпотентны: старт сессии приходит и событием, и первым тиком,
+ * а после переподключения сокета повторяется. Переключать режим киоска на
+ * каждое такое сообщение — значит моргать окном поверх чужой игры.
+ */
+
+/** Сервер разрешил игру: снимаем киоск и уводим окно с глаз. */
+ipcMain.handle("agent:unlock", () => {
+  if (unlocked) return;
+  unlocked = true;
+  lockWindow?.setKiosk(false);
+  lockWindow?.setAlwaysOnTop(false);
+  lockWindow?.minimize();
+});
+
+/** Время кончилось: возвращаем блокировку поверх игры. */
+ipcMain.handle("agent:lock", () => {
+  if (!unlocked && lockWindow?.isVisible()) return;
+  unlocked = false;
+  lockWindow?.restore();
+  lockWindow?.setKiosk(true);
+  lockWindow?.setAlwaysOnTop(true, "screen-saver");
+  lockWindow?.focus();
+});
+
+app.whenReady().then(() => {
+  // Окно поднимается первым: всё, что идёт следом, может не получиться, и
+  // тогда причину надо на чём-то показать.
   createLockWindow();
 
-  // Сочетания, которыми чаще всего пробуют выйти из киоска.
-  for (const accelerator of ["Alt+F4", "Alt+Tab", "Super", "Control+Shift+Escape"]) {
-    globalShortcut.register(accelerator, () => {
-      if (!unlocked) lockWindow?.focus();
-    });
+  try {
+    // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
+    // и никто не станет запускать блокировку вручную на каждой из сорока.
+    if (app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: true, args: [] });
+    }
+  } catch (error) {
+    showFailure(`Не удалось прописать автозапуск: ${asText(error)}`);
   }
 
-  ipcMain.handle("agent:config", () => {
-    const settings = readSettings();
-    return {
-      ...settings,
-      hostname: process.env.COMPUTERNAME ?? process.env.HOSTNAME ?? "unknown",
-      // В бездисковом зале имя и настройки у машин общие, поэтому себя они
-      // называют MAC-адресом.
-      macAddress: machineMac(),
-      configured: isConfigured(settings),
-    };
-  });
-
   /*
-   * Настройку машины делает администратор при установке. Перезагружаем окно
-   * вместо переподключения сокета: заново пройти весь путь запуска надёжнее,
-   * чем чинить состояние экрана после смены сервера.
+   * Сочетания, которыми чаще всего пробуют выйти из киоска. Каждое ставится
+   * отдельно: часть из них система придерживает за собой — Ctrl+Shift+Esc,
+   * например, Windows не отдаёт никому, — и отказ в одном не должен уносить
+   * остальные вместе с запуском агента.
    */
-  ipcMain.handle("agent:save-config", (_event, settings: AgentSettings) => {
-    writeSettings(settings);
-    lockWindow?.reload();
-  });
-
-  /*
-   * Обе команды идемпотентны: старт сессии приходит и событием, и первым тиком,
-   * а после переподключения сокета повторяется. Переключать режим киоска на
-   * каждое такое сообщение — значит моргать окном поверх чужой игры.
-   */
-
-  /** Сервер разрешил игру: снимаем киоск и уводим окно с глаз. */
-  ipcMain.handle("agent:unlock", () => {
-    if (unlocked) return;
-    unlocked = true;
-    lockWindow?.setKiosk(false);
-    lockWindow?.setAlwaysOnTop(false);
-    lockWindow?.minimize();
-  });
-
-  /** Время кончилось: возвращаем блокировку поверх игры. */
-  ipcMain.handle("agent:lock", () => {
-    if (!unlocked && lockWindow?.isVisible()) return;
-    unlocked = false;
-    lockWindow?.restore();
-    lockWindow?.setKiosk(true);
-    lockWindow?.setAlwaysOnTop(true, "screen-saver");
-    lockWindow?.focus();
-  });
+  for (const accelerator of ["Alt+F4", "Alt+Tab", "Super", "Control+Shift+Escape"]) {
+    try {
+      globalShortcut.register(accelerator, () => {
+        if (!unlocked) lockWindow?.focus();
+      });
+    } catch (error) {
+      console.error(`Сочетание ${accelerator} не перехвачено: ${asText(error)}`);
+    }
+  }
 });
+
+function asText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /*
  * Пока экран заблокирован, выйти из агента нельзя: Alt+F4 по окну и «Закрыть»
