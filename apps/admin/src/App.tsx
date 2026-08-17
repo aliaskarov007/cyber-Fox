@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { BarScreen } from "./BarScreen.js";
+import { LibraryScreen } from "./LibraryScreen.js";
 import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
@@ -19,15 +20,18 @@ export type Tab =
   | "bar"
   | "guests"
   | "tariffs"
+  | "library"
   | "network"
   | "onboarding"
   | "settings";
 
-const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean }> = [
+const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: boolean }> = [
   { id: "hall", label: "Зал" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
   { id: "tariffs", label: "Тарифы" },
+  // Витрину зала собирает владелец или управляющий: сервер закрывает правку ролью.
+  { id: "library", label: "Игры", manageOnly: true },
   { id: "network", label: "Сеть", ownerOnly: true },
   { id: "onboarding", label: "Подключение" },
   { id: "settings", label: "Настройки" },
@@ -101,7 +105,11 @@ export function App() {
 
         <nav className="link-tabs">
           {/* Сводка по сети — забота владельца; управляющему она не нужна. */}
-          {TABS.filter((item) => !item.ownerOnly || staff.role === "OWNER").map((item) => (
+          {TABS.filter(
+            (item) =>
+              (!item.ownerOnly || staff.role === "OWNER") &&
+              (!item.manageOnly || staff.role === "OWNER" || staff.role === "ADMIN"),
+          ).map((item) => (
             <button
               key={item.id}
               aria-current={tab === item.id}
@@ -141,6 +149,8 @@ export function App() {
         <BarScreen club={club} staff={staff} />
       ) : tab === "guests" ? (
         <GuestsScreen club={club} />
+      ) : tab === "library" ? (
+        <LibraryScreen club={club} />
       ) : tab === "network" ? (
         <NetworkScreen clubs={clubs} />
       ) : tab === "onboarding" ? (

@@ -94,6 +94,31 @@ export interface Product {
   isActive: boolean;
 }
 
+/** Игра или программа на полке оболочки, которую видит гость после оплаты. */
+export interface ClubApp {
+  id: string;
+  zoneId: string | null;
+  name: string;
+  category: string | null;
+  kind: "EXECUTABLE" | "URI";
+  target: string;
+  args: string[];
+  coverUrl: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ClubAppInput {
+  name: string;
+  category?: string;
+  kind?: "EXECUTABLE" | "URI";
+  target: string;
+  args?: string[];
+  coverUrl?: string;
+  zoneId?: string | null;
+  sortOrder?: number;
+}
+
 /** Что отправляет форма товара. Деньги в тиын, остаток пустой — учёта нет. */
 export interface ProductInput {
   name: string;
@@ -295,6 +320,20 @@ export const api = {
 
   createGuest: (clubId: string, body: { fullName: string; phone: string; pin?: string }) =>
     request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+
+  apps: (clubId: string) => request<ClubApp[]>(`/clubs/${clubId}/apps`),
+
+  createApp: (clubId: string, body: ClubAppInput) =>
+    request<ClubApp>(`/clubs/${clubId}/apps`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateApp: (clubId: string, appId: string, body: Partial<ClubAppInput> & { isActive?: boolean }) =>
+    request<ClubApp>(`/clubs/${clubId}/apps/${appId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  deleteApp: (clubId: string, appId: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/apps/${appId}`, { method: "DELETE" }),
 
   createProduct: (clubId: string, body: ProductInput) =>
     request<Product>(`/clubs/${clubId}/products`, { method: "POST", body: JSON.stringify(body) }),
