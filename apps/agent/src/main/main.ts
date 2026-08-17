@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
+import { applyLockdown, releaseLockdown } from "./lockdown.js";
 
 /**
  * Агент на игровом ПК.
@@ -165,6 +166,9 @@ ipcMain.handle("agent:unlock", () => {
   // Окно создаётся несворачиваемым, иначе блокировку убирали бы одной кнопкой.
   // На время оплаченной сессии сворачивание нужно: под ним запускается игра.
   lockWindow?.setMinimizable(true);
+  // Проводник и чужие диски закрываются на время игры. Ошибка здесь не должна
+  // задерживать гостя: он уже заплатил.
+  void applyLockdown();
 });
 
 /**
@@ -203,6 +207,7 @@ ipcMain.handle("agent:shell", () => {
 ipcMain.handle("agent:lock", () => {
   if (!unlocked && lockWindow?.isVisible()) return;
   unlocked = false;
+  void releaseLockdown();
   lockWindow?.restore();
   lockWindow?.setMinimizable(false);
   lockWindow?.setKiosk(true);
@@ -214,6 +219,13 @@ app.whenReady().then(() => {
   // Окно поднимается первым: всё, что идёт следом, может не получиться, и
   // тогда причину надо на чём-то показать.
   createLockWindow();
+
+  /*
+   * Запреты снимаются на старте. Прошлая сессия могла оборваться падением
+   * агента или машины, и тогда проводник остался бы закрытым до следующей
+   * оплаты — на машине с диском это состояние переживает и перезагрузку.
+   */
+  void releaseLockdown();
 
   try {
     // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
@@ -272,6 +284,8 @@ app.on("before-quit", (event) => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  // Осознанный выход не должен оставлять машину с закрытым проводником.
+  void releaseLockdown();
 });
 
 // Машина зала не должна оставаться без блокировки, если окно всё-таки закрыли.
