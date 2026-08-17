@@ -29,6 +29,14 @@ export function Shell({
         setQuery("");
         return;
       }
+      /*
+       * Пробел не считается началом поиска, и на кнопках фокус не перехватывается:
+       * пробелом гость нажимает кнопку, на которой стоит, а перевод фокуса в
+       * поле отменял бы это нажатие.
+       */
+      const onControl = event.target instanceof HTMLElement && event.target !== document.body;
+      if (onControl || event.key === " ") return;
+
       if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
         inputRef.current?.focus();
       }

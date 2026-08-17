@@ -166,6 +166,8 @@ ipcMain.handle("agent:unlock", () => {
   // Окно создаётся несворачиваемым, иначе блокировку убирали бы одной кнопкой.
   // На время оплаченной сессии сворачивание нужно: под ним запускается игра.
   lockWindow?.setMinimizable(true);
+  // Alt+Tab и Alt+F4 возвращаются гостю: во время игры это его окно, а не наше.
+  releaseShortcuts();
   // Проводник и чужие диски закрываются на время игры. Ошибка здесь не должна
   // задерживать гостя: он уже заплатил.
   void applyLockdown();
@@ -223,17 +225,11 @@ function spawnGame(target: string, args: string[]): Promise<void> {
   });
 }
 
-/** Вернуться к полкам, не закрывая игру. */
-ipcMain.handle("agent:shell", () => {
-  if (!unlocked) return;
-  lockWindow?.restore();
-  lockWindow?.focus();
-});
-
 /** Время кончилось: возвращаем блокировку поверх игры. */
 ipcMain.handle("agent:lock", () => {
   if (!unlocked && lockWindow?.isVisible()) return;
   unlocked = false;
+  holdShortcuts();
   void releaseLockdown();
   lockWindow?.restore();
   lockWindow?.setMinimizable(false);
@@ -264,21 +260,7 @@ app.whenReady().then(() => {
     showFailure(`Не удалось прописать автозапуск: ${asText(error)}`);
   }
 
-  /*
-   * Сочетания, которыми чаще всего пробуют выйти из киоска. Каждое ставится
-   * отдельно: часть из них система придерживает за собой — Ctrl+Shift+Esc,
-   * например, Windows не отдаёт никому, — и отказ в одном не должен уносить
-   * остальные вместе с запуском агента.
-   */
-  for (const accelerator of ["Alt+F4", "Alt+Tab", "Super", "Control+Shift+Escape"]) {
-    try {
-      globalShortcut.register(accelerator, () => {
-        if (!unlocked) lockWindow?.focus();
-      });
-    } catch (error) {
-      console.error(`Сочетание ${accelerator} не перехвачено: ${asText(error)}`);
-    }
-  }
+  holdShortcuts();
 
   /*
    * Возврат к полкам поверх запущенной игры. Сочетание редкое намеренно: часто
@@ -294,6 +276,39 @@ app.whenReady().then(() => {
     console.error(`Возврат к полкам не перехвачен: ${asText(error)}`);
   }
 });
+
+/*
+ * Сочетания, которыми чаще всего пробуют выйти из киоска.
+ *
+ * Держатся только пока экран заблокирован. Раньше они висели всё время работы
+ * агента, и во время оплаченной игры гость не мог ни свернуть её штатным
+ * Alt+Tab, ни закрыть Alt+F4: система отдавала сочетание нам, а мы на нём
+ * ничего не делали.
+ *
+ * Каждое ставится отдельно: часть система придерживает за собой — Ctrl+Shift+Esc
+ * Windows не отдаёт никому, — и отказ в одном не должен уносить остальные.
+ */
+const KIOSK_SHORTCUTS = ["Alt+F4", "Alt+Tab", "Super", "Control+Shift+Escape"];
+
+function holdShortcuts(): void {
+  for (const accelerator of KIOSK_SHORTCUTS) {
+    try {
+      globalShortcut.register(accelerator, () => lockWindow?.focus());
+    } catch (error) {
+      console.error(`Сочетание ${accelerator} не перехвачено: ${asText(error)}`);
+    }
+  }
+}
+
+function releaseShortcuts(): void {
+  for (const accelerator of KIOSK_SHORTCUTS) {
+    try {
+      globalShortcut.unregister(accelerator);
+    } catch {
+      // Не перехватывали — нечего и отпускать.
+    }
+  }
+}
 
 function asText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
