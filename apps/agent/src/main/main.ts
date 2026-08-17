@@ -184,8 +184,7 @@ ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: strin
     if (app.kind === "URI") {
       await shell.openExternal(app.target);
     } else {
-      const child = spawn(app.target, app.args ?? [], { detached: true, stdio: "ignore" });
-      child.unref();
+      await spawnGame(app.target, app.args ?? []);
     }
     // Уводим оболочку с дороги: игра открывается поверх, а вернуться к полкам
     // можно тем же сочетанием, что показано на экране.
@@ -195,6 +194,34 @@ ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: strin
     return { ok: false, reason: asText(error) };
   }
 });
+
+/**
+ * Запуск программы с ожиданием отказа.
+ *
+ * spawn не бросает исключение на неверный путь: ошибка приходит событием позже.
+ * Без этой паузы агент сворачивался бы на «успешный» запуск несуществующей
+ * игры, и гость оставался бы перед рабочим столом с пропавшими полками —
+ * ровно то, ради чего оболочка и делалась. Путь к игре набирают руками в кассе,
+ * так что случай обычный, а не редкий.
+ */
+function spawnGame(target: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(target, args, { detached: true, stdio: "ignore" });
+
+    const settle = setTimeout(() => {
+      // Ошибки не было — игра пошла. Отвязываем: закрытая игра не должна
+      // держать агента, а перезапуск агента — убивать игру.
+      child.removeAllListeners("error");
+      child.unref();
+      resolve();
+    }, 400);
+
+    child.once("error", (error) => {
+      clearTimeout(settle);
+      reject(error);
+    });
+  });
+}
 
 /** Вернуться к полкам, не закрывая игру. */
 ipcMain.handle("agent:shell", () => {

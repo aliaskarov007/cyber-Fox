@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
 
@@ -35,6 +35,17 @@ export function SessionBar({
    */
   const [called, setCalled] = useState(false);
 
+  /*
+   * Кнопка возвращается в исходное через минуту. Таймер снимается при уходе с
+   * экрана: сессия заканчивается блокировкой, компонент исчезает, и оставленный
+   * таймер дёргал бы состояние уже несуществующего экрана.
+   */
+  useEffect(() => {
+    if (!called) return;
+    const timer = setTimeout(() => setCalled(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [called]);
+
   const onPackage = tick.packageMinutesLeft !== null;
   const left = onPackage ? tick.packageMinutesLeft! : (tick.minutesAffordable ?? 0);
   const inDebt = tick.balance < 0;
@@ -63,7 +74,6 @@ export function SessionBar({
             onClick={() => {
               setCalled(true);
               void client.callStaff();
-              setTimeout(() => setCalled(false), 60_000);
             }}
           >
             {called ? "Администратор идёт" : "Позвать администратора"}

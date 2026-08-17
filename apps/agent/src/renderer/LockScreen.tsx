@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import {
   type AgentClient,
@@ -30,6 +30,17 @@ export function LockScreen({
   /* Молчащая кнопка вызова заставляет гостя жать её ещё несколько раз, а на
      стойке это выглядит как несколько вызовов с одной машины. */
   const [called, setCalled] = useState(false);
+
+  /*
+   * Кнопка возвращается в исходное через минуту. Таймер снимается при уходе с
+   * экрана: сессия заканчивается блокировкой, компонент исчезает, и оставленный
+   * таймер дёргал бы состояние уже несуществующего экрана.
+   */
+  useEffect(() => {
+    if (!called) return;
+    const timer = setTimeout(() => setCalled(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [called]);
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
 
@@ -173,7 +184,6 @@ export function LockScreen({
         onClick={() => {
           setCalled(true);
           void client.callStaff();
-          setTimeout(() => setCalled(false), 60_000);
         }}
       >
         {called ? "Администратор идёт" : "Позвать администратора"}
