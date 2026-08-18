@@ -18,14 +18,32 @@ import {
  * достаточно: в клубах почти всё ставится через него.
  */
 
-/** Где Steam лежит по умолчанию. Свой путь задаётся переменной в образе. */
+/**
+ * Где искать Steam.
+ *
+ * В бездисковом зале игры почти всегда лежат не в образе, а на отдельном диске
+ * с играми — он общий для всех машин и подключается своей буквой. Поэтому,
+ * кроме обычных мест, перебираются частые варианты такого диска, а точный путь
+ * задаётся переменной в образе: через точку с запятой их можно указать
+ * несколько.
+ */
 function steamRoots(): string[] {
   const fromEnv = process.env.CYBERFOX_STEAM_PATH;
-  if (fromEnv) return [fromEnv];
+  if (fromEnv) {
+    return fromEnv
+      .split(/[;,]/)
+      .map((path) => path.trim())
+      .filter((path) => path.length > 0);
+  }
 
   const programFiles = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
   const programFiles64 = process.env.ProgramFiles ?? "C:\\Program Files";
-  return [join(programFiles, "Steam"), join(programFiles64, "Steam"), "C:\\Steam", "D:\\Steam"];
+
+  const roots = [join(programFiles, "Steam"), join(programFiles64, "Steam")];
+  for (const drive of ["C", "D", "E", "F", "G"]) {
+    roots.push(`${drive}:\\Steam`, `${drive}:\\Games\\Steam`, `${drive}:\\SteamLibrary`);
+  }
+  return roots;
 }
 
 function readIfExists(file: string): string | null {
