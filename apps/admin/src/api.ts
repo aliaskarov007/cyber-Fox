@@ -108,6 +108,16 @@ export interface ClubApp {
   isActive: boolean;
 }
 
+/** Игра, найденная агентом на машине зала, но ещё не поставленная на полку. */
+export interface AppSuggestion {
+  id: string;
+  name: string;
+  kind: "EXECUTABLE" | "URI";
+  target: string;
+  coverUrl: string | null;
+  seenAt: string;
+}
+
 export interface ClubAppInput {
   name: string;
   category?: string;
@@ -331,6 +341,17 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  appSuggestions: (clubId: string) => request<AppSuggestion[]>(`/clubs/${clubId}/apps/suggestions`),
+
+  acceptSuggestions: (clubId: string, ids: string[]) =>
+    request<{ added: number }>(`/clubs/${clubId}/apps/suggestions/accept`, {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+
+  dismissSuggestion: (clubId: string, id: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/apps/suggestions/${id}`, { method: "DELETE" }),
 
   deleteApp: (clubId: string, appId: string) =>
     request<{ ok: true }>(`/clubs/${clubId}/apps/${appId}`, { method: "DELETE" }),

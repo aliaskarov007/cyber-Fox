@@ -47,6 +47,7 @@ declare global {
       saveConfig: (settings: AgentSettings) => Promise<void>;
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
+      scan: () => Promise<Array<{ name: string; target: string; coverUrl: string }>>;
       launch: (app: {
         kind: string;
         target: string;
@@ -127,6 +128,14 @@ export class AgentClient {
 
   stopSession(sessionId: string): Promise<{ ok: boolean; reason?: string }> {
     return this.request("session.stop", { sessionId });
+  }
+
+  /** Отчёт о том, что установлено на машине. */
+  reportLibrary(items: Array<{ name: string; target: string; coverUrl: string }>): Promise<{
+    ok: boolean;
+    saved?: number;
+  }> {
+    return this.request("library.scan", { items });
   }
 
   /** Полки этой машины: общие игры клуба плюс игры её зоны. */

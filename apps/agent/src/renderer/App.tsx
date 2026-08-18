@@ -97,6 +97,15 @@ export function App() {
         // Полки нужны раньше, чем гость сядет: пустая оболочка в момент старта
         // сессии выглядит как сломанная система.
         void loadLibrary();
+        /*
+         * Заодно рассказываем, что на машине установлено. Владелец увидит
+         * список в кассе и отберёт, что показывать гостю: заводить сорок игр
+         * руками никто не станет, а машина знает про себя всё сама.
+         */
+        void window.cyberfox
+          .scan()
+          .then((items) => (items.length > 0 ? client.reportLibrary(items) : null))
+          .catch(() => null);
       },
       onLibraryChanged: () => void loadLibrary(),
       onRejected: setRejection,

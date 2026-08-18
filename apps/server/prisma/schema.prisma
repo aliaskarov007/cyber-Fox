@@ -213,6 +213,7 @@ model Club {
   sales     ProductSale[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
+  appSuggestions AppSuggestion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -292,6 +293,33 @@ model ClubApp {
   @@unique([clubId, name])
   @@index([clubId])
   @@index([zoneId])
+}
+
+/**
+ * Игра, найденная агентом на машине зала, но ещё не поставленная на полку.
+ *
+ * Отдельно от каталога намеренно: на машинах стоит и то, что гостю показывать
+ * незачем — служебные программы, чужие лаунчеры, старьё. Владелец смотрит
+ * список и берёт нужное, а не разгребает полки после первой же загрузки.
+ */
+model AppSuggestion {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  name   String
+  kind   AppLaunchKind @default(URI)
+  /// Ссылка запуска или путь к программе — он же признак повтора.
+  target String
+  coverUrl String?
+
+  /// Где нашли. В бездисковом зале образ общий, поэтому достаточно одной
+  /// машины, но знать, кто сообщил, полезно при разборе.
+  computerId String?
+  seenAt     DateTime @default(now())
+
+  @@unique([clubId, target])
+  @@index([clubId])
 }
 
 enum ComputerStatus {

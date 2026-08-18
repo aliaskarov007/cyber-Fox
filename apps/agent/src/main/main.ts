@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
 import { applyLockdown, releaseLockdown } from "./lockdown.js";
+import { scanInstalled } from "./scan.js";
 
 /**
  * Агент на игровом ПК.
@@ -171,6 +172,19 @@ ipcMain.handle("agent:unlock", () => {
   // Проводник и чужие диски закрываются на время игры. Ошибка здесь не должна
   // задерживать гостя: он уже заплатил.
   void applyLockdown();
+});
+
+/**
+ * Что стоит на этой машине. Экран пересылает список серверу, а тот показывает
+ * его владельцу — заводить каталог руками по сорок игр никто не станет.
+ */
+ipcMain.handle("agent:scan", () => {
+  try {
+    return scanInstalled();
+  } catch (error) {
+    console.error(`Разведка игр не удалась: ${asText(error)}`);
+    return [];
+  }
 });
 
 /**

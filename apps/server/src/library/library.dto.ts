@@ -62,3 +62,11 @@ export class UpdateAppDto extends PartialType(CreateAppDto) {
   @IsBoolean()
   isActive?: boolean;
 }
+
+/** Отобранное владельцем из найденного агентами. */
+export class AcceptSuggestionsDto {
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  ids!: string[];
+}

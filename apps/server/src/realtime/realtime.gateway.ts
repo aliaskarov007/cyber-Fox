@@ -285,6 +285,26 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     };
   }
 
+  /**
+   * Что стоит на машине. Присылает агент после подключения.
+   *
+   * Заводить каталог руками по сорок игр никто не станет, а машина знает про
+   * себя всё сама. Найденное не попадает на полки: владелец отбирает из списка,
+   * потому что на машинах зала стоит и то, что гостю показывать незачем.
+   */
+  @SubscribeMessage("library.scan")
+  async recordScan(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { items?: Array<{ name: string; target: string; coverUrl?: string | null }> },
+  ) {
+    const clubId = client.data.clubId as string | undefined;
+    const computerId = client.data.computerId as string | undefined;
+    if (!clubId || !computerId) return { ok: false, saved: 0 };
+
+    const result = await this.library.recordScan(clubId, computerId, body.items ?? []);
+    return { ok: true, ...result };
+  }
+
   @SubscribeMessage("staff.call")
   async callStaff(@ConnectedSocket() client: Socket): Promise<{ ok: boolean }> {
     const computerId = client.data.computerId as string | undefined;

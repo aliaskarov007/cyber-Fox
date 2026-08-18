@@ -102,6 +102,90 @@ export class LibraryService {
     return { ok: true };
   }
 
+  /**
+   * Что агент нашёл на машине.
+   *
+   * Записывается в отдельный список, а не сразу на полки: на машинах зала
+   * стоит и то, что гостю показывать незачем. Уже добавленное в каталог
+   * пропускается — иначе владелец каждый раз разгребал бы одно и то же.
+   */
+  async recordScan(
+    clubId: string,
+    computerId: string,
+    items: Array<{ name: string; target: string; coverUrl?: string | null }>,
+  ): Promise<{ saved: number }> {
+    if (items.length === 0) return { saved: 0 };
+
+    const known = await this.prisma.clubApp.findMany({
+      where: { clubId, target: { in: items.map((item) => item.target) } },
+      select: { target: true },
+    });
+    const inCatalog = new Set(known.map((app) => app.target));
+
+    const fresh = items.filter((item) => !inCatalog.has(item.target));
+    for (const item of fresh) {
+      await this.prisma.appSuggestion.upsert({
+        where: { clubId_target: { clubId, target: item.target } },
+        // Повторный обход обновляет время: по нему видно, что игра ещё стоит.
+        update: { name: item.name, coverUrl: item.coverUrl ?? null, computerId, seenAt: new Date() },
+        create: {
+          clubId,
+          computerId,
+          name: item.name,
+          target: item.target,
+          coverUrl: item.coverUrl ?? null,
+          kind: "URI",
+        },
+      });
+    }
+
+    return { saved: fresh.length };
+  }
+
+  async suggestions(staff: AuthenticatedStaff, clubId: string) {
+    await this.access.requireClub(staff, clubId);
+    return this.prisma.appSuggestion.findMany({ where: { clubId }, orderBy: { name: "asc" } });
+  }
+
+  /** Перенос найденного на полки: владелец отобрал, что показывать гостю. */
+  async accept(staff: AuthenticatedStaff, clubId: string, ids: string[]): Promise<{ added: number }> {
+    await this.access.requireClub(staff, clubId);
+    const chosen = await this.prisma.appSuggestion.findMany({
+      where: { id: { in: ids }, clubId },
+    });
+
+    let added = 0;
+    for (const item of chosen) {
+      try {
+        await this.prisma.clubApp.create({
+          data: {
+            clubId,
+            name: item.name,
+            kind: item.kind,
+            target: item.target,
+            coverUrl: item.coverUrl,
+          },
+        });
+        added += 1;
+      } catch (error) {
+        // Игра с таким названием уже на полке: пропускаем, но предложение
+        // всё равно убираем — оно своё дело сделало.
+        if ((error as { code?: string }).code !== "P2002") throw error;
+      }
+    }
+
+    await this.prisma.appSuggestion.deleteMany({ where: { id: { in: chosen.map((i) => i.id) }, clubId } });
+    if (added > 0) this.bus.emit("library.changed", { clubId });
+    return { added };
+  }
+
+  /** Отказ: программа найдена, но гостю не нужна. */
+  async dismiss(staff: AuthenticatedStaff, clubId: string, id: string): Promise<{ ok: true }> {
+    await this.access.requireClub(staff, clubId);
+    await this.prisma.appSuggestion.deleteMany({ where: { id, clubId } });
+    return { ok: true };
+  }
+
   /*
    * Название игры в клубе уникально. Без перехвата совпадение выглядело бы
    * пятисотой ошибкой, и владелец, переименовывая игру в уже занятое имя, видел

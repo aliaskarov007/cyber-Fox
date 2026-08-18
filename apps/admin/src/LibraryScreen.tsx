@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { type Club, type ClubApp, type Zone, api } from "./api.js";
+import { type AppSuggestion, type Club, type ClubApp, type Zone, api } from "./api.js";
+import { FoundApps } from "./FoundApps.js";
 import { LibraryForm } from "./LibraryForm.js";
 
 /**
@@ -12,6 +13,7 @@ import { LibraryForm } from "./LibraryForm.js";
  */
 export function LibraryScreen({ club }: { club: Club }) {
   const [apps, setApps] = useState<ClubApp[]>([]);
+  const [found, setFound] = useState<AppSuggestion[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [editing, setEditing] = useState<ClubApp | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -19,9 +21,14 @@ export function LibraryScreen({ club }: { club: Club }) {
 
   async function load(): Promise<void> {
     try {
-      const [nextApps, nextZones] = await Promise.all([api.apps(club.id), api.zones(club.id)]);
+      const [nextApps, nextZones, nextFound] = await Promise.all([
+        api.apps(club.id),
+        api.zones(club.id),
+        api.appSuggestions(club.id),
+      ]);
       setApps(nextApps);
       setZones(nextZones);
+      setFound(nextFound);
     } catch (cause) {
       // Молчаливый пустой экран здесь неотличим от «каталог пуст».
       setError((cause as Error).message);
@@ -48,6 +55,9 @@ export function LibraryScreen({ club }: { club: Club }) {
   return (
     <main>
       {error && <div className="error">{error}</div>}
+
+      {/* Найденное стоит выше каталога: это то, что требует решения. */}
+      <FoundApps club={club} found={found} onChanged={() => void load()} />
 
       <section className="zone-block">
         <div className="zone-head">

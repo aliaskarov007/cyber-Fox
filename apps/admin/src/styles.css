@@ -806,3 +806,16 @@ tr.muted td {
 .button-link:hover {
   background: var(--accent-hover);
 }
+
+/* Обложка найденного — кнопка выбора: попасть по картинке проще, чем по строке. */
+.cover-art {
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+.cover-card[aria-selected="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
