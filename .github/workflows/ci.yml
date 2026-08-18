@@ -111,6 +111,7 @@ jobs:
 
           own=$(psql -tA "$DATABASE_URL" -c "
             BEGIN;
+            SET LOCAL ROLE cyberfox_app;
             SELECT set_config('app.tenant_id', '11111111-1111-1111-1111-111111111111', true);
             SELECT count(*) FROM \"Club\" WHERE name LIKE 'Зал %';
             COMMIT;" | tail -2 | head -1)
@@ -120,6 +121,7 @@ jobs:
 
           foreign=$(psql -tA "$DATABASE_URL" -c "
             BEGIN;
+            SET LOCAL ROLE cyberfox_app;
             SELECT set_config('app.tenant_id', '11111111-1111-1111-1111-111111111111', true);
             SELECT count(*) FROM \"Club\" WHERE id = 'bbbbbbbb-2222-2222-2222-222222222222';
             COMMIT;" | tail -2 | head -1)

@@ -28,6 +28,15 @@ export class TenantScopeInterceptor implements NestInterceptor {
 
     const run = this.prisma.$transaction(
       async (tx) => {
+        /*
+         * Сначала роль, потом сеть.
+         *
+         * Владельца таблиц правила изоляции не ограничивают, а подключается
+         * приложение именно владельцем — без переключения роли правила не
+         * действуют вовсе. SET LOCAL держится до конца транзакции, поэтому
+         * соединение возвращается в пул прежним.
+         */
+        await tx.$executeRawUnsafe("SET LOCAL ROLE cyberfox_app");
         // set_config с третьим аргументом true действует до конца транзакции:
         // соединение вернётся в пул чистым, без чужой сети в настройках.
         await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
