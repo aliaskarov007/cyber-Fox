@@ -166,9 +166,6 @@ ipcMain.handle("agent:unlock", () => {
   lockWindow?.setKiosk(false);
   lockWindow?.setAlwaysOnTop(false);
   lockWindow?.setFullScreen(true);
-  // Окно создаётся несворачиваемым, иначе блокировку убирали бы одной кнопкой.
-  // На время оплаченной сессии сворачивание нужно: под ним запускается игра.
-  lockWindow?.setMinimizable(true);
   // Alt+Tab и Alt+F4 возвращаются гостю: во время игры это его окно, а не наше.
   releaseShortcuts();
   // Проводник и чужие диски закрываются на время игры. Ошибка здесь не должна
@@ -205,14 +202,14 @@ ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: strin
       await spawnGame(app.target, app.args ?? []);
     }
     /*
-     * Оболочка уходит с дороги не сразу.
+     * Оболочка не сворачивается. Она и есть то, что гость видит вместо рабочего
+     * стола: игра открывается поверх, а закрыв её, гость возвращается к полкам,
+     * а не к ярлыкам Windows. Свернувшись, оболочка отдавала бы зал обратно
+     * системе — ровно то, ради ухода от чего она делалась.
      *
-     * Игра открывается не мгновенно — Steam и лаунчеры думают несколько секунд.
-     * Пропав в тот же миг, оболочка оставляет гостя перед пустым столом, и он
-     * решает, что нажатие не сработало. Пауза даёт экрану показать «запускаем»
-     * и напомнить, каким сочетанием вернуться к полкам.
+     * Отдаём фокус запускаемой игре и уходим на задний план сами.
      */
-    setTimeout(() => lockWindow?.minimize(), 2500);
+    lockWindow?.blur();
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: asText(error) };
@@ -254,8 +251,7 @@ ipcMain.handle("agent:lock", () => {
   setPlaying(false);
   holdShortcuts();
   void releaseLockdown();
-  lockWindow?.restore();
-  lockWindow?.setMinimizable(false);
+  lockWindow?.show();
   lockWindow?.setKiosk(true);
   lockWindow?.setAlwaysOnTop(true, "screen-saver");
   lockWindow?.focus();
@@ -298,7 +294,9 @@ app.whenReady().then(() => {
   try {
     globalShortcut.register("Control+Alt+Home", () => {
       if (!unlocked) return;
-      lockWindow?.restore();
+      // Поднимаем полки над игрой, не закрывая её: гость возвращается выбрать
+      // другую и продолжает ту же оплаченную сессию.
+      lockWindow?.show();
       lockWindow?.focus();
     });
   } catch (error) {

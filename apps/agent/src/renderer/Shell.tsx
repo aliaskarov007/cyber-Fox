@@ -113,7 +113,8 @@ export function Shell({
         <div className="launching">
           <div className="launching-name">Запускаем «{launching.name}»</div>
           <div className="launching-hint">
-            Игра откроется через несколько секунд. Вернуться к полкам — Ctrl + Alt + Home
+            Игра откроется через несколько секунд и встанет поверх полок. Закроете её — снова
+            окажетесь здесь. Вернуться раньше — Ctrl + Alt + Home
           </div>
         </div>
       )}
