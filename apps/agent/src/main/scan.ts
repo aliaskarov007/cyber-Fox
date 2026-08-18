@@ -42,8 +42,25 @@ function steamRoots(): string[] {
   const roots = [join(programFiles, "Steam"), join(programFiles64, "Steam")];
   for (const drive of ["C", "D", "E", "F", "G"]) {
     roots.push(`${drive}:\\Steam`, `${drive}:\\Games\\Steam`, `${drive}:\\SteamLibrary`);
+    // Клубы кладут Steam в свою папку — D:\Online\Steam, D:\Игры\Steam и
+    // подобное. Угадать имя нельзя, поэтому смотрим папки первого уровня: их
+    // на игровом диске десятки, а не тысячи.
+    roots.push(...nestedSteamDirs(`${drive}:\\`));
   }
   return roots;
+}
+
+/** Папки вида <диск>\<что-то>\Steam. Глубже не идём: это уже перебор диска. */
+function nestedSteamDirs(drive: string): string[] {
+  try {
+    return readdirSync(drive, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(drive, entry.name, "Steam"))
+      .filter((path) => existsSync(path));
+  } catch {
+    // Диска нет или он недоступен — обычное дело на машине зала.
+    return [];
+  }
 }
 
 function readIfExists(file: string): string | null {

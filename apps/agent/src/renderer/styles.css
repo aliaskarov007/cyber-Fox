@@ -461,3 +461,27 @@ button:disabled {
   font-size: 22px;
   font-weight: 600;
 }
+
+/*
+ * Что происходит между нажатием и появлением игры. Без этого экрана гость видит
+ * исчезнувшую оболочку и пустой стол и решает, что нажатие не сработало.
+ */
+.launching {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+  background: rgba(14, 16, 21, 0.92);
+}
+
+.launching-name {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.launching-hint {
+  color: var(--muted);
+  font-size: 15px;
+}

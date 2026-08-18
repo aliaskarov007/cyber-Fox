@@ -17,6 +17,8 @@ export function Shell({
   onLaunch: (app: LibraryApp) => void;
 }) {
   const [query, setQuery] = useState("");
+  /** Что сейчас запускается: между нажатием и появлением игры проходят секунды. */
+  const [launching, setLaunching] = useState<LibraryApp | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /*
@@ -78,7 +80,15 @@ export function Shell({
           <h2 className="shelf-title">{shelf.title}</h2>
           <div className="shelf-row">
             {shelf.apps.map((app) => (
-              <button key={app.id} className="tile" type="button" onClick={() => onLaunch(app)}>
+              <button
+                key={app.id}
+                className="tile"
+                type="button"
+                onClick={() => {
+                  setLaunching(app);
+                  onLaunch(app);
+                }}
+              >
                 <span className="tile-art">
                   {app.coverUrl ? (
                     <img
@@ -98,6 +108,15 @@ export function Shell({
       ))}
 
       <div className="shell-hint">Вернуться к играм из запущенной игры — Ctrl + Alt + Home</div>
+
+      {launching && (
+        <div className="launching">
+          <div className="launching-name">Запускаем «{launching.name}»</div>
+          <div className="launching-hint">
+            Игра откроется через несколько секунд. Вернуться к полкам — Ctrl + Alt + Home
+          </div>
+        </div>
+      )}
     </div>
   );
 }
