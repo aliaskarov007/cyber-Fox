@@ -29,7 +29,7 @@ export class AuthController {
    * укладывается; перебор — нет. Считается по адресу, а не по логину: иначе
    * подбор пароля к одной почте разошёлся бы на десяток соседних.
    */
-  @Throttle({ вход: { ttl: 60_000, limit: 5 } })
+  @Throttle({ login: { ttl: 60_000, limit: 5 } })
   @Public()
   @Post("login")
   login(@Body() dto: LoginDto): Promise<LoginResult> {
