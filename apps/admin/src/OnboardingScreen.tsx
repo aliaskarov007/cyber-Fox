@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { AgentDownload } from "./AgentDownload.js";
+
 import {
   type Checkout,
   type Club,
@@ -76,7 +78,9 @@ export function OnboardingScreen({ club, isOwner }: { club: Club; isOwner: boole
           связывает программу с конкретным ПК — вводить его повторно не нужно.
         </div>
 
-        {isOwner && <DisklessKey club={club} />}
+        {/* Сначала где взять программу, потом чем её настроить. */}
+      <AgentDownload />
+      {isOwner && <DisklessKey club={club} />}
 
         <div className="table-wrap">
           <table>

@@ -10,6 +10,7 @@ name: Проверка
 on:
   push:
     branches: [main, "claude/**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -145,3 +146,14 @@ jobs:
           path: apps/agent/release/*.exe
           if-no-files-found: error
           retention-days: 30
+
+      # Клуб не должен заходить в GitHub, чтобы получить установщик: артефакты
+      # сборки требуют входа. По тегу файл уходит в релиз, откуда качается
+      # прямой ссылкой, одинаковой для всех выпусков:
+      #   github.com/aliaskarov007/cyber-Fox/releases/latest/download/CyberFoxAgentSetup.exe
+      - name: Выложить установщик в релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/agent/release/CyberFoxAgentSetup.exe
+          generate_release_notes: true

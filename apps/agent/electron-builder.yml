@@ -17,6 +17,11 @@ copyright: Cyber-Fox
 # При обновлении electron в package.json обновите и здесь.
 electronVersion: 33.4.11
 
+# Имя файла без версии и пробелов. Ссылка на скачивание стоит в кассе и в
+# инструкции, и меняться при каждом выпуске она не должна; пробелы в имени
+# ломают половину способов скачать файл в консоли.
+artifactName: CyberFoxAgentSetup.${ext}
+
 directories:
   output: release
   buildResources: build
