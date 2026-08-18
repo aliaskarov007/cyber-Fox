@@ -10,6 +10,11 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Без ограничения журнал докера растёт бесконечно и съедает диск мини-ПК
+    # за несколько месяцев работы зала.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cyberfox}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте пароль базы в .env}
@@ -29,6 +34,11 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
+    # Без ограничения журнал докера растёт бесконечно и съедает диск мини-ПК
+    # за несколько месяцев работы зала.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     depends_on:
       db:
         condition: service_healthy
@@ -41,12 +51,25 @@ services:
       PAYMENT_CHECKOUT_URL: ${PAYMENT_CHECKOUT_URL:-}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
       TZ: ${TZ:-Asia/Almaty}
+    # Проверяется не порт, а ответ вместе с базой: подвисший на базе сервер
+    # держит порт открытым, но зал с него ни посадить, ни списать не может.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   web:
     build:
       context: .
       dockerfile: apps/admin/Dockerfile
     restart: unless-stopped
+    # Без ограничения журнал докера растёт бесконечно и съедает диск мини-ПК
+    # за несколько месяцев работы зала.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     depends_on:
       - server
     environment:
@@ -63,6 +86,11 @@ services:
   backup:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Без ограничения журнал докера растёт бесконечно и съедает диск мини-ПК
+    # за несколько месяцев работы зала.
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     depends_on:
       db:
         condition: service_healthy
