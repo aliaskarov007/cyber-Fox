@@ -21,3 +21,6 @@ tsconfig.tsbuildinfo
 .env
 /backups/
 proxy-ca.crt
+
+# Ключ доступа к внешнему хранилищу бэкапов
+deploy/backup/offsite-key

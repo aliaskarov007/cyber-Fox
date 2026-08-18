@@ -94,6 +94,20 @@ jobs:
       - name: Заполнить демо-данными
         run: pnpm --filter @cyberfox/server seed
 
+      # Бэкап, который никто не восстанавливал, — не бэкап. Проверка снимает
+      # копию так же, как ночной контейнер в клубе, и разворачивает её в чистую
+      # базу, сверяя, что клуб и гости на месте.
+      - name: Снять копию и восстановить её в чистую базу
+        run: |
+          docker build -f deploy/backup/Dockerfile -t cyberfox-backup .
+          PGPASSWORD=ci pg_dump -h localhost -U postgres -d cyberfox > /tmp/dump.sql
+          psql "postgresql://postgres:ci@localhost:5432/postgres" -c 'CREATE DATABASE restored'
+          psql "postgresql://postgres:ci@localhost:5432/restored" -f /tmp/dump.sql > /dev/null
+          clubs=$(psql -tA "postgresql://postgres:ci@localhost:5432/restored" -c 'SELECT count(*) FROM "Club"')
+          guests=$(psql -tA "postgresql://postgres:ci@localhost:5432/restored" -c 'SELECT count(*) FROM "Guest"')
+          echo "в восстановленной базе клубов: $clubs, гостей: $guests"
+          test "$clubs" -ge 1 && test "$guests" -ge 1
+
   installer:
     name: Установщик агента
     runs-on: windows-latest
