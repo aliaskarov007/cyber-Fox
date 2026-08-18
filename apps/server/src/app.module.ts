@@ -14,6 +14,7 @@ import { ImportModule } from "./import/import.module.js";
 import { LibraryModule } from "./library/library.module.js";
 import { NetworkModule } from "./network/network.module.js";
 import { PaymentsModule } from "./payments/payments.module.js";
+import { PlatformModule } from "./platform/platform.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProductsModule } from "./products/products.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
@@ -57,6 +58,7 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     ImportModule,
     UploadsModule,
     PaymentsModule,
+    PlatformModule,
     RealtimeModule,
   ],
   providers: [

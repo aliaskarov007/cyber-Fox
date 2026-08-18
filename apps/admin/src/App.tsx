@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { BarScreen } from "./BarScreen.js";
+import { PlatformLogin, PlatformScreen } from "./PlatformScreen.js";
+import { getPlatformToken } from "./platform-api.js";
 import { LibraryScreen } from "./LibraryScreen.js";
 import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
@@ -37,7 +39,23 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: bo
   { id: "settings", label: "Настройки" },
 ];
 
+/*
+ * Платформенная часть живёт по своему адресу и со своим входом. Разделение
+ * намеренное: это разные люди с разными правами, и путать их экраны нельзя —
+ * администратор зала не должен случайно увидеть чужие клубы.
+ */
 export function App() {
+  if (window.location.pathname.startsWith("/platform")) return <PlatformApp />;
+  return <ClubApp />;
+}
+
+function PlatformApp() {
+  const [name, setName] = useState<string | null>(getPlatformToken() ? "Платформа" : null);
+  if (!name) return <PlatformLogin onIn={setName} />;
+  return <PlatformScreen name={name} onLogout={() => setName(null)} />;
+}
+
+function ClubApp() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [clubId, setClubId] = useState<string | null>(null);

@@ -15,6 +15,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/**
+ * Тот, кто продаёт систему клубам, а не работает в зале.
+ *
+ * Отдельно от сотрудников намеренно. Учётная запись платформы видит все сети
+ * сразу, и жить рядом с кассовыми входами она не должна: утёкший пароль
+ * администратора зала не открывает чужие клубы, а платформенный вход не
+ * появляется в списке сотрудников ни одного клуба.
+ */
+model PlatformAdmin {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  fullName     String
+  passwordHash String
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// Сеть клубов одного владельца. Единица подписки на платформу.
 model Tenant {
   id   String @id @default(uuid())

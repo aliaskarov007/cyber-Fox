@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "platform-admin": "tsx prisma/platform-admin.ts"
   },
   "dependencies": {
     "@cyberfox/shared": "workspace:*",
