@@ -1,0 +1,122 @@
+# Проверка каждого коммита.
+#
+# Три работы намеренно разделены. Первая ловит поломки кода за минуту, вторая
+# гоняет миграции по настоящему Postgres — до сих пор их проверяли только
+# глазами, — третья собирает установщик агента на живой Windows, а не через
+# wine с мака.
+
+name: Проверка
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  code:
+    name: Типы, тесты, сборка
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Клиент Prisma нужен до проверки типов: без него сервер не компилируется.
+      - run: pnpm --filter @cyberfox/server prisma:generate
+
+      - run: pnpm typecheck
+      # --if-present: тесты есть у сервера и агента, у кассы и общих типов их нет.
+      - run: pnpm -r --if-present test
+      - run: pnpm build
+
+  migrations:
+    name: Миграции на живой базе
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: cyberfox
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/cyberfox
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @cyberfox/server prisma:generate
+
+      # Ровно то, что делает клуб при первом запуске: пустая база и все
+      # миграции подряд.
+      - name: Прогнать все миграции с нуля
+        run: pnpm --filter @cyberfox/server exec prisma migrate deploy
+
+      # Схема и миграции разъезжаются молча: правку модели легко закоммитить,
+      # забыв миграцию, и упрётся в это клуб, а не разработчик.
+      - name: Сверить схему с миграциями
+        run: |
+          pnpm --filter @cyberfox/server exec prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code && echo "схема совпадает" || {
+              echo "::error::Схема Prisma разошлась с миграциями — не хватает миграции"
+              exit 1
+            }
+
+      - name: Заполнить демо-данными
+        run: pnpm --filter @cyberfox/server seed
+
+  installer:
+    name: Установщик агента
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @cyberfox/agent pack:win
+
+      # Готовый файл забирают из вкладки Actions: в зал уходит ссылка, а не
+      # пересылка 78 мегабайт через мессенджер.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyber-fox-agent-setup
+          path: apps/agent/release/*.exe
+          if-no-files-found: error
+          retention-days: 30

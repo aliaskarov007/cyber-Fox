@@ -11,7 +11,8 @@
     "dev:electron": "electron .",
     "build": "tsc -p tsconfig.main.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit",
-    "pack:win": "pnpm build && electron-builder --win --publish never"
+    "pack:win": "pnpm build && electron-builder --win --publish never",
+    "test": "vitest run"
   },
   "dependencies": {
     "socket.io-client": "^4.8.1"
