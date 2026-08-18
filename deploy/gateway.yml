@@ -1,0 +1,30 @@
+# Cyber-Fox за общим шлюзом.
+#
+# На сервере, где уже стоит Caddy и держит 80 и 443, свой Caddy с теми же
+# портами не поднять. Поэтому наш веб-контейнер отдаёт кассу по обычному HTTP
+# внутрь docker-сети, а сертификат и HTTPS остаются на общем шлюзе.
+#
+#   docker compose -f docker-compose.yml -f deploy/gateway.yml up -d
+#
+# Шлюзу останется добавить один блок:
+#   game.arzan.cloud {
+#       reverse_proxy cyberfox-web:80
+#   }
+
+services:
+  web:
+    environment:
+      # Двоеточие без имени — слушаем порт, сертификат берёт на себя шлюз.
+      CYBERFOX_DOMAIN: ":80"
+    # !override, а не добавление: 80 и 443 из основного файла заняты шлюзом.
+    ports: !override []
+    # Имя фиксировано: на него ссылается конфиг шлюза, и меняться при
+    # переименовании проекта оно не должно.
+    container_name: cyberfox-web
+    networks:
+      default:
+      shared-gateway:
+
+networks:
+  shared-gateway:
+    external: true
