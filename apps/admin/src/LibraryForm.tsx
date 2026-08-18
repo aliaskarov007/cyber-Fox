@@ -36,6 +36,8 @@ export function LibraryForm({
   const [zoneId, setZoneId] = useState(editing?.zoneId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Идёт отправка картинки: файл на пару мегабайт летит не мгновенно. */
+  const [uploading, setUploading] = useState(false);
 
   /** Подсказка обложки появляется, только если поле пустое: своё не затираем. */
   const suggested = coverUrl.trim() === "" ? steamCoverUrl(target, args) : null;
@@ -129,6 +131,31 @@ export function LibraryForm({
       </label>
 
       <label>
+        {/*
+         * У игр из сборок ссылки на обложку не существует, а искать похожую по
+         * названию администратору некогда. Поэтому картинку можно просто
+         * загрузить — она ляжет рядом с сервером и встанет на плитку.
+         */}
+        Или загрузить картинку
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={uploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            setError(null);
+            api
+              .uploadCover(club.id, file)
+              .then((result) => setCoverUrl(result.url))
+              .catch((cause: Error) => setError(cause.message))
+              .finally(() => setUploading(false));
+          }}
+        />
+      </label>
+
+      <label>
         Зона
         <select value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
           <option value="">во всех зонах</option>
@@ -163,7 +190,7 @@ export function LibraryForm({
       )}
 
       <div className="actions">
-        <button className="primary" type="submit" disabled={busy}>
+        <button className="primary" type="submit" disabled={busy || uploading}>
           {editing ? "Сохранить" : "Добавить"}
         </button>
         <button type="button" onClick={onClose}>

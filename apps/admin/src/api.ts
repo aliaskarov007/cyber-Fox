@@ -351,6 +351,26 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /**
+   * Обложка файлом. Заголовок Content-Type не ставим намеренно: браузер сам
+   * добавит границу раздела частей, а заданный руками её потеряет.
+   */
+  uploadCover: async (clubId: string, file: File): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getToken();
+    const response = await fetch(`/api/clubs/${clubId}/uploads/cover`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? `Ошибка ${response.status}`);
+    }
+    return (await response.json()) as { url: string };
+  },
+
   appSuggestions: (clubId: string) => request<AppSuggestion[]>(`/clubs/${clubId}/apps/suggestions`),
 
   acceptSuggestions: (clubId: string, ids: string[]) =>

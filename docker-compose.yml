@@ -51,6 +51,10 @@ services:
       PAYMENT_CHECKOUT_URL: ${PAYMENT_CHECKOUT_URL:-}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
       TZ: ${TZ:-Asia/Almaty}
+    volumes:
+      # Загруженные обложки живут отдельно от образа: пересборка сервера не
+      # должна стирать картинки, которые клуб подобрал руками.
+      - covers:/data/covers
     # Проверяется не порт, а ответ вместе с базой: подвисший на базе сервер
     # держит порт открытым, но зал с него ни посадить, ни списать не может.
     healthcheck:
@@ -120,6 +124,7 @@ services:
       - ${OFFSITE_KEY:-./deploy/backup/offsite-key.none}:/keys/offsite:ro
 
 volumes:
+  covers:
   db-data:
   caddy-data:
   caddy-config:

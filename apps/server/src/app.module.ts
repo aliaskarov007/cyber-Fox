@@ -21,6 +21,7 @@ import { ReportsModule } from "./reports/reports.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
 import { SignupModule } from "./signup/signup.module.js";
+import { UploadsModule } from "./uploads/uploads.module.js";
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { SignupModule } from "./signup/signup.module.js";
     ReportsModule,
     SignupModule,
     ImportModule,
+    UploadsModule,
     PaymentsModule,
     RealtimeModule,
   ],

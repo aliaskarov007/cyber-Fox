@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 
 import { AppModule } from "./app.module.js";
+import { COVERS_DIR } from "./uploads/uploads.controller.js";
 
 async function bootstrap(): Promise<void> {
   // Сырое тело нужно вебхуку платежей: подпись считается по байтам запроса,
@@ -10,6 +11,18 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   app.setGlobalPrefix("api");
+
+  /*
+   * Загруженные обложки раздаются как обычные файлы. Адрес начинается с /api,
+   * потому что именно он уже проксируется на сервер: иначе каждому клубу
+   * пришлось бы править настройки своего шлюза.
+   */
+  app.useStaticAssets(COVERS_DIR, {
+    prefix: "/api/covers/",
+    // Обложка не меняется: имя файла случайное, новая версия — новое имя.
+    maxAge: "365d",
+    index: false,
+  });
 
   /*
    * За обратным прокси адрес клиента приходит заголовком, а не соединением.
