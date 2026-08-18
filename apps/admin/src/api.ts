@@ -78,6 +78,9 @@ export interface Computer {
   clubId: string;
   zoneId: string;
   name: string;
+  /** Место на плане зала; пусто у нерасставленных. */
+  posX: number | null;
+  posY: number | null;
   status: "OFFLINE" | "IDLE" | "IN_USE" | "RESERVED" | "MAINTENANCE";
   /** Код привязки агента к машине. Показывается при установке. */
   pairingToken: string | null;
@@ -223,6 +226,8 @@ export interface HallCell {
     status: "OFFLINE" | "IDLE" | "IN_USE" | "RESERVED" | "MAINTENANCE";
     zone: { id: string; name: string };
     lastSeenAt: string | null;
+    posX: number | null;
+    posY: number | null;
   };
   session: {
     id: string;
@@ -314,7 +319,11 @@ export const api = {
   createComputer: (clubId: string, body: { name: string; zoneId: string }) =>
     request<Computer>(`/clubs/${clubId}/computers`, { method: "POST", body: JSON.stringify(body) }),
 
-  updateComputer: (clubId: string, computerId: string, body: Partial<{ name: string; zoneId: string }>) =>
+  updateComputer: (
+    clubId: string,
+    computerId: string,
+    body: Partial<{ name: string; zoneId: string; posX: number | null; posY: number | null }>,
+  ) =>
     request<Computer>(`/clubs/${clubId}/computers/${computerId}`, {
       method: "PATCH",
       body: JSON.stringify(body),

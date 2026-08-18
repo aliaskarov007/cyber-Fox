@@ -58,6 +58,17 @@ export class UpdateComputerDto {
   @IsOptional()
   @IsString()
   zoneId?: string;
+
+  /** Место на плане зала. null снимает машину с плана обратно в список. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  posX?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  posY?: number | null;
 }
 
 export class CreateTariffDto {

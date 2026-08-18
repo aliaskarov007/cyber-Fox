@@ -828,6 +828,8 @@ export class SessionsService {
     status: ComputerStatus;
     zone: { id: string; name: string };
     lastSeenAt: Date | null;
+    posX: number | null;
+    posY: number | null;
   }) {
     return {
       id: computer.id,
@@ -835,6 +837,9 @@ export class SessionsService {
       status: computer.status,
       zone: computer.zone,
       lastSeenAt: computer.lastSeenAt,
+      // Место на плане: где машина стоит в помещении, а не по алфавиту.
+      posX: computer.posX,
+      posY: computer.posY,
     };
   }
 

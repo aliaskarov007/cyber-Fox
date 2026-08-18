@@ -349,6 +349,12 @@ model Computer {
   macAddress String?
   lastSeenAt DateTime?
 
+  /// Место машины на плане зала: столбец и ряд, как она стоит в помещении.
+  /// Пусто у тех, кого ещё не расставили — такие показываются общим списком
+  /// под планом, а не сваливаются в угол поверх друг друга.
+  posX Int?
+  posY Int?
+
   sessions          Session[]
   offlineOperations OfflineOperation[]
 
