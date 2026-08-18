@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {

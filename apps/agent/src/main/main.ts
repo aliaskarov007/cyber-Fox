@@ -6,6 +6,7 @@ import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
 import { applyLockdown, releaseLockdown } from "./lockdown.js";
 import { scanInstalled } from "./scan.js";
+import { setPlaying, startUpdater } from "./updater.js";
 
 /**
  * Агент на игровом ПК.
@@ -161,6 +162,7 @@ ipcMain.handle("agent:save-config", (_event, settings: AgentSettings) => {
 ipcMain.handle("agent:unlock", () => {
   if (unlocked) return;
   unlocked = true;
+  setPlaying(true);
   lockWindow?.setKiosk(false);
   lockWindow?.setAlwaysOnTop(false);
   lockWindow?.setFullScreen(true);
@@ -243,6 +245,7 @@ function spawnGame(target: string, args: string[]): Promise<void> {
 ipcMain.handle("agent:lock", () => {
   if (!unlocked && lockWindow?.isVisible()) return;
   unlocked = false;
+  setPlaying(false);
   holdShortcuts();
   void releaseLockdown();
   lockWindow?.restore();
@@ -256,6 +259,12 @@ app.whenReady().then(() => {
   // Окно поднимается первым: всё, что идёт следом, может не получиться, и
   // тогда причину надо на чём-то показать.
   createLockWindow();
+
+  /*
+   * Обновления проверяются только в собранном приложении: в разработке
+   * обновлять нечего, а лишние запросы к GitHub при каждом запуске мешают.
+   */
+  if (app.isPackaged) startUpdater();
 
   /*
    * Запреты снимаются на старте. Прошлая сессия могла оборваться падением

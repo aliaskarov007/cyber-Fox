@@ -175,6 +175,13 @@ jobs:
 
       - name: Собрать установщик
         working-directory: apps/agent
+        # Подпись включается сама, как только в секретах репозитория появится
+        # сертификат: electron-builder читает эти две переменные. Пока их нет,
+        # сборка идёт неподписанной — и Windows встречает установку
+        # предупреждением SmartScreen.
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: npx electron-builder --win --publish never
 
       # Готовый файл забирают из вкладки Actions: в зал уходит ссылка, а не
@@ -194,5 +201,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/agent/release/CyberFoxAgentSetup.exe
+          # latest.yml обязателен: по нему агент узнаёт, что вышла новая версия.
+          # Без него автообновление молчит, а установщик качается как раньше.
+          files: |
+            apps/agent/release/CyberFoxAgentSetup.exe
+            apps/agent/release/latest.yml
           generate_release_notes: true
