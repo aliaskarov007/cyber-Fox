@@ -126,6 +126,17 @@ export class NetworkService {
 
     if (dto.clubId) await this.requireOwnClub(staff.tenantId, dto.clubId);
 
+    /*
+     * Увольнение, смена пароля, роли или зала отзывают прежние токены. Иначе
+     * уволенный сотрудник работал бы в кассе до конца срока токена — двенадцать
+     * часов, — а смена роли применялась бы только после нового входа.
+     */
+    const revokes =
+      dto.isActive === false ||
+      dto.password !== undefined ||
+      dto.role !== undefined ||
+      dto.clubId !== undefined;
+
     return toPublicStaff(
       await this.prisma.staff.update({
         where: { id: staffId },
@@ -135,6 +146,7 @@ export class NetworkService {
           isActive: dto.isActive,
           clubId: dto.role === StaffRole.OWNER ? null : dto.clubId,
           ...(dto.password ? { passwordHash: await bcrypt.hash(dto.password, 10) } : {}),
+          ...(revokes ? { tokenVersion: { increment: 1 } } : {}),
         },
       }),
     );

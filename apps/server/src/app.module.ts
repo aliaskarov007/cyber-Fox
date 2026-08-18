@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { AuthModule } from "./auth/auth.module.js";
 import { SubscriptionModule } from "./billing-platform/subscription.module.js";
@@ -24,6 +25,16 @@ import { SignupModule } from "./signup/signup.module.js";
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    /*
+     * Ограничение частоты запросов. Пароль сотрудника подбирался бы бесконечно,
+     * в том числе из локальной сети клуба, где касса открыта каждому, кто
+     * подключился к вайфаю. Общий предел щедрый — кассовый экран шлёт много
+     * мелких запросов; жёсткий стоит отдельно на входе.
+     */
+    ThrottlerModule.forRoot([
+      { name: "общий", ttl: 60_000, limit: 300 },
+      { name: "вход", ttl: 60_000, limit: 5 },
+    ]),
     PrismaModule,
     SubscriptionModule,
     AuthModule,
@@ -42,6 +53,7 @@ import { SignupModule } from "./signup/signup.module.js";
   ],
   providers: [
     // Закрыто по умолчанию: публичные точки помечаются явно декоратором @Public.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

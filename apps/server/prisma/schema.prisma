@@ -783,6 +783,11 @@ model Staff {
   role     StaffRole
   isActive Boolean   @default(true)
 
+  /// Версия выданных токенов. Увольнение, смена пароля и смена роли поднимают
+  /// её, и прежние токены перестают действовать: до этого уволенному хватало
+  /// не закрывать вкладку, а срок жизни токена — двенадцать часов.
+  tokenVersion Int @default(0)
+
   shifts   Shift[]
   payments Payment[]
   sales    ProductSale[]

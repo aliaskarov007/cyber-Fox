@@ -9,6 +9,8 @@ export interface JwtPayload {
   tenantId: string;
   clubId: string | null;
   role: StaffRole;
+  /** Версия токена: не совпала с той, что в базе — токен больше не годен. */
+  ver: number;
 }
 
 export interface AuthenticatedStaff {

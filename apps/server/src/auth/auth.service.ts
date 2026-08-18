@@ -41,6 +41,7 @@ export class AuthService {
       tenantId: staff.tenantId,
       clubId: staff.clubId,
       role: staff.role,
+      ver: staff.tokenVersion,
     };
 
     return {
