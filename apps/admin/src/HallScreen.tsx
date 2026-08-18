@@ -4,7 +4,6 @@ import type { Tab } from "./App.js";
 import { type Club, type HallCell, type Tariff, api, formatMoney } from "./api.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
-import { HallLayout } from "./HallLayout.js";
 import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
@@ -134,17 +133,6 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
       />
 
       {loaded && hall.length === 0 && <FirstSteps onGoTo={onGoTo} />}
-
-      {/* План идёт выше списка по зонам: администратор смотрит на зал, а список
-          остаётся как способ найти машину по имени. */}
-      {hall.length > 0 && (
-        <HallLayout
-          club={club}
-          hall={hall}
-          onChanged={() => void refresh()}
-          onPick={(id) => setSelectedId(id)}
-        />
-      )}
 
       {zones.map(([zoneId, zone]) => (
         <section className="zone-block" key={zoneId}>

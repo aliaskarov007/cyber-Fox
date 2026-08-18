@@ -820,80 +820,9 @@ tr.muted td {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-/* --- План зала --- */
-
 /*
  * Клетки квадратные и мелкие: план должен помещаться на экран целиком, иначе
  * администратор снова листает вместо того, чтобы взглянуть.
  */
-.plan {
-  display: grid;
-  gap: 4px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px;
-}
-
-.plan-cell {
-  aspect-ratio: 1;
-  border-radius: 4px;
-}
-
 /* Пустые места видны только когда расставляют: в обычном виде они шум. */
-.plan.editing .plan-cell {
-  border: 1px dashed var(--line);
-}
-
-.plan-pc {
-  width: 100%;
-  height: 100%;
-  padding: 2px;
-  font-size: 11px;
-  font-family: var(--mono);
-  font-weight: 600;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-  color: var(--ink-2);
-  overflow: hidden;
-}
-
-.plan.editing .plan-pc {
-  cursor: grab;
-}
-
 /* Та же шкала состояний, что у карточек: занятость читается цветом. */
-.plan-pc[data-state="IN_USE"] {
-  border-color: var(--in-use);
-  color: #5fd6b6;
-}
-.plan-pc[data-state="CREDIT"] {
-  border-color: var(--credit);
-  color: #f0c04d;
-}
-.plan-pc[data-state="PAUSED"] {
-  border-color: var(--paused);
-}
-.plan-pc[data-state="MAINTENANCE"] {
-  border-color: var(--stopped);
-}
-.plan-pc[data-state="OFFLINE"] {
-  opacity: 0.45;
-}
-
-.plan-waiting {
-  margin-top: 10px;
-}
-
-.plan-waiting-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.plan-waiting-row .plan-pc {
-  width: 56px;
-  height: 40px;
-}
