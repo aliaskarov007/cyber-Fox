@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { type ClubApp, type ClubAppInput, type Club, type Zone, api } from "./api.js";
-import { steamCoverUrl } from "./steam-cover.js";
+import { pointsAtSteamItself, steamCoverUrl } from "./steam-cover.js";
 
 /**
  * Заведение и правка игры.
@@ -14,12 +14,15 @@ import { steamCoverUrl } from "./steam-cover.js";
 export function LibraryForm({
   club,
   zones,
+  apps,
   editing,
   onClose,
   onSaved,
 }: {
   club: Club;
   zones: Zone[];
+  /** Что уже на полках: нужно, чтобы предупредить о повторе. */
+  apps: ClubApp[];
   editing: ClubApp | null;
   onClose: () => void;
   onSaved: () => void;
@@ -35,7 +38,19 @@ export function LibraryForm({
   const [error, setError] = useState<string | null>(null);
 
   /** Подсказка обложки появляется, только если поле пустое: своё не затираем. */
-  const suggested = coverUrl.trim() === "" ? steamCoverUrl(target) : null;
+  const suggested = coverUrl.trim() === "" ? steamCoverUrl(target, args) : null;
+
+  /*
+   * Путь в сам Steam вместо игры — самая частая ошибка при заполнении руками.
+   * Плитка откроет клиент Steam, и гость будет искать игру сам: ровно то, ради
+   * ухода от чего полки и делались.
+   */
+  const opensSteamItself = pointsAtSteamItself(target, args);
+
+  /** Похожее название уже на полке: три плитки одной игры гостю не помогают. */
+  const duplicate = apps.find(
+    (app) => app.id !== editing?.id && app.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  );
   const preview = coverUrl.trim() === "" ? suggested : coverUrl.trim();
 
   async function submit(event: FormEvent): Promise<void> {
@@ -124,6 +139,21 @@ export function LibraryForm({
           ))}
         </select>
       </label>
+
+      {opensSteamItself && (
+        <div className="notice warn">
+          Этот путь открывает сам Steam, а не игру. Гостю придётся искать её в библиотеке.
+          Укажите вместо пути ссылку запуска <code>steam://rungameid/730</code> — число берётся из
+          адреса игры в магазине Steam. Тогда подставится и обложка.
+        </div>
+      )}
+
+      {duplicate && (
+        <div className="notice">
+          Игра с таким названием уже есть на полках: «{duplicate.name}». Проверьте, не заводите ли
+          её второй раз — гость увидит две одинаковые плитки.
+        </div>
+      )}
 
       {preview && (
         <div className="cover-preview">

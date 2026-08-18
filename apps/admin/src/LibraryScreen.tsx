@@ -79,6 +79,7 @@ export function LibraryScreen({ club }: { club: Club }) {
             key={editing?.id ?? "new"}
             club={club}
             zones={zones}
+            apps={apps}
             editing={editing}
             onClose={() => {
               setFormOpen(false);
