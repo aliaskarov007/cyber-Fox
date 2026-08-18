@@ -914,11 +914,16 @@ export class SessionsService {
     minutesAffordable: number | null;
     creditLeft: number | null;
     accruedCost: number;
+    /* Панель гостя в оболочке: кто сидит, по какому тарифу и сколько бонусов. */
+    guestName: string | null;
+    bonusPoints: number | null;
+    tariffName: string | null;
   } | null> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       include: {
         club: true,
+        guest: { select: { fullName: true, bonusPoints: true } },
         segments: { orderBy: { startedAt: "desc" }, take: 1 },
       },
     });
@@ -947,6 +952,10 @@ export class SessionsService {
       minutesAffordable: wallet && price > 0 ? minutesAffordable(wallet, price) : null,
       creditLeft: wallet ? creditLeft(wallet) : null,
       accruedCost: session.totalCharged,
+      // У анонимной посадки гостя нет — панель покажет только время и остаток.
+      guestName: session.guest?.fullName ?? null,
+      bonusPoints: session.guest?.bonusPoints ?? null,
+      tariffName: tariff?.name ?? null,
     };
   }
 

@@ -33,6 +33,10 @@ export interface GuestLoginResult {
 
 export interface Tick {
   sessionId: string;
+  /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
+  guestName?: string | null;
+  bonusPoints?: number | null;
+  tariffName?: string | null;
   packageMinutesLeft: number | null;
   balance: number;
   minutesAffordable: number | null;
@@ -139,8 +143,13 @@ export class AgentClient {
   }
 
   /** Полки этой машины: общие игры клуба плюс игры её зоны. */
-  library(): Promise<{ ok: boolean; apps: LibraryApp[] }> {
+  library(): Promise<{ ok: boolean; apps: LibraryApp[]; favourites?: string[] }> {
     return this.request("library.fetch", {});
+  }
+
+  /** Гость отметил игру своей или снял отметку. */
+  favourite(appId: string, on: boolean): Promise<{ ok: boolean }> {
+    return this.request("library.favourite", { appId, on });
   }
 
   callStaff(): Promise<{ ok: boolean }> {

@@ -116,7 +116,8 @@ export function LibraryScreen({ club }: { club: Club }) {
                 <div className="cover-body">
                   <div className="cover-name">{app.name}</div>
                   <div className="cover-meta">
-                    {app.category ?? "общая полка"} · {zoneName(app.zoneId)}
+                    {app.section === "APP" ? "приложение" : "игра"} · {app.category ?? "без жанра"} ·{" "}
+                    {zoneName(app.zoneId)}
                   </div>
                   <div className="actions">
                     <button

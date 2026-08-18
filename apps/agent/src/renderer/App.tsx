@@ -38,6 +38,8 @@ export function App() {
   /** Полки оболочки: приходят с сервера и обновляются по его же сигналу. */
   const [apps, setApps] = useState<LibraryApp[]>([]);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  /** Что гость отметил своим. Пусто при анонимной посадке. */
+  const [favourites, setFavourites] = useState<string[]>([]);
   /** Локальный остаток на время обрыва: показываем его вместо серверного. */
   const [localMinutes, setLocalMinutes] = useState<number | null>(null);
   const started = useRef(false);
@@ -45,7 +47,9 @@ export function App() {
 
   const loadLibrary = useCallback(async () => {
     const result = await client.library().catch(() => null);
-    if (result?.ok) setApps(result.apps);
+    if (!result?.ok) return;
+    setApps(result.apps);
+    setFavourites(result.favourites ?? []);
   }, [client]);
 
   /** Досылка накопленного. Очередь чистится только по подтверждению сервера. */
@@ -263,6 +267,23 @@ export function App() {
         />
         <Shell
           apps={apps}
+          favourites={favourites}
+          /*
+           * Отмечать можно только своей учётной записью: у анонимной посадки
+           * гостя нет, и хранить отметку не за кем.
+           */
+          onToggleFavourite={
+            displayTick.guestName
+              ? (app, on) => {
+                  // Отметка ставится сразу: ждать ответа сервера ради сердечка
+                  // незачем, а сеть в зале иногда думает.
+                  setFavourites((current) =>
+                    on ? [...current, app.id] : current.filter((id) => id !== app.id),
+                  );
+                  void client.favourite(app.id, on);
+                }
+              : null
+          }
           onLaunch={(app) => {
             setLaunchError(null);
             void window.cyberfox

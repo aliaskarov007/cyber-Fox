@@ -255,6 +255,13 @@ enum AppLaunchKind {
   URI
 }
 
+/// Игра или программа. Гость ищет их по-разному: за игрой приходят, браузер
+/// открывают между делом, — поэтому в оболочке это разные вкладки.
+enum AppSection {
+  GAME
+  APP
+}
+
 /// Игра или программа на полке оболочки.
 ///
 /// Каталог принадлежит клубу, а не машине: в бездисковом зале образ у всех
@@ -271,8 +278,10 @@ model ClubApp {
   zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
 
   name     String
-  /// Полка, на которой игра стоит в оболочке: «Шутеры», «Программы».
+  /// Жанр: «Шутеры», «Гонки». В оболочке по нему фильтруют кнопками.
   category String?
+  /// Вкладка оболочки, в которой запись показывается.
+  section  AppSection @default(GAME)
 
   kind AppLaunchKind @default(EXECUTABLE)
   /// Путь к программе на машине зала либо ссылка запуска.
@@ -286,6 +295,8 @@ model ClubApp {
 
   sortOrder Int     @default(0)
   isActive  Boolean @default(true)
+
+  favourites GuestFavourite[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -302,6 +313,22 @@ model ClubApp {
  * незачем — служебные программы, чужие лаунчеры, старьё. Владелец смотрит
  * список и берёт нужное, а не разгребает полки после первой же загрузки.
  */
+/// Игра, отмеченная гостем как своя.
+///
+/// Гость возвращается к двум-трём играм из сорока, и каждый раз искать их среди
+/// остальных — лишняя работа. Отмеченные встают первыми.
+model GuestFavourite {
+  guestId String
+  guest   Guest   @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  appId   String
+  app     ClubApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([guestId, appId])
+  @@index([guestId])
+}
+
 model AppSuggestion {
   id     String @id @default(uuid())
   clubId String
@@ -438,6 +465,7 @@ model Guest {
   wallets  GuestWallet[]
   packages GuestPackage[]
   sessions Session[]
+  favourites GuestFavourite[]
   payments Payment[]
   sales    ProductSale[]
   paymentIntents PaymentIntent[]

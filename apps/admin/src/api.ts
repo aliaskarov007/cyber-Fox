@@ -103,6 +103,8 @@ export interface ClubApp {
   zoneId: string | null;
   name: string;
   category: string | null;
+  /** Вкладка оболочки: игра или программа. */
+  section: "GAME" | "APP";
   kind: "EXECUTABLE" | "URI";
   target: string;
   args: string[];
@@ -124,6 +126,7 @@ export interface AppSuggestion {
 export interface ClubAppInput {
   name: string;
   category?: string;
+  section?: "GAME" | "APP";
   kind?: "EXECUTABLE" | "URI";
   target: string;
   args?: string[];

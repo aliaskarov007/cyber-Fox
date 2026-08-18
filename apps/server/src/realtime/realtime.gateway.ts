@@ -271,12 +271,23 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (!clubId || !zoneId) return { ok: false, apps: [] };
 
     const apps = await this.library.forZone(clubId, zoneId);
+
+    /*
+     * Отметки принадлежат гостю, а не машине: он садится за разные ПК, и свои
+     * игры должен видеть первыми на любом. Без гостя — анонимная посадка —
+     * отметок нет вовсе.
+     */
+    const guestId = await this.currentGuest(client);
+    const favourites = guestId ? await this.library.favouriteIds(guestId) : [];
+
     return {
       ok: true,
+      favourites,
       apps: apps.map((app) => ({
         id: app.id,
         name: app.name,
         category: app.category,
+        section: app.section,
         kind: app.kind,
         target: app.target,
         args: app.args,
@@ -303,6 +314,32 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
 
     const result = await this.library.recordScan(clubId, computerId, body.items ?? []);
     return { ok: true, ...result };
+  }
+
+  /** Гость отметил игру своей или снял отметку. */
+  @SubscribeMessage("library.favourite")
+  async setFavourite(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { appId: string; on: boolean },
+  ) {
+    const clubId = client.data.clubId as string | undefined;
+    const guestId = await this.currentGuest(client);
+    if (!clubId || !guestId) return { ok: false };
+
+    await this.library.setFavourite(clubId, guestId, body.appId, body.on);
+    return { ok: true };
+  }
+
+  /** Гость за этой машиной прямо сейчас, если сессия его, а не анонимная. */
+  private async currentGuest(client: Socket): Promise<string | null> {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return null;
+
+    const session = await this.prisma.session.findFirst({
+      where: { computerId, status: "ACTIVE" },
+      select: { guestId: true },
+    });
+    return session?.guestId ?? null;
   }
 
   @SubscribeMessage("staff.call")

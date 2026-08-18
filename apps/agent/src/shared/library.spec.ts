@@ -1,9 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { type LibraryApp, search, shelves } from "./library.js";
+import {
+  type LibraryApp,
+  byGenre,
+  favouritesFirst,
+  genres,
+  inSection,
+  search,
+  shelves,
+} from "./library.js";
 
-function app(name: string, category: string | null = null): LibraryApp {
-  return { id: name, name, category, kind: "EXECUTABLE", target: "C:\\game.exe", args: [], coverUrl: null };
+function app(
+  name: string,
+  category: string | null = null,
+  section: "GAME" | "APP" = "GAME",
+): LibraryApp {
+  return {
+    id: name,
+    name,
+    category,
+    section,
+    kind: "EXECUTABLE",
+    target: "C:\\game.exe",
+    args: [],
+    coverUrl: null,
+  };
 }
 
 describe("полки", () => {
@@ -44,5 +65,44 @@ describe("поиск", () => {
 
   it("не находит того, чего нет", () => {
     expect(search(catalog, "варкрафт")).toEqual([]);
+  });
+});
+
+describe("вкладки и жанры", () => {
+  const catalog = [
+    app("CS2", "Шутеры"),
+    app("Dota", "MOBA"),
+    app("Блокнот", null, "APP"),
+    app("Chrome", "Программы", "APP"),
+  ];
+
+  it("вкладка показывает только своё: программы не мешают выбирать игру", () => {
+    expect(inSection(catalog, "GAME").map((a) => a.name)).toEqual(["CS2", "Dota"]);
+    expect(inSection(catalog, "APP").map((a) => a.name)).toEqual(["Блокнот", "Chrome"]);
+  });
+
+  it("кнопки жанров — только те, что есть: пустая кнопка выглядит поломкой", () => {
+    expect(genres(inSection(catalog, "GAME"))).toEqual(["Шутеры", "MOBA"]);
+  });
+
+  it("безжанровое собирается в «Остальное» и уходит в конец", () => {
+    expect(genres(inSection(catalog, "APP"))).toEqual(["Программы", "Остальное"]);
+  });
+
+  it("выбор жанра оставляет только его, а пустой выбор — всё", () => {
+    expect(byGenre(catalog, "MOBA").map((a) => a.name)).toEqual(["Dota"]);
+    expect(byGenre(catalog, null)).toHaveLength(4);
+  });
+});
+
+describe("избранное", () => {
+  it("отмеченные встают первыми, порядок остальных не меняется", () => {
+    const list = [app("A"), app("Б"), app("В")];
+    expect(favouritesFirst(list, ["В"]).map((a) => a.name)).toEqual(["В", "A", "Б"]);
+  });
+
+  it("без отметок ничего не переставляется", () => {
+    const list = [app("A"), app("Б")];
+    expect(favouritesFirst(list, []).map((a) => a.name)).toEqual(["A", "Б"]);
   });
 });

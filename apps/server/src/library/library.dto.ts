@@ -1,5 +1,5 @@
 import { PartialType } from "@nestjs/mapped-types";
-import { AppLaunchKind } from "@prisma/client";
+import { AppLaunchKind, AppSection } from "@prisma/client";
 import {
   ArrayMaxSize,
   IsArray,
@@ -25,6 +25,11 @@ export class CreateAppDto {
   @IsOptional()
   @IsEnum(AppLaunchKind)
   kind?: AppLaunchKind;
+
+  /** Вкладка оболочки: игра или программа. */
+  @IsOptional()
+  @IsEnum(AppSection)
+  section?: AppSection;
 
   /** Путь к программе на машине зала либо ссылка запуска. */
   @IsString()

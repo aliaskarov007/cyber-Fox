@@ -30,6 +30,7 @@ export function LibraryForm({
   const [name, setName] = useState(editing?.name ?? "");
   const [category, setCategory] = useState(editing?.category ?? "");
   const [kind, setKind] = useState<"EXECUTABLE" | "URI">(editing?.kind ?? "EXECUTABLE");
+  const [section, setSection] = useState<"GAME" | "APP">(editing?.section ?? "GAME");
   const [target, setTarget] = useState(editing?.target ?? "");
   const [args, setArgs] = useState(editing?.args.join(" ") ?? "");
   const [coverUrl, setCoverUrl] = useState(editing?.coverUrl ?? "");
@@ -63,6 +64,7 @@ export function LibraryForm({
       const body: ClubAppInput = {
         name: name.trim(),
         kind,
+        section,
         target: target.trim(),
         args: args.trim() === "" ? [] : args.trim().split(/\s+/),
         // Пустая зона означает «во всех», а не «зона не выбрана».
@@ -95,7 +97,16 @@ export function LibraryForm({
       </label>
 
       <label>
-        Полка
+        {/* Вкладка в оболочке: за игрой приходят, браузер открывают между делом. */}
+        Где показывать
+        <select value={section} onChange={(e) => setSection(e.target.value as "GAME" | "APP")}>
+          <option value="GAME">Игры</option>
+          <option value="APP">Приложения</option>
+        </select>
+      </label>
+
+      <label>
+        Жанр
         <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Шутеры" />
       </label>
 

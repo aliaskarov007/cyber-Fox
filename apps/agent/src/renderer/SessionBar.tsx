@@ -63,8 +63,22 @@ export function SessionBar({
           </span>
         </div>
 
+        {/*
+          * Кто сидит и по какому тарифу. У анонимной посадки имени нет — тогда
+          * и показывать нечего, кроме денег.
+          */}
+        {tick.guestName && (
+          <div className="session-guest">
+            <span className="session-guest-name">{tick.guestName}</span>
+            {tick.tariffName && <span className="k"> · {tick.tariffName}</span>}
+          </div>
+        )}
+
         <div className="session-money">
           <span className="k">Баланс</span> {formatMoney(tick.balance)}
+          {tick.bonusPoints ? (
+            <span className="k"> · бонусы {formatMoney(tick.bonusPoints)}</span>
+          ) : null}
         </div>
 
         <div className="session-actions">

@@ -1,23 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { type LibraryApp, search, shelves } from "../shared/library.js";
+import { type LibraryApp, byGenre, favouritesFirst, genres, inSection, search } from "../shared/library.js";
 
 /**
  * Что видит гость после оплаты: полки игр вместо рабочего стола.
  *
- * Гость садится играть, а не разбираться в меню, поэтому обложки крупные,
- * подписи короткие, а поиск начинается с первой набранной буквы — без поля,
- * которое надо сперва найти мышкой.
+ * Игры и программы разведены по вкладкам: за игрой приходят, браузер открывают
+ * между делом, и мешать их в одном списке — значит заставлять искать. Жанры
+ * стоят кнопками, а не полками одна под другой: так весь выбор помещается на
+ * экран без прокрутки.
  */
 export function Shell({
   apps,
+  favourites,
   onLaunch,
+  onToggleFavourite,
 }: {
   apps: LibraryApp[];
+  /** Что этот гость отметил своим. Пусто у анонимной посадки. */
+  favourites: string[];
   onLaunch: (app: LibraryApp) => void;
+  /** Пусто — отмечать некому: сессия без гостя. */
+  onToggleFavourite: ((app: LibraryApp, on: boolean) => void) | null;
 }) {
+  const [section, setSection] = useState<"GAME" | "APP">("GAME");
+  const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  /** Что сейчас запускается: между нажатием и появлением игры проходят секунды. */
   const [launching, setLaunching] = useState<LibraryApp | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -31,14 +39,8 @@ export function Shell({
         setQuery("");
         return;
       }
-      /*
-       * Пробел не считается началом поиска, и на кнопках фокус не перехватывается:
-       * пробелом гость нажимает кнопку, на которой стоит, а перевод фокуса в
-       * поле отменял бы это нажатие.
-       */
       const onControl = event.target instanceof HTMLElement && event.target !== document.body;
       if (onControl || event.key === " ") return;
-
       if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
         inputRef.current?.focus();
       }
@@ -47,8 +49,12 @@ export function Shell({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const found = useMemo(() => search(apps, query), [apps, query]);
-  const rows = useMemo(() => shelves(found), [found]);
+  const here = useMemo(() => inSection(apps, section), [apps, section]);
+  const buttons = useMemo(() => genres(here), [here]);
+  const shown = useMemo(
+    () => favouritesFirst(search(byGenre(here, genre), query), favourites),
+    [here, genre, query, favourites],
+  );
 
   if (apps.length === 0) {
     return (
@@ -64,48 +70,102 @@ export function Shell({
 
   return (
     <div className="shell">
-      <input
-        ref={inputRef}
-        className="shell-search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Начните печатать название"
-        aria-label="Поиск игры"
-      />
+      <div className="shell-head">
+        {(["GAME", "APP"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className="shell-tab"
+            aria-selected={section === tab}
+            onClick={() => {
+              setSection(tab);
+              // Жанр относится к вкладке: на другой его может не быть вовсе.
+              setGenre(null);
+            }}
+          >
+            {tab === "GAME" ? "Игры" : "Приложения"}
+          </button>
+        ))}
+      </div>
 
-      {rows.length === 0 && <div className="shell-empty-hint">Ничего не нашли по запросу</div>}
+      <div className="shell-toolbar">
+        <input
+          ref={inputRef}
+          className="shell-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск"
+          aria-label="Поиск игры"
+        />
 
-      {rows.map((shelf) => (
-        <section className="shelf" key={shelf.title}>
-          <h2 className="shelf-title">{shelf.title}</h2>
-          <div className="shelf-row">
-            {shelf.apps.map((app) => (
-              <button
-                key={app.id}
-                className="tile"
-                type="button"
-                onClick={() => {
-                  setLaunching(app);
-                  onLaunch(app);
-                }}
-              >
-                <span className="tile-art">
-                  {app.coverUrl ? (
-                    <img
-                      src={app.coverUrl}
-                      alt=""
-                      onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-                    />
-                  ) : (
-                    <span className="tile-letter">{app.name.slice(0, 1)}</span>
-                  )}
-                </span>
-                <span className="tile-name">{app.name}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
+        <button
+          type="button"
+          className="genre"
+          aria-pressed={genre === null}
+          onClick={() => setGenre(null)}
+        >
+          Все
+        </button>
+        {buttons.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className="genre"
+            aria-pressed={genre === name}
+            onClick={() => setGenre(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="shell-empty-hint">Ничего не нашли</div>
+      ) : (
+        <div className="tiles">
+          {shown.map((app) => {
+            const marked = favourites.includes(app.id);
+            return (
+              <div className="tile-wrap" key={app.id}>
+                <button
+                  className="tile"
+                  type="button"
+                  onClick={() => {
+                    setLaunching(app);
+                    onLaunch(app);
+                  }}
+                >
+                  <span className="tile-art">
+                    {app.coverUrl ? (
+                      <img
+                        src={app.coverUrl}
+                        alt=""
+                        onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                      />
+                    ) : (
+                      <span className="tile-letter">{app.name.slice(0, 1)}</span>
+                    )}
+                  </span>
+                  <span className="tile-name">{app.name}</span>
+                </button>
+
+                {/* Отмечать некому, если сессия анонимная: сердечко просто не показываем. */}
+                {onToggleFavourite && (
+                  <button
+                    type="button"
+                    className="tile-fav"
+                    aria-pressed={marked}
+                    aria-label={marked ? "Убрать из моих" : "В мои игры"}
+                    onClick={() => onToggleFavourite(app, !marked)}
+                  >
+                    {marked ? "♥" : "♡"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="shell-hint">Вернуться к играм из запущенной игры — Ctrl + Alt + Home</div>
 

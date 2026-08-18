@@ -42,6 +42,42 @@ export class LibraryService {
     });
   }
 
+  /** Что этот гость отметил своим: отмеченные встают в оболочке первыми. */
+  async favouriteIds(guestId: string): Promise<string[]> {
+    const rows = await this.prisma.guestFavourite.findMany({
+      where: { guestId },
+      select: { appId: true },
+    });
+    return rows.map((row) => row.appId);
+  }
+
+  /**
+   * Отметить или снять отметку.
+   *
+   * Принадлежность игры клубу проверяется здесь же: пометить чужую запись
+   * гость не должен, даже если идентификатор откуда-то узнал.
+   */
+  async setFavourite(
+    clubId: string,
+    guestId: string,
+    appId: string,
+    on: boolean,
+  ): Promise<{ ok: true }> {
+    const app = await this.prisma.clubApp.findFirst({ where: { id: appId, clubId } });
+    if (!app) throw new NotFoundException("Игра не найдена");
+
+    if (on) {
+      await this.prisma.guestFavourite.upsert({
+        where: { guestId_appId: { guestId, appId } },
+        update: {},
+        create: { guestId, appId },
+      });
+    } else {
+      await this.prisma.guestFavourite.deleteMany({ where: { guestId, appId } });
+    }
+    return { ok: true };
+  }
+
   async create(staff: AuthenticatedStaff, clubId: string, dto: CreateAppDto): Promise<ClubApp> {
     await this.access.requireClub(staff, clubId);
     await this.requireOwnZone(clubId, dto.zoneId);
@@ -51,6 +87,7 @@ export class LibraryService {
         name: dto.name.trim(),
         category: dto.category?.trim() || null,
         kind: dto.kind ?? "EXECUTABLE",
+        section: dto.section ?? "GAME",
         target: dto.target.trim(),
         args: dto.args ?? [],
         coverUrl: dto.coverUrl?.trim() || null,

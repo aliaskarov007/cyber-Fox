@@ -23,6 +23,10 @@ export interface RealtimeEvents {
     minutesAffordable: number | null;
     creditLeft: number | null;
     accruedCost: number;
+    /* Панель гостя в оболочке. У анонимной посадки пусто: гостя нет. */
+    guestName?: string | null;
+    bonusPoints?: number | null;
+    tariffName?: string | null;
   };
   "session.switched": SessionEvent & {
     to: "PACKAGE" | "PER_MINUTE";

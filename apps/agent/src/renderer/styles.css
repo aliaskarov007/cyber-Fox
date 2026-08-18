@@ -369,7 +369,7 @@ button:disabled {
 .shell {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
 }
 
 .shell-search {
@@ -484,4 +484,89 @@ button:disabled {
 .launching-hint {
   color: var(--muted);
   font-size: 15px;
+}
+
+/* --- Вкладки, жанры, избранное --- */
+
+.shell-head {
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+}
+
+.shell-tab {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--muted);
+}
+
+.shell-tab[aria-selected="true"] {
+  color: var(--ink);
+}
+
+.shell-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Жанры кнопками: весь выбор помещается на экран, без полок одна под другой. */
+.genre {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.genre[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.tile-wrap {
+  position: relative;
+}
+
+/* Сердечко поверх обложки: до него дотягиваются мышью, не открывая игру. */
+.tile-fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 15px;
+  background: rgba(8, 10, 14, 0.72);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.tile-fav[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.session-guest {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.session-guest-name {
+  font-weight: 650;
 }
