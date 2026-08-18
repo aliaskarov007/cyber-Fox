@@ -100,17 +100,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @cyberfox/agent pack:win
+      # Агент собирается своим npm-установом внутри своей папки, а не общим
+      # pnpm по всему монорепозиторию. Причина конкретная: electron-builder на
+      # этапе «installing production dependencies» переустанавливает зависимости
+      # приложения у себя, и на Windows это ломает плоскую раскладку pnpm —
+      # сборщик теряет собственный app-builder.exe и падает с ENOENT. Агент ни
+      # от чего в монорепозитории не зависит, поэтому отдельная установка ему
+      # ничего не стоит.
+      - name: Установить зависимости агента
+        working-directory: apps/agent
+        run: npm install --no-audit --no-fund
+
+      - name: Собрать экран и основной процесс
+        working-directory: apps/agent
+        run: npm run build
+
+      - name: Собрать установщик
+        working-directory: apps/agent
+        run: npx electron-builder --win --publish never
 
       # Готовый файл забирают из вкладки Actions: в зал уходит ссылка, а не
       # пересылка 78 мегабайт через мессенджер.
