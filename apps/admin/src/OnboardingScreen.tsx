@@ -268,6 +268,18 @@ function SubscriptionBlock({
  * Поэтому в образ кладётся один ключ на клуб, а машины различаются по MAC
  * сетевой карты — без уникального MAC загрузка по сети невозможна.
  */
+/** Отдаёт содержимое файлом, не заставляя человека сохранять текст руками. */
+function downloadJson(content: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "cyberfox.json";
+  link.click();
+  // Ссылку на созданный объект надо отпустить, иначе он живёт до перезагрузки
+  // вкладки, а кассовый экран не закрывают всю смену.
+  URL.revokeObjectURL(url);
+}
+
 function DisklessKey({ club }: { club: Club }) {
   const [shown, setShown] = useState(false);
 
@@ -285,17 +297,25 @@ function DisklessKey({ club }: { club: Club }) {
         появится в зале при первой загрузке.
       </div>
 
-      {shown ? (
+      <div className="actions" style={{ marginTop: 8 }}>
+        {/*
+         * Скачивание, а не копирование текста: файл кладут в образ, и путь от
+         * «выделить мышкой» до «сохранить как cyberfox.json» — это лишний шаг,
+         * на котором теряют кавычки и получают файл с расширением .txt.
+         */}
+        <button className="primary" type="button" onClick={() => downloadJson(file)}>
+          Скачать cyberfox.json
+        </button>
+        {!shown && <button onClick={() => setShown(true)}>Показать содержимое</button>}
+      </div>
+
+      {shown && (
         <>
           <div className="checkout-link" style={{ marginTop: 8, whiteSpace: "pre" }}>{file}</div>
           <div className="note" style={{ marginTop: 6 }}>
             Ключ пускает машину в этот клуб — держите образ там, куда нет доступа у гостей.
           </div>
         </>
-      ) : (
-        <div className="actions" style={{ marginTop: 8 }}>
-          <button onClick={() => setShown(true)}>Показать ключ клуба</button>
-        </div>
       )}
     </div>
   );
