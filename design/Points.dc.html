@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #12141a; color: #eceef3;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #ffb08c; } a:hover { color: #f26430; }
+    * { box-sizing: border-box; }
+    th { text-align: left; padding: 9px 12px; border-bottom: 1px solid #2c313d; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.08em; color: #8d95a5; font-weight: 500; }
+    td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #2c313d; font-size: 14px; }
+    td.num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .chip { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 6px;
+      border-radius: 3px; font-weight: 600; white-space: nowrap; }
+  </style>
+</helmet>
+
+<div style="width: 1000px; height: 760px; background: #12141a; overflow: hidden; padding: 24px">
+
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px">
+    <h2 style="font-size: 19px; margin: 0; font-weight: 700">Ночь PUBG</h2>
+    <span class="chip" style="background: #12332c; color: #5fd6b6">раунд 3 из 4</span>
+    <div style="flex: 1"></div>
+    <div style="background: #e1521c; border: 1px solid #e1521c; color: #fff; font-weight: 600; border-radius: 6px; padding: 6px 11px; font-size: 13px">Внести раунд 3</div>
+  </div>
+  <div style="font-size: 13px; color: #8d95a5; margin-bottom: 18px">
+    Второй формат: сетки нет, все играют одновременно. Админ вносит место и убийства после каждого раунда.
+  </div>
+
+  <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; padding: 16px; margin-bottom: 18px">
+    <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #c2c8d4; margin-bottom: 10px">Как считаются очки</div>
+    <div style="display: flex; gap: 28px; font-size: 14px; flex-wrap: wrap">
+      <span><b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">10</b> <span style="color: #8d95a5">за 1 место</span></span>
+      <span><b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">6</b> <span style="color: #8d95a5">за 2 место</span></span>
+      <span><b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">5</b> <span style="color: #8d95a5">за 3 место</span></span>
+      <span><b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">4…1</b> <span style="color: #8d95a5">за 4–7 место</span></span>
+      <span><b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">+1</b> <span style="color: #8d95a5">за каждое убийство</span></span>
+    </div>
+  </div>
+
+  <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; overflow: hidden">
+    <table style="width: 100%; border-collapse: collapse">
+      <thead>
+        <tr>
+          <th style="width: 44px"></th>
+          <th>Участник</th>
+          <th>Раунд 1</th>
+          <th>Раунд 2</th>
+          <th>Раунд 3</th>
+          <th>Убийств</th>
+          <th>Очки</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #1b1f28">
+          <td class="num" style="color: #f0c04d; font-weight: 700">1</td>
+          <td style="font-weight: 650">Айдос</td>
+          <td class="num">1 место</td>
+          <td class="num">4 место</td>
+          <td class="num" style="color: #666e7e">—</td>
+          <td class="num">14</td>
+          <td class="num" style="font-weight: 700; font-size: 15px">28</td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #8d95a5; font-weight: 700">2</td>
+          <td>Тимур</td>
+          <td class="num">3 место</td>
+          <td class="num">1 место</td>
+          <td class="num" style="color: #666e7e">—</td>
+          <td class="num">9</td>
+          <td class="num" style="font-weight: 700; font-size: 15px">24</td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #8d95a5; font-weight: 700">3</td>
+          <td>Мадина</td>
+          <td class="num">2 место</td>
+          <td class="num">5 место</td>
+          <td class="num" style="color: #666e7e">—</td>
+          <td class="num">11</td>
+          <td class="num" style="font-weight: 700; font-size: 15px">20</td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #666e7e; font-weight: 700">4</td>
+          <td>Данияр</td>
+          <td class="num">6 место</td>
+          <td class="num">2 место</td>
+          <td class="num" style="color: #666e7e">—</td>
+          <td class="num">8</td>
+          <td class="num" style="font-weight: 700; font-size: 15px">16</td>
+        </tr>
+        <tr>
+          <td class="num" style="color: #666e7e; font-weight: 700">5</td>
+          <td>Ерлан</td>
+          <td class="num">4 место</td>
+          <td class="num">7 место</td>
+          <td class="num" style="color: #666e7e">—</td>
+          <td class="num">6</td>
+          <td class="num" style="font-weight: 700; font-size: 15px">11</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top: 18px; background: #21252f; border: 1px solid #2c313d; border-radius: 6px; padding: 9px 12px; font-size: 13px; color: #c2c8d4">
+    Таблица висит на экране у стойки и на свободных машинах: участники видят, кто ведёт, не отвлекая администратора.
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

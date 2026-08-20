@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #12141a; color: #eceef3;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #ffb08c; } a:hover { color: #f26430; }
+    * { box-sizing: border-box; }
+    .chip { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 6px;
+      border-radius: 3px; font-weight: 600; white-space: nowrap; }
+    .side { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 10px; font-size: 14px; }
+    .score { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums; font-weight: 650; }
+    .match { background: #191c24; border: 1px solid #2c313d; border-radius: 6px; overflow: hidden; width: 250px; }
+    .won { color: #eceef3; font-weight: 650; }
+    .lost { color: #666e7e; }
+  </style>
+</helmet>
+
+<div style="width: 1200px; height: 760px; background: #12141a; overflow: hidden; padding: 24px">
+
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px">
+    <h2 style="font-size: 19px; margin: 0; font-weight: 700">Кубок пятницы · CS2</h2>
+    <span class="chip" style="background: #12332c; color: #5fd6b6">идёт раунд 2</span>
+    <div style="flex: 1"></div>
+    <div style="border: 1px solid #2c313d; background: #21252f; color: #eceef3; border-radius: 6px; padding: 6px 11px; font-size: 13px">Рассадка</div>
+  </div>
+  <div style="font-size: 13px; color: #8d95a5; margin-bottom: 18px">
+    Счёт вводит администратор. Победитель уходит в следующий раунд сам — переставлять команды руками не нужно.
+  </div>
+
+  <div style="display: flex; gap: 44px; align-items: stretch">
+
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d95a5">Четвертьфинал</div>
+
+      <div class="match">
+        <div class="side"><span class="won">Соколы</span><span class="score">2</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span class="lost">Барыс</span><span class="score lost">0</span></div>
+      </div>
+
+      <div class="match">
+        <div class="side"><span class="lost">Тау</span><span class="score lost">1</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span class="won">Ночная смена</span><span class="score">2</span></div>
+      </div>
+
+      <div class="match">
+        <div class="side"><span class="won">Алматы Про</span><span class="score">2</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span class="lost">Санжар и друзья</span><span class="score lost">1</span></div>
+      </div>
+
+      <div class="match">
+        <div class="side"><span class="won">Степь</span><span class="score">2</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span class="lost">Кайрат</span><span class="score lost">0</span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; justify-content: space-around; gap: 12px">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d95a5">Полуфинал</div>
+
+      <div class="match" style="border-color: #e1521c">
+        <div style="background: #21252f; padding: 5px 10px; display: flex; align-items: center; justify-content: space-between">
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb08c">идёт · ПК-31…40</span>
+          <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #8d95a5">18:24</span>
+        </div>
+        <div class="side"><span>Соколы</span><span class="score">1</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span>Ночная смена</span><span class="score">1</span></div>
+        <div style="padding: 8px 10px; border-top: 1px solid #2c313d; display: flex; gap: 6px">
+          <div style="flex: 1; border: 1px solid #2c313d; background: #21252f; border-radius: 6px; padding: 5px 0; font-size: 13px; text-align: center">Соколы +1</div>
+          <div style="flex: 1; border: 1px solid #2c313d; background: #21252f; border-radius: 6px; padding: 5px 0; font-size: 13px; text-align: center">Смена +1</div>
+        </div>
+      </div>
+
+      <div class="match">
+        <div style="background: #21252f; padding: 5px 10px">
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d95a5">ждёт машин</span>
+        </div>
+        <div class="side"><span>Алматы Про</span><span class="score" style="color: #666e7e">—</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span>Степь</span><span class="score" style="color: #666e7e">—</span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; justify-content: center; gap: 12px">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d95a5">Финал</div>
+      <div class="match" style="background: #191c24">
+        <div class="side"><span style="color: #666e7e">победитель полуфинала 1</span></div>
+        <div style="height: 1px; background: #2c313d"></div>
+        <div class="side"><span style="color: #666e7e">победитель полуфинала 2</span></div>
+      </div>
+      <div style="font-size: 12px; color: #666e7e; width: 250px; line-height: 1.45">
+        После финала — кнопка «Выплатить призы»: суммы уходят на балансы победителей
+        и попадают в отчёт смены.
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

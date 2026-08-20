@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #12141a; color: #eceef3;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #ffb08c; } a:hover { color: #f26430; }
+    * { box-sizing: border-box; }
+    .lbl { display: grid; gap: 5px; font-size: 13px; color: #8d95a5; }
+    .fld { font: inherit; background: #21252f; color: #eceef3; border: 1px solid #2c313d;
+      border-radius: 6px; padding: 9px 11px; width: 100%; }
+    .hint { font-size: 12px; color: #666e7e; line-height: 1.45; }
+  </style>
+</helmet>
+
+<div style="width: 1000px; height: 900px; background: #12141a; overflow: hidden; padding: 24px">
+
+  <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px">
+    <h2 style="font-size: 15px; margin: 0; letter-spacing: 0.02em; text-transform: uppercase; color: #c2c8d4">Новый турнир</h2>
+  </div>
+
+  <div style="display: grid; gap: 18px">
+
+    <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; padding: 16px; display: grid; gap: 14px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">Название<input class="fld" value="Кубок пятницы"></label>
+        <label class="lbl">Игра<input class="fld" value="CS2"></label>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">Дата и время<input class="fld" value="22.08.2026, 19:00"></label>
+        <label class="lbl">Регистрация до<input class="fld" value="22.08.2026, 18:30"></label>
+        <label class="lbl">Примерная длительность<input class="fld" value="3 часа"></label>
+      </div>
+    </div>
+
+    <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; padding: 16px; display: grid; gap: 14px">
+      <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #c2c8d4">Формат</div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+        <div style="border: 1px solid #e1521c; background: #21252f; border-radius: 6px; padding: 12px">
+          <div style="font-weight: 650; font-size: 14px; color: #ffb08c">Олимпийка</div>
+          <div class="hint" style="margin-top: 4px">На вылет. Проигравший выбывает. CS, Dota, файтинги.</div>
+        </div>
+        <div style="border: 1px solid #2c313d; background: #191c24; border-radius: 6px; padding: 12px">
+          <div style="font-weight: 650; font-size: 14px">Таблица очков</div>
+          <div class="hint" style="margin-top: 4px">Несколько раундов, очки за место и убийства. PUBG, Fortnite.</div>
+        </div>
+        <div style="border: 1px solid #2c313d; background: #191c24; border-radius: 6px; padding: 12px">
+          <div style="font-weight: 650; font-size: 14px">Круговая</div>
+          <div class="hint" style="margin-top: 4px">Каждый с каждым. Для малых групп до 8 участников.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">Состав
+          <select class="fld"><option>Команды по 5</option></select>
+        </label>
+        <label class="lbl">Участников<input class="fld" value="8 команд"></label>
+        <label class="lbl">Матч до<input class="fld" value="2 побед"></label>
+      </div>
+    </div>
+
+    <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; padding: 16px; display: grid; gap: 14px">
+      <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #c2c8d4">Зал</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">Зона
+          <select class="fld"><option>Стандарт</option></select>
+        </label>
+        <label class="lbl">Машин под турнир<input class="fld" value="10"></label>
+      </div>
+      <div style="background: #21252f; border: 1px solid #2c313d; border-radius: 6px; padding: 9px 12px; font-size: 13px; color: #c2c8d4">
+        На время турнира эти машины бронируются: посадить за них обычного гостя нельзя.
+        Идущие сессии не прерываются — админ увидит, какие ПК освободятся позже.
+      </div>
+    </div>
+
+    <div style="background: #191c24; border: 1px solid #2c313d; border-radius: 6px; padding: 16px; display: grid; gap: 14px">
+      <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #c2c8d4">Деньги</div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">Взнос с участника<input class="fld" value="2 000 ₸"></label>
+        <label class="lbl">Доля клуба из взносов<input class="fld" value="0 %"></label>
+        <label class="lbl">Добавить от клуба<input class="fld" value="0 ₸"></label>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <label class="lbl">1 место<input class="fld" value="50 %"></label>
+        <label class="lbl">2 место<input class="fld" value="30 %"></label>
+        <label class="lbl">3 место<input class="fld" value="20 %"></label>
+      </div>
+
+      <div style="background: #21252f; border: 1px solid #2c313d; border-radius: 6px; padding: 9px 12px; font-size: 13px; color: #c2c8d4; display: flex; align-items: center; gap: 10px">
+        <span>Призовой фонд при полном наборе:</span>
+        <b style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 15px">80 000 ₸</b>
+        <span style="color: #666e7e">(40 участников × 2 000 ₸)</span>
+      </div>
+
+      <label class="lbl">Время игры в турнире
+        <select class="fld"><option>Включено во взнос — поминутно не списывается</option></select>
+      </label>
+      <div class="hint">
+        Другие варианты: обычная тарификация сверху, или бесплатно за счёт клуба.
+        Выбор попадёт в отчёт смены: взносы — приход, время — упущенная выручка.
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px">
+      <div style="background: #e1521c; border: 1px solid #e1521c; color: #fff; font-weight: 600; border-radius: 6px; padding: 9px 14px; font-size: 15px">Создать и открыть регистрацию</div>
+      <div style="border: 1px solid #2c313d; background: #21252f; color: #eceef3; border-radius: 6px; padding: 9px 14px; font-size: 15px">Сохранить черновиком</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #12141a; color: #eceef3;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; font-size: 15px;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #ffb08c; } a:hover { color: #f26430; }
+    * { box-sizing: border-box; }
+    .chip { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 6px;
+      border-radius: 3px; font-weight: 600; white-space: nowrap; }
+    .pc { background: #191c24; border: 1px solid #2c313d; border-radius: 6px; min-height: 104px;
+      display: grid; overflow: hidden; }
+    .pc-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
+    .pc-name { font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+    .pc-body { padding: 0 12px 10px; display: grid; gap: 2px; }
+    .pc-line { font-size: 12px; color: #8d95a5; }
+    .pc-guest { font-size: 13px; }
+  </style>
+</helmet>
+
+<div style="width: 1200px; height: 820px; background: #12141a; overflow: hidden; padding: 24px">
+
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px">
+    <h2 style="font-size: 19px; margin: 0; font-weight: 700">Рассадка · Кубок пятницы</h2>
+    <span class="chip" style="background: #12332c; color: #5fd6b6">полуфинал 1</span>
+    <div style="flex: 1"></div>
+    <div style="border: 1px solid #2c313d; background: #21252f; color: #eceef3; border-radius: 6px; padding: 6px 11px; font-size: 13px">Сетка</div>
+    <div style="background: #e1521c; border: 1px solid #e1521c; color: #fff; font-weight: 600; border-radius: 6px; padding: 6px 11px; font-size: 13px">Посадить всех</div>
+  </div>
+  <div style="font-size: 13px; color: #8d95a5; margin-bottom: 18px">
+    Одна кнопка открывает сессии всем десяти игрокам сразу. Каждый видит на своём ПК, что он в турнире.
+  </div>
+
+  <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+    <h2 style="font-size: 15px; margin: 0; letter-spacing: 0.02em; text-transform: uppercase; color: #c2c8d4">Соколы</h2>
+    <span style="font-size: 12px; color: #666e7e; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ПК-31…35</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 22px">
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-31</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Айдос</span><span class="pc-line">капитан · турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-32</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Тимур</span><span class="pc-line">турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-33</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Данияр</span><span class="pc-line">турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-34</span><span class="chip" style="background: #362b10; color: #f0c04d">не сел</span></div>
+      <div class="pc-body"><span class="pc-guest">Ерлан</span><span class="pc-line">место держится</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-35</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Санжар</span><span class="pc-line">турнир</span></div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+    <h2 style="font-size: 15px; margin: 0; letter-spacing: 0.02em; text-transform: uppercase; color: #c2c8d4">Ночная смена</h2>
+    <span style="font-size: 12px; color: #666e7e; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ПК-36…40</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 22px">
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-36</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Мадина</span><span class="pc-line">капитан · турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-37</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Алина</span><span class="pc-line">турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-38</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Нурлан</span><span class="pc-line">турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-39</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Аскар</span><span class="pc-line">турнир</span></div>
+    </div>
+    <div class="pc" style="border-color: #e1521c">
+      <div class="pc-head"><span class="pc-name">ПК-40</span><span class="chip" style="background: #12332c; color: #5fd6b6">играет</span></div>
+      <div class="pc-body"><span class="pc-guest">Дамир</span><span class="pc-line">турнир</span></div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+    <h2 style="font-size: 15px; margin: 0; letter-spacing: 0.02em; text-transform: uppercase; color: #c2c8d4">Забронировано под следующий матч</h2>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+    <div class="pc">
+      <div class="pc-head"><span class="pc-name">ПК-41</span><span class="chip" style="background: #1c2739; color: #8fb0e8">бронь</span></div>
+      <div class="pc-body"><span class="pc-line">турнир · свободен</span></div>
+    </div>
+    <div class="pc">
+      <div class="pc-head"><span class="pc-name">ПК-42</span><span class="chip" style="background: #362b10; color: #f0c04d">освободится в 18:40</span></div>
+      <div class="pc-body"><span class="pc-guest">Гость вне турнира</span><span class="pc-line">сессию не прерываем</span></div>
+    </div>
+    <div class="pc">
+      <div class="pc-head"><span class="pc-name">ПК-43</span><span class="chip" style="background: #1c2739; color: #8fb0e8">бронь</span></div>
+      <div class="pc-body"><span class="pc-line">турнир · свободен</span></div>
+    </div>
+    <div class="pc">
+      <div class="pc-head"><span class="pc-name">ПК-44</span><span class="chip" style="background: #1c2739; color: #8fb0e8">бронь</span></div>
+      <div class="pc-body"><span class="pc-line">турнир · свободен</span></div>
+    </div>
+    <div class="pc">
+      <div class="pc-head"><span class="pc-name">ПК-45</span><span class="chip" style="background: #1c2739; color: #8fb0e8">бронь</span></div>
+      <div class="pc-body"><span class="pc-line">турнир · свободен</span></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
