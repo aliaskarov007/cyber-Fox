@@ -2,7 +2,9 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
+
+import { ApiThrottlerGuard } from "./common/throttler.guard.js";
 
 import { AuthModule } from "./auth/auth.module.js";
 import { SubscriptionModule } from "./billing-platform/subscription.module.js";
@@ -40,7 +42,9 @@ import { UploadsModule } from "./uploads/uploads.module.js";
      */
     ThrottlerModule.forRoot([
       { name: "general", ttl: 60_000, limit: 300 },
-      { name: "login", ttl: 60_000, limit: 5 },
+      // Десять попыток на одну почту в минуту: человек, забывший пароль,
+      // укладывается, перебор — нет.
+      { name: "login", ttl: 60_000, limit: 10 },
     ]),
     PrismaModule,
     HealthModule,
@@ -63,7 +67,7 @@ import { UploadsModule } from "./uploads/uploads.module.js";
   ],
   providers: [
     // Закрыто по умолчанию: публичные точки помечаются явно декоратором @Public.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
