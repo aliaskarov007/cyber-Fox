@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { coverUrl, dedupe, launchUri, libraryPaths, parseManifest } from "./steam-library.js";
+import {
+  coverUrl,
+  dedupe,
+  isServiceEntry,
+  launchUri,
+  libraryPaths,
+  parseManifest,
+} from "./steam-library.js";
 
 describe("библиотеки Steam", () => {
   it("достаёт пути и разворачивает двойные слэши", () => {
@@ -63,5 +70,26 @@ describe("что уходит на сервер", () => {
   it("порядок по названию: список читает человек", () => {
     const list = dedupe([{ appId: "2", name: "Ядро" }, { appId: "1", name: "Апекс" }]);
     expect(list.map((g) => g.name)).toEqual(["Апекс", "Ядро"]);
+  });
+});
+
+describe("служебное не попадает на полки", () => {
+  it("наборы библиотек и среды запуска — не игры", () => {
+    expect(isServiceEntry("Steamworks Common Redistributables")).toBe(true);
+    expect(isServiceEntry("Steam Linux Runtime 3.0")).toBe(true);
+    expect(isServiceEntry("Proton 9.0")).toBe(true);
+  });
+
+  it("настоящие игры остаются", () => {
+    expect(isServiceEntry("Counter-Strike 2")).toBe(false);
+    expect(isServiceEntry("PUBG: BATTLEGROUNDS")).toBe(false);
+  });
+
+  it("разведка их отсеивает: владельцу не приходится чистить руками", () => {
+    const list = dedupe([
+      { appId: "730", name: "Counter-Strike 2" },
+      { appId: "228980", name: "Steamworks Common Redistributables" },
+    ]);
+    expect(list.map((g) => g.name)).toEqual(["Counter-Strike 2"]);
   });
 });

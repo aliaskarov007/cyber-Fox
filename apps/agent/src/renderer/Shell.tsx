@@ -27,7 +27,23 @@ export function Shell({
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [launching, setLaunching] = useState<LibraryApp | null>(null);
+  /** Игра думает слишком долго: гостю пора сказать, что делать. */
+  const [slow, setSlow] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /*
+   * Экран запуска не висит вечно. Через полминуты он либо уступил место игре и
+   * гость его не видит, либо игра не открылась — и тогда молчание хуже плохой
+   * новости: гость сидит и ждёт за свои деньги.
+   */
+  useEffect(() => {
+    if (!launching) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [launching]);
 
   /*
    * Печать где угодно попадает в поиск. За игровым ПК гость держит руки на
@@ -171,11 +187,17 @@ export function Shell({
 
       {launching && (
         <div className="launching">
-          <div className="launching-name">Запускаем «{launching.name}»</div>
-          <div className="launching-hint">
-            Игра откроется через несколько секунд и встанет поверх полок. Закроете её — снова
-            окажетесь здесь. Вернуться раньше — Ctrl + Alt + Home
+          <div className="launching-name">
+            {slow ? `«${launching.name}» долго не открывается` : `Запускаем «${launching.name}»`}
           </div>
+          <div className="launching-hint">
+            {slow
+              ? "Иногда игра открывается за экраном или обновляется. Нажмите Alt + Tab, чтобы её найти. Если ничего нет — позовите администратора: возможно, игра прописана неверно."
+              : "Игра откроется через несколько секунд и встанет поверх полок. Закроете её — снова окажетесь здесь. Вернуться раньше — Ctrl + Alt + Home"}
+          </div>
+          <button type="button" className="ghost" onClick={() => setLaunching(null)}>
+            Вернуться к играм
+          </button>
         </div>
       )}
     </div>

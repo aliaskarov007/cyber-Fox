@@ -166,8 +166,13 @@ ipcMain.handle("agent:unlock", () => {
   lockWindow?.setKiosk(false);
   lockWindow?.setAlwaysOnTop(false);
   lockWindow?.setFullScreen(true);
-  // Alt+Tab и Alt+F4 возвращаются гостю: во время игры это его окно, а не наше.
-  releaseShortcuts();
+  /*
+   * Гостю возвращаются только Alt+Tab и Alt+F4: ими он переключается между
+   * игрой и полками и закрывает игру. Остальное держим весь сеанс — прежде
+   * снималось всё разом, и Ctrl+Shift+Esc открывал диспетчер задач прямо во
+   * время оплаченной игры, а через него снимался и сам агент.
+   */
+  releaseShortcuts(GAME_SHORTCUTS);
   // Проводник и чужие диски закрываются на время игры. Ошибка здесь не должна
   // задерживать гостя: он уже заплатил.
   void applyLockdown();
@@ -202,19 +207,49 @@ ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: strin
       await spawnGame(app.target, app.args ?? []);
     }
     /*
-     * Оболочка не сворачивается. Она и есть то, что гость видит вместо рабочего
-     * стола: игра открывается поверх, а закрыв её, гость возвращается к полкам,
-     * а не к ярлыкам Windows. Свернувшись, оболочка отдавала бы зал обратно
-     * системе — ровно то, ради ухода от чего она делалась.
-     *
-     * Отдаём фокус запускаемой игре и уходим на задний план сами.
+     * Оболочка остаётся на экране: она и есть то, что гость видит вместо
+     * рабочего стола. Игра открывается поверх, а закрыв её, гость возвращается
+     * к полкам, а не к ярлыкам Windows.
      */
     lockWindow?.blur();
+    giveWayToGame();
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: asText(error) };
   }
 });
+
+/**
+ * Уступить место игре, если она не вышла вперёд сама.
+ *
+ * Обычно запущенная игра забирает передний план у того, кто её запустил. Но
+ * Steam и лаунчеры думают по несколько секунд, а иные окна открываются под
+ * нашим полноэкранным — гость смотрит на полки и решает, что нажатие не
+ * сработало.
+ *
+ * Поэтому проверяем несколько раз подряд: если через несколько секунд впереди
+ * всё ещё мы, отходим сами. Свернуться на секунду лучше, чем спрятать игру.
+ */
+function giveWayToGame(): void {
+  let attempts = 0;
+
+  const step = setInterval(() => {
+    attempts += 1;
+    if (!unlocked || !lockWindow) {
+      clearInterval(step);
+      return;
+    }
+
+    if (lockWindow.isFocused()) {
+      // Сворачивание временное: гость вернёт полки сочетанием, а игра к тому
+      // моменту уже займёт экран.
+      lockWindow.setMinimizable(true);
+      lockWindow.minimize();
+    }
+
+    if (attempts >= 6) clearInterval(step);
+  }, 2000);
+}
 
 /**
  * Запуск программы с ожиданием отказа.
@@ -317,6 +352,15 @@ app.whenReady().then(() => {
  */
 const KIOSK_SHORTCUTS = ["Alt+F4", "Alt+Tab", "Super", "Control+Shift+Escape"];
 
+/**
+ * Что отдаётся гостю на время оплаченной игры.
+ *
+ * Alt+Tab нужен, чтобы переключаться между игрой и полками, Alt+F4 — чтобы
+ * закрыть игру. Диспетчер задач и клавиша Windows не отдаются никогда: первым
+ * снимают агента, второй открывают меню «Пуск» со всей системой.
+ */
+const GAME_SHORTCUTS = ["Alt+F4", "Alt+Tab"];
+
 function holdShortcuts(): void {
   for (const accelerator of KIOSK_SHORTCUTS) {
     try {
@@ -327,8 +371,8 @@ function holdShortcuts(): void {
   }
 }
 
-function releaseShortcuts(): void {
-  for (const accelerator of KIOSK_SHORTCUTS) {
+function releaseShortcuts(only: string[] = KIOSK_SHORTCUTS): void {
+  for (const accelerator of only) {
     try {
       globalShortcut.unregister(accelerator);
     } catch {

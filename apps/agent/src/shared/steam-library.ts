@@ -60,9 +60,34 @@ export function coverUrl(game: InstalledGame): string {
   return `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appId}/library_600x900.jpg`;
 }
 
+/**
+ * Служебное, что Steam ставит рядом с играми.
+ *
+ * Это не игры: наборы библиотек, среды запуска, инструменты разработчика. Гостю
+ * их показывать незачем, а владельцу — вычищать руками после каждой разведки.
+ */
+const SERVICE_PARTS = [
+  "redistributable",
+  "steamworks",
+  "steam linux runtime",
+  "proton",
+  "steamvr",
+  "sdk",
+  "dedicated server",
+  "benchmark",
+];
+
+export function isServiceEntry(name: string): boolean {
+  const value = name.toLowerCase();
+  return SERVICE_PARTS.some((part) => value.includes(part));
+}
+
 /** Игры без повторов: одна и та же может стоять в двух библиотеках. */
 export function dedupe(games: InstalledGame[]): InstalledGame[] {
   const byId = new Map<string, InstalledGame>();
-  for (const game of games) if (!byId.has(game.appId)) byId.set(game.appId, game);
+  for (const game of games) {
+    if (isServiceEntry(game.name)) continue;
+    if (!byId.has(game.appId)) byId.set(game.appId, game);
+  }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
