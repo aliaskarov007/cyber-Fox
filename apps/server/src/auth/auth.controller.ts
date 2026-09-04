@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import { IsEmail, IsString, MinLength } from "class-validator";
 
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -25,11 +25,14 @@ export class AuthController {
   ) {}
 
   /*
-   * Десять попыток в минуту на одну почту. Считается именно по почте: весь клуб
-   * выходит в интернет через один адрес, и счёт по адресу запирал вход всему
-   * залу, стоило одному человеку забыть пароль.
+   * Тридцать попыток в минуту на одну почту. Считается именно по почте: весь
+   * клуб выходит в интернет через один адрес, и счёт по адресу запирал вход
+   * всему залу, стоило одному человеку забыть пароль. По той же причине вход
+   * выведен из общего счётчика по адресу: иначе сорок агентов и гости зала
+   * выбирали его раньше, чем администратор успевал войти.
    */
-  @Throttle({ login: { ttl: 60_000, limit: 10 } })
+  @SkipThrottle({ general: true })
+  @Throttle({ login: { ttl: 60_000, limit: 30 } })
   @Public()
   @Post("login")
   login(@Body() dto: LoginDto): Promise<LoginResult> {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 
 import { Public } from "../auth/guards.js";
 import { CreateTenantDto, PlatformLoginDto, UpdateSubscriptionDto } from "./platform.dto.js";
@@ -16,8 +16,10 @@ import { PlatformService } from "./platform.service.js";
 export class PlatformController {
   constructor(private readonly platform: PlatformService) {}
 
-  // Тот же предел, что и на входе в кассу: подбор пароля к платформе опаснее.
-  @Throttle({ login: { ttl: 60_000, limit: 5 } })
+  // Считается по почте, как и вход в кассу; предел ниже: подбор пароля к
+  // платформе опаснее. Из общего счётчика по адресу вход выведен.
+  @SkipThrottle({ general: true })
+  @Throttle({ login: { ttl: 60_000, limit: 10 } })
   @Public()
   @Post("login")
   login(@Body() dto: PlatformLoginDto) {
