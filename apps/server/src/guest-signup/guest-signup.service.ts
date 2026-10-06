@@ -47,13 +47,13 @@ export type RegisterResult =
       expiresAt: Date;
     }
   /** WhatsApp не подключён: аккаунт готов сразу, номер ждёт стойки. */
-  | { ok: true; mode: "DONE"; guestId: string; consentText: string }
+  | { ok: true; mode: "DONE"; guestId: string; consentText: string; bonus: number }
   | { ok: false; reason: string };
 
 export type StatusResult =
   | { state: "WAITING" }
   | { state: "EXPIRED" }
-  | { state: "DONE"; guestId: string; consentText: string };
+  | { state: "DONE"; guestId: string; consentText: string; bonus: number };
 
 /**
  * Регистрация гостя прямо за игровым ПК.
@@ -167,7 +167,13 @@ export class GuestSignupService {
         };
       }
       await this.prisma.guest.update({ where: { id: existing.id }, data: { pinHash } });
-      return { ok: true, mode: "DONE", guestId: existing.id, consentText: consentText(computer.club.consentBonus) };
+      return {
+        ok: true,
+        mode: "DONE",
+        guestId: existing.id,
+        consentText: consentText(computer.club.consentBonus),
+        bonus: computer.club.consentBonus,
+      };
     }
 
     const guest = await this.prisma.guest.create({
@@ -179,7 +185,13 @@ export class GuestSignupService {
         registeredClubId: computer.clubId,
       },
     });
-    return { ok: true, mode: "DONE", guestId: guest.id, consentText: consentText(computer.club.consentBonus) };
+    return {
+      ok: true,
+      mode: "DONE",
+      guestId: guest.id,
+      consentText: consentText(computer.club.consentBonus),
+      bonus: computer.club.consentBonus,
+    };
   }
 
   /** Экран ПК спрашивает, пришло ли сообщение. */
@@ -190,7 +202,12 @@ export class GuestSignupService {
     if (!verification || verification.computerId !== computerId) return { state: "EXPIRED" };
     if (verification.verifiedAt && verification.guestId) {
       const club = await this.prisma.club.findUniqueOrThrow({ where: { id: verification.clubId } });
-      return { state: "DONE", guestId: verification.guestId, consentText: consentText(club.consentBonus) };
+      return {
+        state: "DONE",
+        guestId: verification.guestId,
+        consentText: consentText(club.consentBonus),
+        bonus: club.consentBonus,
+      };
     }
     if (verification.expiresAt < new Date()) return { state: "EXPIRED" };
     return { state: "WAITING" };

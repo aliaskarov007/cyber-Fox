@@ -219,6 +219,27 @@ export class GuestsService {
     return toPublicGuest(guest);
   }
 
+  /**
+   * Подтвердить номер на стойке. Нужно гостю, который зарегистрировался за ПК,
+   * пока WhatsApp не подключён: администратор видит человека и его телефон.
+   * Ждавший подтверждения подарок за согласие начисляется сразу.
+   */
+  async verifyPhone(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    guestId: string,
+  ): Promise<{ bonus: number }> {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+    if (!guest.phoneVerifiedAt) {
+      await this.prisma.guest.update({
+        where: { id: guest.id },
+        data: { phoneVerifiedAt: new Date() },
+      });
+    }
+    return { bonus: await this.consents.grantBonus(this.prisma, guest.id, clubId) };
+  }
+
   /** Согласие на приглашения со слов гостя на стойке — или отказ от них. */
   async setConsent(
     staff: AuthenticatedStaff,

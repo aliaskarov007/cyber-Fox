@@ -1,17 +1,42 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   type AgentClient,
   type GuestLoginResult,
   formatMoney,
 } from "./agent-client.js";
+import { NATIONAL_LENGTH, addDigit, formatNational, fullPhone } from "./phone-input.js";
+import { encodeQr, qrPath } from "./qr.js";
 
 /**
- * Экран блокировки: вход по телефону и PIN.
+ * Экран блокировки: один путь для всех.
  *
- * Пароль на клубной клавиатуре с очередью за спиной — отказ от идеи
- * самообслуживания, поэтому телефон и четыре цифры (docs/guest-access.md).
+ * Гость набирает номер — дальше система сама решает, что нужно: знакомому
+ * номеру PIN, новому — придумать PIN и подтвердить номер через WhatsApp.
+ * Кнопок «Войти» и «Регистрация» нет: десятая цифра номера и четвёртая цифра
+ * PIN сами отправляют запрос (docs/guest-access.md, раздел 2).
+ *
+ * Всё набирается экранной клавиатурой мышью или цифрами на клавиатуре — что
+ * гостю ближе.
  */
+
+type Step =
+  | { kind: "phone" }
+  | { kind: "pin" }
+  | { kind: "newPin" }
+  | {
+      kind: "whatsapp";
+      verificationId: string;
+      link: string;
+      code: string;
+      businessNumber: string;
+      expiresAt: number;
+    }
+  | { kind: "consent"; guestId: string; text: string; bonus: number };
+
+/** Как часто экран спрашивает, пришло ли сообщение в WhatsApp. */
+const STATUS_POLL_MS = 2000;
+
 export function LockScreen({
   client,
   perMinutePrice,
@@ -24,9 +49,11 @@ export function LockScreen({
   online: boolean;
   onStarted: () => void;
 }) {
+  const [step, setStep] = useState<Step>({ kind: "phone" });
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   /* Молчащая кнопка вызова заставляет гостя жать её ещё несколько раз, а на
      стойке это выглядит как несколько вызовов с одной машины. */
   const [called, setCalled] = useState(false);
@@ -44,20 +71,184 @@ export function LockScreen({
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
 
-  async function submit(event: FormEvent): Promise<void> {
-    event.preventDefault();
+  function restart(message: string | null = null): void {
+    setStep({ kind: "phone" });
+    setPhone("");
+    setPin("");
+    setCard(null);
+    setError(message);
+    setNotice(null);
+  }
+
+  const login = useCallback(
+    async (enteredPin: string): Promise<void> => {
+      const result = await client.login(fullPhone(phone), enteredPin);
+      if (!result.ok) {
+        setPin("");
+        setError(result.reason ?? "Не удалось войти");
+        // Без денег карточка всё равно нужна — гость видит, к кому идти.
+        if (result.guest) setCard(result);
+        return;
+      }
+      setCard(result);
+    },
+    [client, phone],
+  );
+
+  /** Номер набран полностью — спрашиваем сервер, что дальше. */
+  async function submitPhone(digits: string): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      const result = await client.login(phone, pin);
-      if (!result.ok) setError(result.reason ?? "Не удалось войти");
-      else setCard(result);
+      const result = await client.lookup(fullPhone(digits));
+      if (!result.ok) {
+        setError(result.reason);
+        return;
+      }
+      setStep({ kind: result.next === "PIN" ? "pin" : "newPin" });
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
       setBusy(false);
     }
   }
+
+  async function submitPin(entered: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      await login(entered);
+    } catch (cause) {
+      setPin("");
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitNewPin(entered: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await client.register(fullPhone(phone), entered);
+      if (!result.ok) {
+        setPin("");
+        setError(result.reason);
+        return;
+      }
+      if (result.mode === "WHATSAPP") {
+        setStep({
+          kind: "whatsapp",
+          verificationId: result.verificationId,
+          link: result.link,
+          code: result.code,
+          businessNumber: result.businessNumber,
+          expiresAt: new Date(result.expiresAt).getTime(),
+        });
+      } else {
+        setStep({ kind: "consent", guestId: result.guestId, text: result.consentText, bonus: result.bonus });
+      }
+    } catch (cause) {
+      setPin("");
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* Ждём сообщение в WhatsApp: сервер узнаёт о нём сам, экран лишь спрашивает. */
+  const waitingFor = step.kind === "whatsapp" ? step.verificationId : null;
+  useEffect(() => {
+    if (!waitingFor) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void client
+        .registerStatus(waitingFor)
+        .then((status) => {
+          if (stopped) return;
+          if (status.state === "DONE") {
+            setStep({ kind: "consent", guestId: status.guestId, text: status.consentText, bonus: status.bonus });
+          } else if (status.state === "EXPIRED") {
+            setPin("");
+            setStep({ kind: "newPin" });
+            setError("Время на подтверждение вышло. Придумайте PIN ещё раз — появится новый код.");
+          }
+        })
+        // Обрыв связи переждём: следующий опрос спросит снова.
+        .catch(() => undefined);
+    }, STATUS_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [client, waitingFor]);
+
+  async function answerConsent(guestId: string, accept: boolean): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await client.consent(guestId, accept);
+      if (result.ok && result.bonus > 0) {
+        setNotice(`На счёт начислено ${formatMoney(result.bonus)}. Спасибо!`);
+      } else if (result.ok && accept) {
+        setNotice("Подписка оформлена. Подарок придёт на счёт, когда администратор подтвердит номер.");
+      }
+      // Аккаунт готов — сразу входим тем же PIN, без повторного набора.
+      await login(pin);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Цифра с экранной или обычной клавиатуры. */
+  const press = useCallback(
+    (key: string): void => {
+      if (busy) return;
+      if (step.kind === "phone") {
+        if (key === "back") setPhone((d) => d.slice(0, -1));
+        else {
+          const next = addDigit(phone, key);
+          setPhone(next);
+          if (next.length === NATIONAL_LENGTH && next !== phone) void submitPhone(next);
+        }
+        return;
+      }
+      if (step.kind === "pin" || step.kind === "newPin") {
+        if (key === "back") {
+          setPin((p) => p.slice(0, -1));
+          return;
+        }
+        if (!/^\d$/.test(key) || pin.length >= 4) return;
+        const next = pin + key;
+        setPin(next);
+        setError(null);
+        if (next.length === 4) void (step.kind === "pin" ? submitPin(next) : submitNewPin(next));
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [busy, step, phone, pin],
+  );
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent): void {
+      if (/^\d$/.test(event.key)) press(event.key);
+      else if (event.key === "Backspace") press("back");
+      else if (event.key === "Escape") restart();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [press]);
+
+  const qr = useMemo(() => {
+    if (step.kind !== "whatsapp") return null;
+    try {
+      return qrPath(encodeQr(step.link));
+    } catch {
+      return null;
+    }
+  }, [step]);
 
   async function start(tariffId?: string): Promise<void> {
     if (!card?.guest) return;
@@ -78,6 +269,7 @@ export function LockScreen({
       <div className="card">
         <h1>Здравствуйте, {card.guest.fullName}</h1>
 
+        {notice && <div className="banner info">{notice}</div>}
         {error && <div className="error">{error}</div>}
 
         <div className="rows">
@@ -114,7 +306,7 @@ export function LockScreen({
           </div>
         )}
 
-        {minutes ? (
+        {!card.ok ? null : minutes ? (
           <button className="primary" disabled={busy} onClick={() => void start()}>
             Играть на минутах пакета ({minutes.minutesRemaining} мин)
           </button>
@@ -124,16 +316,78 @@ export function LockScreen({
           </button>
         )}
 
-        <button className="ghost" onClick={() => setCard(null)}>
+        <button className="ghost" onClick={() => restart()}>
           Это не я
         </button>
       </div>
     );
   }
 
+  if (step.kind === "consent") {
+    return (
+      <div className="card">
+        <h1>Готово, номер подтверждён!</h1>
+        {error && <div className="error">{error}</div>}
+        <div className="consent-offer">
+          {step.bonus > 0 && <div className="gift">+{formatMoney(step.bonus)}</div>}
+          <div>Хотите получать приглашения на турниры и события клуба?</div>
+        </div>
+        {/* Гость видит ровно тот текст, который сохранится как его согласие. */}
+        <div className="note">{step.text}</div>
+        <button className="primary" disabled={busy} onClick={() => void answerConsent(step.guestId, true)}>
+          {step.bonus > 0 ? `Да, хочу +${formatMoney(step.bonus)}` : "Да, хочу"}
+        </button>
+        <button disabled={busy} onClick={() => void answerConsent(step.guestId, false)}>
+          Нет, спасибо
+        </button>
+      </div>
+    );
+  }
+
+  if (step.kind === "whatsapp") {
+    const minutesLeft = Math.max(0, Math.ceil((step.expiresAt - Date.now()) / 60_000));
+    return (
+      <div className="card">
+        <h1>Подтвердите номер в WhatsApp</h1>
+        {error && <div className="error">{error}</div>}
+        {qr && (
+          <svg
+            className="qr"
+            viewBox={`0 0 ${qr.size} ${qr.size}`}
+            shapeRendering="crispEdges"
+            role="img"
+            aria-label="QR-код для WhatsApp"
+          >
+            <rect width={qr.size} height={qr.size} fill="#fff" />
+            <path d={qr.path} fill="#000" />
+          </svg>
+        )}
+        <ol className="steps">
+          <li>Наведите камеру телефона на код</li>
+          <li>В WhatsApp нажмите «Отправить» — текст уже вписан</li>
+        </ol>
+        <div className="note">
+          Без камеры: напишите в WhatsApp на номер {step.businessNumber} сообщение{" "}
+          <b className="code">{step.code}</b>. Писать нужно с номера {formatNational(phone)}. Код
+          действует ещё {minutesLeft} мин.
+        </div>
+        <div className="waiting">Ждём сообщение…</div>
+        <button className="ghost" onClick={() => restart()}>
+          Другой номер
+        </button>
+      </div>
+    );
+  }
+
+  const pinStep = step.kind === "pin" || step.kind === "newPin";
+
   return (
-    <form className="card" onSubmit={submit}>
-      <h1>Вход в клуб</h1>
+    <div className="card">
+      <h1>
+        {step.kind === "phone" && "Вход в клуб"}
+        {step.kind === "pin" && "Введите PIN"}
+        {step.kind === "newPin" && "Придумайте PIN из 4 цифр"}
+      </h1>
 
       {error && <div className="error">{error}</div>}
 
@@ -146,34 +400,48 @@ export function LockScreen({
         </div>
       )}
 
-      <label>
-        Номер телефона
-        <input
-          inputMode="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="+7 700 000 00 00"
-          autoFocus
-        />
-      </label>
+      {step.kind === "phone" ? (
+        <>
+          <div className="note">Номер телефона — новый гость зарегистрируется за минуту</div>
+          <div className={`display ${phone.length === 0 ? "empty" : ""}`}>{formatNational(phone)}</div>
+        </>
+      ) : (
+        <>
+          <div className="note">
+            {formatNational(phone)}
+            {step.kind === "newPin" && " · этот PIN понадобится для входа"}
+          </div>
+          {/* Свой новый PIN гость видит цифрами — опечатку видно сразу. */}
+          <div className="pin-dots">
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className={i < pin.length ? "filled" : ""}>
+                {i < pin.length ? (step.kind === "newPin" ? pin[i] : "●") : ""}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
 
-      <label>
-        PIN
-        <input
-          inputMode="numeric"
-          type="password"
-          maxLength={4}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          placeholder="····"
-        />
-      </label>
+      <div className="numpad">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+          <button key={d} type="button" disabled={busy || !online} onClick={() => press(d)}>
+            {d}
+          </button>
+        ))}
+        <button type="button" className="ghost" disabled={busy} onClick={() => (pinStep ? restart() : press("back"))}>
+          {pinStep ? "Назад" : "⌫"}
+        </button>
+        <button type="button" disabled={busy || !online} onClick={() => press("0")}>
+          0
+        </button>
+        <button type="button" className="ghost" disabled={busy} onClick={() => press("back")}>
+          {pinStep ? "⌫" : ""}
+        </button>
+      </div>
 
-      <button className="primary" type="submit" disabled={busy || pin.length !== 4}>
-        {busy ? "Проверяем…" : "Войти"}
-      </button>
+      {busy && <div className="waiting">Проверяем…</div>}
 
-      {perMinutePrice !== null && (
+      {step.kind === "phone" && perMinutePrice !== null && (
         <div className="note">Поминутный тариф этой зоны — {formatMoney(perMinutePrice)}/мин.</div>
       )}
 
@@ -188,6 +456,6 @@ export function LockScreen({
       >
         {called ? "Администратор идёт" : "Позвать администратора"}
       </button>
-    </form>
+    </div>
   );
 }

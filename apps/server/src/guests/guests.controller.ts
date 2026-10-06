@@ -85,4 +85,13 @@ export class GuestsController {
   ) {
     return this.guests.setConsent(staff, clubId, guestId, dto.consent);
   }
+
+  @Post(":guestId/verify-phone")
+  verifyPhone(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+  ) {
+    return this.guests.verifyPhone(staff, clubId, guestId);
+  }
 }

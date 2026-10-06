@@ -1,19 +1,21 @@
 import { type FormEvent, useState } from "react";
 
-import { type Club, api } from "./api.js";
+import { type Club, api, formatMoney } from "./api.js";
 
 /**
  * Заведение гостя на стойке.
  *
- * PIN здесь необязателен, но без него гость не сможет сесть за машину сам: вход
- * по телефону и PIN — один из двух путей, и второй требует администратора на
- * каждую посадку.
+ * Обязателен только телефон: имя можно спросить потом, а PIN гость придумает
+ * сам за ПК — система предложит это, как только он наберёт номер. Согласие на
+ * приглашения — отдельная галочка, по умолчанию снятая: отмечается, только
+ * если гость сказал «да».
  */
 export function GuestNewForm({ club, onCreated }: { club: Club; onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
+  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,13 +26,15 @@ export function GuestNewForm({ club, onCreated }: { club: Club; onCreated: (id: 
     try {
       if (pin !== "" && !/^\d{4}$/.test(pin)) throw new Error("PIN — четыре цифры");
       const guest = await api.createGuest(club.id, {
-        fullName: fullName.trim(),
         phone: phone.trim(),
+        ...(fullName.trim() === "" ? {} : { fullName: fullName.trim() }),
         ...(pin === "" ? {} : { pin }),
+        ...(consent ? { marketingConsent: true } : {}),
       });
       setFullName("");
       setPhone("");
       setPin("");
+      setConsent(false);
       setOpen(false);
       onCreated(guest.id);
     } catch (cause) {
@@ -53,23 +57,30 @@ export function GuestNewForm({ club, onCreated }: { club: Club; onCreated: (id: 
       {error && <div className="error">{error}</div>}
 
       <label>
-        Имя
-        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Асхат" />
-      </label>
-
-      <label>
         Телефон
         <input
           inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          placeholder="+77010000001"
+          placeholder="8 701 123 45 67"
+          autoFocus
         />
       </label>
 
       <label>
-        PIN, 4 цифры (можно позже)
+        Имя (можно не заполнять)
+        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Асхат" />
+      </label>
+
+      <label>
+        PIN (можно не задавать — гость придумает сам за ПК)
         <input inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value)} />
+      </label>
+
+      <label className="check">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        Гость согласен получать приглашения на события
+        {club.consentBonus > 0 ? ` — подарок ${formatMoney(club.consentBonus)} на счёт` : ""}
       </label>
 
       <div className="actions">

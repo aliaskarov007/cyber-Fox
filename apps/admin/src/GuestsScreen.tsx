@@ -61,6 +61,7 @@ export function GuestsScreen({ club }: { club: Club }) {
               <th>Телефон</th>
               <th>Бонусы</th>
               <th>PIN</th>
+              <th>Приглашения</th>
               <th />
             </tr>
           </thead>
@@ -70,7 +71,11 @@ export function GuestsScreen({ club }: { club: Club }) {
                 <td>{guest.fullName}</td>
                 <td className="num">{guest.phone}</td>
                 <td className="num">{formatMoney(guest.bonusPoints)}</td>
-                <td>{guest.hasPin ? "задан" : "—"}</td>
+                <td>
+                  {guest.hasPin ? "задан" : "—"}
+                  {!guest.phoneVerified && <span className="chip idle"> номер не подтверждён</span>}
+                </td>
+                <td>{guest.marketingConsent ? "да" : "—"}</td>
                 <td>
                   <button onClick={() => setSelectedId(guest.id)}>Карточка</button>
                 </td>
@@ -154,6 +159,17 @@ function GuestCardPanel({
           нельзя.
         </div>
       )}
+
+      <GuestInvites
+        club={club}
+        guestId={guestId}
+        phoneVerified={card.guest.phoneVerified}
+        consent={card.guest.marketingConsent}
+        onChanged={() => {
+          void load();
+          onChanged();
+        }}
+      />
 
       <div className="section">
         <h3>Вход за машиной</h3>
@@ -329,5 +345,90 @@ function GuestCardPanel({
 
       <button onClick={onClose}>Закрыть</button>
     </>
+  );
+}
+
+/**
+ * Номер и приглашения.
+ *
+ * Подтвердить номер нужно гостю, который зарегистрировался за ПК без WhatsApp:
+ * администратор видит человека и его телефон. Согласие отмечается только со
+ * слов гостя — рассылки по базе без согласия запрещены законом.
+ */
+function GuestInvites({
+  club,
+  guestId,
+  phoneVerified,
+  consent,
+  onChanged,
+}: {
+  club: Club;
+  guestId: string;
+  phoneVerified: boolean;
+  consent: boolean;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(action: () => Promise<{ bonus: number }>, done: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { bonus } = await action();
+      setMessage(bonus > 0 ? `${done} Начислен подарок ${formatMoney(bonus)}.` : done);
+      onChanged();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="section">
+      <h3>Номер и приглашения</h3>
+      {error && <div className="error">{error}</div>}
+      {message && <div className="notice">{message}</div>}
+      <div className="rows">
+        <div className="row">
+          <span className="k">Номер</span>
+          <span>{phoneVerified ? "подтверждён" : "не подтверждён"}</span>
+        </div>
+        <div className="row">
+          <span className="k">Приглашения</span>
+          <span>{consent ? "согласен" : "нет согласия"}</span>
+        </div>
+      </div>
+      <div className="actions">
+        {!phoneVerified && (
+          <button
+            disabled={busy}
+            onClick={() => void run(() => api.verifyGuestPhone(club.id, guestId), "Номер подтверждён.")}
+          >
+            Подтвердить номер (гость у стойки)
+          </button>
+        )}
+        {consent ? (
+          <button
+            disabled={busy}
+            onClick={() => void run(() => api.setGuestConsent(club.id, guestId, false), "Гость отписан.")}
+          >
+            Отписать от приглашений
+          </button>
+        ) : (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => void run(() => api.setGuestConsent(club.id, guestId, true), "Согласие записано.")}
+          >
+            Гость согласен на приглашения
+            {club.consentBonus > 0 ? ` (+${formatMoney(club.consentBonus)})` : ""}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -73,6 +73,10 @@ export interface Guest {
   phone: string;
   bonusPoints: number;
   hasPin: boolean;
+  /** Номер подтверждён через WhatsApp или администратором. */
+  phoneVerified: boolean;
+  /** Согласен на приглашения и не отписался. */
+  marketingConsent: boolean;
 }
 
 export interface Computer {
@@ -342,8 +346,19 @@ export const api = {
   guestCard: (clubId: string, guestId: string) =>
     request<GuestCard>(`/clubs/${clubId}/guests/${guestId}`),
 
-  createGuest: (clubId: string, body: { fullName: string; phone: string; pin?: string }) =>
-    request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+  createGuest: (
+    clubId: string,
+    body: { fullName?: string; phone: string; pin?: string; marketingConsent?: boolean },
+  ) => request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+
+  setGuestConsent: (clubId: string, guestId: string, consent: boolean) =>
+    request<{ bonus: number }>(`/clubs/${clubId}/guests/${guestId}/consent`, {
+      method: "POST",
+      body: JSON.stringify({ consent }),
+    }),
+
+  verifyGuestPhone: (clubId: string, guestId: string) =>
+    request<{ bonus: number }>(`/clubs/${clubId}/guests/${guestId}/verify-phone`, { method: "POST" }),
 
   apps: (clubId: string) => request<ClubApp[]>(`/clubs/${clubId}/apps`),
 

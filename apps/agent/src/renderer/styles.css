@@ -570,3 +570,102 @@ button:disabled {
 .session-guest-name {
   font-weight: 650;
 }
+
+/* --- Вход: экранная клавиатура, номер, PIN, WhatsApp --- */
+
+.display {
+  font-family: var(--mono);
+  font-size: 26px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.display.empty {
+  color: var(--muted);
+}
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.pin-dots span {
+  width: 52px;
+  height: 60px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 650;
+}
+
+.pin-dots span.filled {
+  border-color: var(--accent);
+}
+
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.numpad button {
+  font-size: 26px;
+  font-weight: 600;
+  padding: 16px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.numpad button.ghost {
+  font-size: 18px;
+}
+
+.waiting {
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.qr {
+  width: 260px;
+  height: 260px;
+  margin: 0 auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+  font-size: 16px;
+}
+
+.code {
+  font-family: var(--mono);
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.consent-offer {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.consent-offer .gift {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--ok);
+}

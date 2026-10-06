@@ -31,6 +31,28 @@ export interface GuestLoginResult {
   minutesAffordable: number | null;
 }
 
+export type LookupResult =
+  | { ok: true; phone: string; next: "PIN" | "REGISTER" }
+  | { ok: false; reason: string };
+
+export type RegisterResult =
+  | {
+      ok: true;
+      mode: "WHATSAPP";
+      verificationId: string;
+      link: string;
+      code: string;
+      businessNumber: string;
+      expiresAt: string;
+    }
+  | { ok: true; mode: "DONE"; guestId: string; consentText: string; bonus: number }
+  | { ok: false; reason: string };
+
+export type RegisterStatus =
+  | { state: "WAITING" }
+  | { state: "EXPIRED" }
+  | { state: "DONE"; guestId: string; consentText: string; bonus: number };
+
 export interface Tick {
   sessionId: string;
   /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
@@ -124,6 +146,26 @@ export class AgentClient {
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {
     return this.request("guest.login", { phone, pin });
+  }
+
+  /** Первый шаг: знаком ли номер — дальше PIN или регистрация. */
+  lookup(phone: string): Promise<LookupResult> {
+    return this.request("guest.lookup", { phone });
+  }
+
+  /** Регистрация нового гостя прямо за этим ПК. */
+  register(phone: string, pin: string): Promise<RegisterResult> {
+    return this.request("guest.register", { phone, pin });
+  }
+
+  /** Пришло ли сообщение с кодом в WhatsApp клуба. */
+  registerStatus(verificationId: string): Promise<RegisterStatus> {
+    return this.request("guest.register.status", { verificationId });
+  }
+
+  /** Ответ на вопрос о приглашениях сразу после регистрации. */
+  consent(guestId: string, accept: boolean): Promise<{ ok: boolean; bonus: number; reason?: string }> {
+    return this.request("guest.consent", { guestId, accept });
   }
 
   startSession(guestId: string, tariffId?: string): Promise<{ ok: boolean; reason?: string }> {
