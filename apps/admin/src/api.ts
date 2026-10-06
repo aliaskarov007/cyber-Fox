@@ -490,7 +490,23 @@ export const api = {
 
   tenant: () => request<Tenant>("/network/tenant"),
 
-  updateTenant: (body: { name?: string; sharedBalance?: boolean; moveBalancesToClubId?: string }) =>
+  events: () => request<ClubEvent[]>("/network/events"),
+
+  createEvent: (body: ClubEventInput) =>
+    request<ClubEvent>("/network/events", { method: "POST", body: JSON.stringify(body) }),
+
+  updateEvent: (eventId: string, body: Partial<ClubEventInput>) =>
+    request<ClubEvent>(`/network/events/${eventId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  deleteEvent: (eventId: string) =>
+    request<{ ok: true }>(`/network/events/${eventId}`, { method: "DELETE" }),
+
+  updateTenant: (body: {
+    name?: string;
+    sharedBalance?: boolean;
+    moveBalancesToClubId?: string;
+    slogan?: string;
+  }) =>
     request<Tenant>("/network/tenant", { method: "PATCH", body: JSON.stringify(body) }),
 
   createClub: (body: { name: string; city?: string; timezone?: string }) =>
@@ -653,6 +669,34 @@ export interface Tenant {
   id: string;
   name: string;
   sharedBalance: boolean;
+  /** Лозунг под названием сети на экранах ПК. */
+  slogan: string;
+}
+
+/** Ивент в афише на экранах ПК. */
+export interface ClubEvent {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  startsAt: string;
+  clubId: string | null;
+  prize: string | null;
+  fee: string | null;
+  seats: string | null;
+  howToJoin: string | null;
+  isPublished: boolean;
+}
+
+export interface ClubEventInput {
+  title: string;
+  subtitle: string;
+  startsAt: string;
+  clubId: string | null;
+  prize: string;
+  fee: string;
+  seats: string;
+  howToJoin: string;
+  isPublished: boolean;
 }
 
 export interface StaffMember {
