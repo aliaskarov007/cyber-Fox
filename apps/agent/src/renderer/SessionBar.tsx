@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
+import { packageEndingText } from "./package-warning.js";
 
 /**
  * Полоса состояния над полками.
@@ -49,7 +50,9 @@ export function SessionBar({
   const onPackage = tick.packageMinutesLeft !== null;
   const left = onPackage ? tick.packageMinutesLeft! : (tick.minutesAffordable ?? 0);
   const inDebt = tick.balance < 0;
-  const tone = inDebt ? "debt" : left <= warnMinutes ? "warn" : "ok";
+  // Порог берётся из настроек зала; пока сервер его не прислал — общий.
+  const warnAt = tick.warnMinutes ?? warnMinutes;
+  const tone = inDebt ? "debt" : left <= warnAt ? "warn" : "ok";
   const remaining = formatRemaining(left);
 
   return (
@@ -111,10 +114,10 @@ export function SessionBar({
         </div>
       )}
 
-      {!inDebt && left <= warnMinutes && (
+      {!inDebt && left <= warnAt && (
         <div className="banner warn">
           {onPackage
-            ? "Минуты пакета заканчиваются. Дальше включится поминутный тариф — игра не прервётся."
+            ? packageEndingText(left, tick.afterPackagePrice ?? null, tick.afterPackageMinutes ?? null)
             : "Времени осталось мало. Пополните счёт у администратора, чтобы продолжить."}
         </div>
       )}

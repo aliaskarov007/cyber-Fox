@@ -214,6 +214,17 @@ model Club {
   lowBalanceWarnMinutes Int @default(10)
   /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
   bonusPercent Int @default(0)
+
+  /// Перенос остатка абонемента при продлении (docs/billing.md, раздел 4.6).
+  rolloverPercent       Int @default(20)
+  /// То же с третьего абонемента подряд.
+  rolloverStreakPercent Int @default(30)
+  /// Потолок переноса, процент от оплаченных минут нового абонемента.
+  rolloverCapPercent    Int @default(25)
+  /// Продление засчитывается за столько дней до окончания…
+  renewBeforeDays       Int @default(7)
+  /// …и столько дней после.
+  renewAfterDays        Int @default(3)
   /// Подарок за согласие на приглашения, в тиын. Начисляется один раз на
   /// гостя, в кошелёк этого зала. 0 — подарок выключен.
   consentBonus Int @default(50000)
@@ -492,6 +503,16 @@ enum TariffKind {
   PER_MINUTE
 }
 
+/// Как устроен пакетный тариф (docs/billing.md, раздел 4.6).
+enum PackageFormat {
+  /// Обычный пакет минут, в том числе «N+M» с бонусными минутами.
+  MINUTES
+  /// Ночной: продаётся внутри окна и действует ровно до его конца.
+  NIGHT
+  /// Абонемент: при продлении часть остатка переносится в новый.
+  SUBSCRIPTION
+}
+
 model Tariff {
   id     String @id @default(uuid())
   clubId String
@@ -507,6 +528,10 @@ model Tariff {
   /// Для PACKAGE: сколько минут и за сколько.
   packageMinutes Int?
   packagePrice   Int?
+  /// Формат пакета: обычный, ночной или абонемент.
+  packageFormat PackageFormat @default(MINUTES)
+  /// Подарочные минуты сверх оплаченных: «2+1» — это 120 оплаченных и 60 в подарок.
+  bonusMinutes  Int @default(0)
   /// Срок жизни пакета; пусто — берём packageValidityDays клуба.
   validityDays   Int?
 
@@ -632,6 +657,18 @@ model GuestPackage {
   minutesTotal     Int
   minutesRemaining Int
   pricePaid        Int
+
+  /// Сколько из minutesTotal перенесено с прошлого абонемента. Тратятся первыми
+  /// и второй раз не переносятся.
+  carriedMinutes Int     @default(0)
+  /// С какого абонемента перенесён остаток.
+  carriedFromId  String?
+  /// Какой по счёту абонемент подряд: от этого зависит процент переноса.
+  streak         Int     @default(1)
+  /// Абонемент продлён заранее — остаток перенесётся в этот, когда старый кончится.
+  renewedById    String?
+  /// Остаток уже перенесён: второй раз не переносится.
+  rolledOverAt   DateTime?
 
   purchasedAt DateTime           @default(now())
   expiresAt   DateTime

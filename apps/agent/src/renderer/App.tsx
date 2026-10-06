@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { AgentSettings } from "../shared/settings.js";
 import { type Afisha, AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
 import { splitBrand } from "./afisha-format.js";
+import { switchedText } from "./package-warning.js";
 import type { LibraryApp } from "../shared/library.js";
 import { LockScreen } from "./LockScreen.js";
 import { Poster } from "./Poster.js";
@@ -153,7 +154,7 @@ export function App() {
       onSwitched: (event) => {
         setSwitchNote(
           event.to === "PER_MINUTE"
-            ? "Пакет закончился, включён поминутный тариф. Игра продолжается."
+            ? switchedText(event.pricePerMinute, event.minutesLeft)
             : "Продолжаем на следующем пакете минут.",
         );
         setTimeout(() => setSwitchNote(null), 15_000);

@@ -31,6 +31,8 @@ export interface GuestLoginResult {
   packagesElsewhere: Array<{ id: string; zoneName: string; minutesRemaining: number }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;
+  /** Абонемент скоро кончится: продлите — часть остатка переедет. */
+  renewalHint?: string | null;
 }
 
 /** Ивент в афише на экране блокировки. */
@@ -85,6 +87,11 @@ export interface Tick {
   minutesAffordable: number | null;
   creditLeft: number | null;
   accruedCost: number;
+  /** После пакета: цена поминутки и на сколько минут хватит баланса. */
+  afterPackagePrice?: number | null;
+  afterPackageMinutes?: number | null;
+  /** За сколько минут до конца предупреждать — настройка зала. */
+  warnMinutes?: number;
 }
 
 declare global {

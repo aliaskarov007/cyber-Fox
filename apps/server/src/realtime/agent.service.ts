@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from "@nes
 import {
   ComputerStatus,
   GuestPackageStatus,
+  PackageFormat,
   SessionStartedBy,
   SessionStatus,
   SegmentEndReason,
@@ -10,7 +11,9 @@ import bcrypt from "bcryptjs";
 
 import { minutesAffordable, pickPerMinuteTariff } from "../billing/billing.rules.js";
 import { SubscriptionService } from "../billing-platform/subscription.service.js";
-import { toLocalMoment } from "../common/local-time.js";
+import { toLocalDate, toLocalMoment } from "../common/local-time.js";
+import { rolloverSettings } from "../packages/package-sale.service.js";
+import { renewalHint } from "../packages/package.rules.js";
 import { findGuestByPhone } from "../guests/guest-lookup.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -31,6 +34,8 @@ export interface GuestLoginResult {
   packagesElsewhere: Array<{ id: string; zoneName: string; minutesRemaining: number }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;
+  /** Абонемент скоро кончится: продлите — часть остатка переедет. */
+  renewalHint: string | null;
 }
 
 /**
@@ -188,6 +193,7 @@ export class AgentService {
       packagesElsewhere: [],
       perMinutePrice: null,
       minutesAffordable: null,
+      renewalHint: null,
     };
 
     // Номер в любой привычной записи: «8 701…», «+7 701…», «701…».
@@ -262,9 +268,22 @@ export class AgentService {
         minutesRemaining: { gt: 0 },
         expiresAt: { gt: now },
       },
-      include: { zone: { select: { name: true } } },
+      include: {
+        zone: { select: { name: true } },
+        sourceTariff: { select: { packageFormat: true, packageMinutes: true, packagePrice: true } },
+      },
       orderBy: { expiresAt: "asc" },
     });
+
+    // Первым кончающийся абонемент без продления — о нём и напомним.
+    const expiring = packages.find(
+      (p) => p.sourceTariff.packageFormat === PackageFormat.SUBSCRIPTION && !p.renewedById,
+    );
+    const ends = expiring ? toLocalDate(expiring.expiresAt, computer.club.timezone) : null;
+    const hint =
+      expiring && ends
+        ? renewalHint(expiring, expiring.sourceTariff, rolloverSettings(computer.club), now, ends)
+        : null;
 
     const tariffs = await this.prisma.tariff.findMany({
       where: { zoneId: computer.zoneId, kind: "PER_MINUTE", isActive: true },
@@ -293,6 +312,7 @@ export class AgentService {
         ...empty,
         guest: { id: guest.id, fullName: guest.fullName, balance: wallet.balance },
         reason: "Недостаточно средств. Подойдите к администратору, чтобы пополнить счёт.",
+        renewalHint: hint,
       };
     }
 
@@ -310,6 +330,7 @@ export class AgentService {
         .map((p) => ({ id: p.id, zoneName: p.zone.name, minutesRemaining: p.minutesRemaining })),
       perMinutePrice: perMinute?.pricePerMinute ?? null,
       minutesAffordable: affordable,
+      renewalHint: hint,
     };
   }
 

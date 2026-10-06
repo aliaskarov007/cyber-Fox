@@ -27,6 +27,9 @@ export interface RealtimeEvents {
     guestName?: string | null;
     bonusPoints?: number | null;
     tariffName?: string | null;
+    afterPackagePrice?: number | null;
+    afterPackageMinutes?: number | null;
+    warnMinutes?: number;
   };
   "session.switched": SessionEvent & {
     to: "PACKAGE" | "PER_MINUTE";

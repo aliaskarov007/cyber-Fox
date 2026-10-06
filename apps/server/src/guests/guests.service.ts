@@ -3,6 +3,7 @@ import {
   type Guest,
   type GuestPackage,
   GuestPackageStatus,
+  PackageFormat,
   type PaymentMethod,
   TariffKind,
   TransactionType,
@@ -15,6 +16,7 @@ import { normalizePhone, phoneTail } from "../common/phone.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import { canInvite } from "./consent.rules.js";
+import { PackageSaleService } from "../packages/package-sale.service.js";
 import { ConsentService } from "./consent.service.js";
 import { findGuestByPhone } from "./guest-lookup.js";
 import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
@@ -134,6 +136,7 @@ export class GuestsService {
     private readonly access: ClubAccessService,
     private readonly wallets: WalletService,
     private readonly consents: ConsentService,
+    private readonly sales: PackageSaleService,
   ) {}
 
   async search(staff: AuthenticatedStaff, clubId: string, query: string): Promise<PublicGuest[]> {
@@ -396,13 +399,12 @@ export class GuestsService {
     const tariff = await this.prisma.tariff.findUnique({ where: { id: dto.tariffId } });
     if (!tariff || tariff.clubId !== clubId) throw new NotFoundException("Тариф не найден");
     if (tariff.kind !== TariffKind.PACKAGE) throw new BadRequestException("Это не пакетный тариф");
-    if (!tariff.packageMinutes || tariff.packagePrice === null) {
-      throw new BadRequestException("У тарифа не заданы минуты или цена");
-    }
+    if (tariff.packagePrice === null) throw new BadRequestException("У тарифа не задана цена");
 
     const price = tariff.packagePrice;
-    const validityDays = tariff.validityDays ?? club.packageValidityDays;
-    const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    // Минуты и срок — по формату: «N+M», ночной до конца окна, абонемент.
+    const { minutes, expiresAt } = this.sales.terms(club, tariff, now);
 
     return this.prisma.$transaction(async (tx) => {
       const wallet = await this.wallets.resolveWallet(guest.id, clubId, tx);
@@ -445,18 +447,33 @@ export class GuestsService {
         });
       }
 
-      return tx.guestPackage.create({
+      // Абонемент вовремя продлевает прежний — часть остатка прежнего переедет.
+      const renewed =
+        tariff.packageFormat === PackageFormat.SUBSCRIPTION
+          ? await this.sales.renewedSubscription(tx, club, guest.id, now)
+          : null;
+
+      const created = await tx.guestPackage.create({
         data: {
           clubId,
           guestId: guest.id,
           zoneId: tariff.zoneId,
           sourceTariffId: tariff.id,
-          minutesTotal: tariff.packageMinutes!,
-          minutesRemaining: tariff.packageMinutes!,
+          minutesTotal: minutes,
+          minutesRemaining: minutes,
           pricePaid: price,
           expiresAt,
+          streak: renewed ? renewed.streak + 1 : 1,
         },
       });
+
+      if (!renewed) return created;
+
+      await tx.guestPackage.update({ where: { id: renewed.id }, data: { renewedById: created.id } });
+      // Прежний уже кончился — переносим сразу. Иначе гость доиграет его, а
+      // перенос сделает воркер, когда срок выйдет.
+      if (renewed.expiresAt <= now) await this.sales.settle(tx, renewed.id, now);
+      return tx.guestPackage.findUniqueOrThrow({ where: { id: created.id } });
     });
   }
 

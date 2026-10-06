@@ -94,6 +94,11 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
   const [warn, setWarn] = useState(String(club.lowBalanceWarnMinutes));
   const [bonus, setBonus] = useState(String(club.bonusPercent));
   const [consentBonus, setConsentBonus] = useState(String(club.consentBonus / 100));
+  const [rollover, setRollover] = useState(String(club.rolloverPercent));
+  const [rolloverStreak, setRolloverStreak] = useState(String(club.rolloverStreakPercent));
+  const [rolloverCap, setRolloverCap] = useState(String(club.rolloverCapPercent));
+  const [renewBefore, setRenewBefore] = useState(String(club.renewBeforeDays));
+  const [renewAfter, setRenewAfter] = useState(String(club.renewAfterDays));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +110,11 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
     setWarn(String(club.lowBalanceWarnMinutes));
     setBonus(String(club.bonusPercent));
     setConsentBonus(String(club.consentBonus / 100));
+    setRollover(String(club.rolloverPercent));
+    setRolloverStreak(String(club.rolloverStreakPercent));
+    setRolloverCap(String(club.rolloverCapPercent));
+    setRenewBefore(String(club.renewBeforeDays));
+    setRenewAfter(String(club.renewAfterDays));
   }, [club]);
 
   async function submit(event: FormEvent): Promise<void> {
@@ -118,6 +128,11 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         lowBalanceWarnMinutes: Number(warn),
         bonusPercent: Number(bonus),
         consentBonus: toTiyn(consentBonus),
+        rolloverPercent: Number(rollover),
+        rolloverStreakPercent: Number(rolloverStreak),
+        rolloverCapPercent: Number(rolloverCap),
+        renewBeforeDays: Number(renewBefore),
+        renewAfterDays: Number(renewAfter),
       });
       onSaved("Настройки зала сохранены");
     } catch (cause) {
@@ -157,6 +172,26 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
             value={consentBonus}
             onChange={(e) => setConsentBonus(e.target.value)}
           />
+        </label>
+        <label>
+          Абонемент: перенос остатка при продлении, %
+          <input inputMode="numeric" value={rollover} onChange={(e) => setRollover(e.target.value)} />
+        </label>
+        <label>
+          С третьего абонемента подряд, %
+          <input inputMode="numeric" value={rolloverStreak} onChange={(e) => setRolloverStreak(e.target.value)} />
+        </label>
+        <label>
+          Потолок переноса, % от нового абонемента
+          <input inputMode="numeric" value={rolloverCap} onChange={(e) => setRolloverCap(e.target.value)} />
+        </label>
+        <label>
+          Продление засчитывается за дней до конца
+          <input inputMode="numeric" value={renewBefore} onChange={(e) => setRenewBefore(e.target.value)} />
+        </label>
+        <label>
+          …и дней после конца
+          <input inputMode="numeric" value={renewAfter} onChange={(e) => setRenewAfter(e.target.value)} />
         </label>
         <button className="primary" type="submit" disabled={busy}>
           Сохранить

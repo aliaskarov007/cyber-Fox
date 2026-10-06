@@ -117,6 +117,30 @@ export function pickPerMinuteTariff(
 }
 
 /**
+ * Поминутный тариф, на который гость переходит в любом случае.
+ *
+ * Пакет кончился, а в зоне сейчас не действует ни один поминутный тариф —
+ * например, поминутка заведена только «с 22:00», а ночной пакет кончился в
+ * 08:00. Останавливать игру из-за пробела в расписании нельзя: гость
+ * предупреждён, что дальше будет поминутно, и ждёт именно этого. Поэтому
+ * берём действующий сейчас, иначе тот, по которому уже играли, иначе
+ * круглосуточный, иначе любой включённый.
+ */
+export function pickFallbackPerMinute(
+  tariffs: PerMinuteTariffState[],
+  moment: LocalMoment,
+  currentId: string | null = null,
+): PerMinuteTariffState | null {
+  return (
+    pickPerMinuteTariff(tariffs, moment) ??
+    tariffs.find((t) => t.id === currentId) ??
+    tariffs.find((t) => t.activeFromMinute === null || t.activeToMinute === null) ??
+    tariffs[0] ??
+    null
+  );
+}
+
+/**
  * Пакет, которым играем следующим: своя зона, есть минуты, не сгорел.
  * Первым тратится тот, что и так сгорит раньше остальных.
  */
@@ -184,7 +208,9 @@ export function decideNextMinute(
         closeReason: SegmentEndReason.PACKAGE_EXHAUSTED,
       };
     }
-    const fallback = pickPerMinuteTariff(state.perMinuteTariffs, moment);
+    // Минуты пакета кончились — гость переходит на поминутку, игра не прерывается.
+    // Остановка только если в зоне нет ни одного поминутного тарифа вовсе.
+    const fallback = pickFallbackPerMinute(state.perMinuteTariffs, moment);
     if (!fallback) return { kind: "STOP", reason: SegmentEndReason.PACKAGE_EXHAUSTED };
     return {
       kind: "SWITCH_PER_MINUTE",
@@ -193,7 +219,8 @@ export function decideNextMinute(
     };
   }
 
-  const scheduled = pickPerMinuteTariff(state.perMinuteTariffs, moment);
+  // Пробел в расписании тарифов не обрывает игру: продолжаем по текущему.
+  const scheduled = pickFallbackPerMinute(state.perMinuteTariffs, moment, segment.tariffId);
   if (!scheduled) return { kind: "STOP", reason: SegmentEndReason.CREDIT_LIMIT };
 
   // Сменилось окно тарифа — например, наступил ночной час.

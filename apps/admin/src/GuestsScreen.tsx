@@ -294,7 +294,13 @@ function GuestCardPanel({
           <div className="rows">
             {card.packages.map((p) => (
               <div className="row" key={p.id}>
-                <span className="k">{p.minutesRemaining} мин</span>
+                <span className="k">
+                  {p.minutesRemaining} мин
+                  {/* Откуда лишние минуты — первое, о чём спросит гость. */}
+                  {p.carriedMinutes > 0 && ` · из них ${p.carriedMinutes} перенесено с прошлого абонемента`}
+                  {p.streak > 1 && ` · ${p.streak}-й абонемент подряд`}
+                  {p.renewedById && " · уже продлён"}
+                </span>
                 <span>до {new Date(p.expiresAt).toLocaleDateString("ru-KZ")}</span>
               </div>
             ))}

@@ -69,6 +69,39 @@ export class UpdateClubDto {
   @Min(0)
   @Max(10_000_000)
   consentBonus?: number;
+
+  /** Перенос остатка абонемента: процент при продлении. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverPercent?: number;
+
+  /** То же с третьего абонемента подряд. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverStreakPercent?: number;
+
+  /** Потолок переноса, процент от оплаченных минут нового абонемента. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverCapPercent?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  renewBeforeDays?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  renewAfterDays?: number;
 }
 
 export class CreateStaffDto {

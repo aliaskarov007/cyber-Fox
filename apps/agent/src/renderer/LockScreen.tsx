@@ -311,6 +311,8 @@ export function LockScreen({
 
         {notice && <div className="banner info">{notice}</div>}
         {error && <div className="error">{error}</div>}
+        {/* Абонемент скоро кончится — продлите, часть остатка переедет. */}
+        {card.renewalHint && <div className="banner warn">{card.renewalHint}</div>}
 
         <div className="rows">
           <div className="row">

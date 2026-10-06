@@ -282,3 +282,46 @@ describe("сценарий из спецификации целиком", () => 
     expect(stopReason).toBe(SegmentEndReason.CREDIT_LIMIT);
   });
 });
+
+describe("пакет кончился — всегда поминутка", () => {
+  // Поминутка в зоне заведена только на ночь, а сейчас утро после ночного пакета.
+  const nightOnly = dayTariff({ id: "t-night", activeFromMinute: 22 * 60, activeToMinute: 8 * 60 });
+  const morning: LocalMoment = { ...MONDAY_20_00, minuteOfDay: 8 * 60 };
+
+  it("переходит на поминутку, даже если по расписанию сейчас тарифа нет", () => {
+    const s = state({
+      currentSegment: { kind: "PACKAGE", tariffId: "t-pkg", guestPackageId: "p-1" },
+      packages: [pkg({ minutesRemaining: 0 })],
+      perMinuteTariffs: [nightOnly],
+    });
+    expect(decideNextMinute(s, morning)).toEqual({
+      kind: "SWITCH_PER_MINUTE",
+      tariffId: "t-night",
+      closeReason: SegmentEndReason.PACKAGE_EXHAUSTED,
+    });
+  });
+
+  it("и продолжает по нему, а не останавливает игру", () => {
+    const s = state({
+      currentSegment: { kind: "PER_MINUTE", tariffId: "t-night", guestPackageId: null },
+      perMinuteTariffs: [nightOnly],
+    });
+    expect(decideNextMinute(s, morning)).toEqual({
+      kind: "PAID_MINUTE",
+      tariffId: "t-night",
+      amount: PER_MINUTE,
+    });
+  });
+
+  it("останавливает только если поминутных тарифов в зоне нет вовсе", () => {
+    const s = state({
+      currentSegment: { kind: "PACKAGE", tariffId: "t-pkg", guestPackageId: "p-1" },
+      packages: [pkg({ minutesRemaining: 0 })],
+      perMinuteTariffs: [],
+    });
+    expect(decideNextMinute(s, morning)).toEqual({
+      kind: "STOP",
+      reason: SegmentEndReason.PACKAGE_EXHAUSTED,
+    });
+  });
+});

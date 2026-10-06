@@ -23,6 +23,14 @@ export interface Club {
   bonusPercent: number;
   /** Подарок за согласие на приглашения, в тиын. */
   consentBonus: number;
+  /** Перенос остатка абонемента при продлении, процентов. */
+  rolloverPercent: number;
+  /** То же с третьего абонемента подряд. */
+  rolloverStreakPercent: number;
+  /** Потолок переноса, процент от нового абонемента. */
+  rolloverCapPercent: number;
+  renewBeforeDays: number;
+  renewAfterDays: number;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -42,11 +50,17 @@ export interface Tariff {
   pricePerMinute: number | null;
   packageMinutes: number | null;
   packagePrice: number | null;
+  /** Обычный пакет (в том числе «N+M»), ночной или абонемент. */
+  packageFormat: PackageFormat;
+  /** Подарочные минуты сверх оплаченных. */
+  bonusMinutes: number;
   validityDays: number | null;
   activeFromMinute: number | null;
   activeToMinute: number | null;
   isActive: boolean;
 }
+
+export type PackageFormat = "MINUTES" | "NIGHT" | "SUBSCRIPTION";
 
 /**
  * Что отправляет форма тарифа.
@@ -62,6 +76,8 @@ export interface TariffInput {
   pricePerMinute?: number | null;
   packageMinutes?: number | null;
   packagePrice?: number | null;
+  packageFormat?: PackageFormat;
+  bonusMinutes?: number;
   validityDays?: number | null;
   activeFromMinute?: number | null;
   activeToMinute?: number | null;
@@ -219,6 +235,12 @@ export interface GuestPackage {
   minutesRemaining: number;
   minutesTotal: number;
   expiresAt: string;
+  /** Сколько из minutesTotal перенесено с прошлого абонемента. */
+  carriedMinutes: number;
+  /** Какой по счёту абонемент подряд. */
+  streak: number;
+  /** Абонемент уже продлён — остаток перенесётся, когда он кончится. */
+  renewedById: string | null;
 }
 
 export interface GuestCard {
@@ -522,6 +544,11 @@ export const api = {
       lowBalanceWarnMinutes: number;
       bonusPercent: number;
       consentBonus: number;
+      rolloverPercent: number;
+      rolloverStreakPercent: number;
+      rolloverCapPercent: number;
+      renewBeforeDays: number;
+      renewAfterDays: number;
     }>,
   ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
 

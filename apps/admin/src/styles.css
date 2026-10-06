@@ -837,3 +837,13 @@ label.check {
 label.check input {
   width: auto;
 }
+
+/* Шаблоны частых пакетов над формой тарифа. */
+.presets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
