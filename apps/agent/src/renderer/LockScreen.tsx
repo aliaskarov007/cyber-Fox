@@ -446,24 +446,24 @@ export function LockScreen({
           </div>
         )}
         <div className="choice-tiles">
-          <button type="button" className="tile" disabled={!online} onClick={() => choose("login")}>
-            <span className="tile-icon" aria-hidden>
+          <button type="button" className="entry" disabled={!online} onClick={() => choose("login")}>
+            <span className="entry-icon" aria-hidden>
               👤
             </span>
-            <span className="tile-title">У меня есть аккаунт</span>
-            <span className="tile-text">Войдите по номеру телефона и PIN — 5 секунд.</span>
-            <span className="tile-cta">Войти</span>
+            <span className="entry-title">У меня есть аккаунт</span>
+            <span className="entry-text">Войдите по номеру телефона и PIN — 5 секунд.</span>
+            <span className="entry-cta">Войти</span>
           </button>
-          <button type="button" className="tile new" disabled={!online} onClick={() => choose("register")}>
-            <span className="tile-icon" aria-hidden>
+          <button type="button" className="entry new" disabled={!online} onClick={() => choose("register")}>
+            <span className="entry-icon" aria-hidden>
               ✨
             </span>
-            <span className="tile-title">Я здесь впервые</span>
-            <span className="tile-text">
+            <span className="entry-title">Я здесь впервые</span>
+            <span className="entry-text">
               Регистрация за 30 секунд: номер, PIN и подтверждение в WhatsApp.
             </span>
-            {giftLabel && <span className="tile-badge">{giftLabel}</span>}
-            <span className="tile-cta">Зарегистрироваться</span>
+            {giftLabel && <span className="entry-badge">{giftLabel}</span>}
+            <span className="entry-cta">Зарегистрироваться</span>
           </button>
         </div>
         <button

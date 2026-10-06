@@ -688,7 +688,7 @@ button:disabled {
   gap: 24px;
 }
 
-.tile {
+.entry {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -702,20 +702,20 @@ button:disabled {
   font-weight: 400;
 }
 
-.tile:hover:not(:disabled) {
+.entry:hover:not(:disabled) {
   border-color: var(--muted);
 }
 
-.tile.new {
+.entry.new {
   border-color: var(--accent);
   background: linear-gradient(160deg, #2a1810 0%, var(--surface) 55%);
 }
 
-.tile.new:hover:not(:disabled) {
+.entry.new:hover:not(:disabled) {
   border-color: var(--accent-hover);
 }
 
-.tile-icon {
+.entry-icon {
   width: 64px;
   height: 64px;
   border-radius: 16px;
@@ -725,23 +725,23 @@ button:disabled {
   background: var(--surface-2);
 }
 
-.tile.new .tile-icon {
+.entry.new .entry-icon {
   background: var(--accent);
 }
 
-.tile-title {
+.entry-title {
   font-size: 34px;
   font-weight: 750;
   letter-spacing: -0.01em;
 }
 
-.tile-text {
+.entry-text {
   color: var(--muted);
   font-size: 18px;
   line-height: 1.5;
 }
 
-.tile-badge {
+.entry-badge {
   align-self: flex-start;
   background: var(--ok);
   color: #06140f;
@@ -751,7 +751,7 @@ button:disabled {
   font-size: 16px;
 }
 
-.tile-cta {
+.entry-cta {
   margin-top: auto;
   padding: 18px;
   border-radius: 12px;
@@ -762,7 +762,7 @@ button:disabled {
   border: 1px solid var(--line);
 }
 
-.tile.new .tile-cta {
+.entry.new .entry-cta {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -774,7 +774,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .tile {
+  .entry {
     min-height: 0;
   }
 }
