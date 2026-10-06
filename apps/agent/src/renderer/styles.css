@@ -758,7 +758,7 @@ button:disabled {
   background: none;
   border: 0;
   padding: 0 4px;
-  gap: 18px;
+  gap: 14px;
 }
 
 .login h1 {
@@ -780,7 +780,7 @@ button:disabled {
 
 .entry {
   display: grid;
-  grid-template-columns: 1fr 250px;
+  grid-template-columns: 1fr 226px;
   align-items: center;
   gap: 24px;
   padding: 28px 28px 28px 32px;
@@ -803,10 +803,11 @@ button:disabled {
 .entry-title {
   font-family: var(--display);
   font-weight: 650;
-  font-size: 34px;
+  font-size: 32px;
   display: flex;
   align-items: center;
   gap: 12px;
+  white-space: nowrap;
 }
 
 .entry-text {
@@ -823,6 +824,7 @@ button:disabled {
   background: var(--ember);
   padding: 4px 10px;
   border-radius: 8px;
+  white-space: nowrap;
 }
 
 .entry-act {
@@ -941,7 +943,7 @@ button:disabled {
 .numpad button {
   font-size: 28px;
   font-weight: 600;
-  padding: 14px 0;
+  padding: 11px 0;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   border-color: var(--glass-line);
@@ -959,8 +961,8 @@ button:disabled {
 }
 
 .qr {
-  width: 250px;
-  height: 250px;
+  width: 210px;
+  height: 210px;
   margin: 0 auto;
   display: block;
   border-radius: 10px;
@@ -1106,6 +1108,11 @@ button:disabled {
 .poster.empty {
   grid-template-rows: 1fr auto;
   padding-bottom: 30px;
+}
+
+/* Без ивентов окно не пустует сверху: приглашение стоит по центру. */
+.poster.empty .art {
+  justify-content: center;
 }
 
 .poster.empty h3 {
