@@ -28,4 +28,18 @@
   ; При удалении сторож не нужен вовсе: он будет пытаться запускать то, чего
   ; больше нет.
   nsExec::Exec 'schtasks /delete /tn "Cyber-Fox Watchdog" /f'
+  ; Постоянные запреты агент ставит сам и сам не снимает никогда — иначе
+  ; гость снимал бы их вместе с агентом. Возвращаем их только при удалении,
+  ; чтобы на машине без агента диспетчер задач и выход из системы работали.
+  ; Снимается в ветке того, кто удаляет: удаляйте из-под учётной записи гостя.
+  nsExec::Exec 'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Policies\Microsoft\Windows\System" /v DisableTaskMgr /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableRegistryTools /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Policies\Microsoft\Windows\System" /v DisableRegistryTools /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v HideFastUserSwitching /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Policies\Microsoft\Windows\System" /v HideFastUserSwitching /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableLockWorkstation /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Policies\Microsoft\Windows\System" /v DisableLockWorkstation /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v NoLogoff /f'
+  nsExec::Exec 'reg delete "HKCU\Software\Policies\Microsoft\Windows\Explorer" /v NoLogoff /f'
 !macroend

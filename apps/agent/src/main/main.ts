@@ -4,7 +4,13 @@ import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
-import { applyLockdown, releaseLockdown } from "./lockdown.js";
+import {
+  applyGuard,
+  applyLockdown,
+  releaseLockdown,
+  startTaskManagerGuard,
+  stopTaskManagerGuard,
+} from "./lockdown.js";
 import { scanInstalled } from "./scan.js";
 import { setPlaying, startUpdater } from "./updater.js";
 
@@ -285,7 +291,9 @@ ipcMain.handle("agent:lock", () => {
   unlocked = false;
   setPlaying(false);
   holdShortcuts();
-  void releaseLockdown();
+  // Запреты игры снимаются, а диспетчер задач и смена пользователя остаются
+  // закрытыми: экран блокировки — ровно то место, где их пробуют первыми.
+  void releaseLockdown().then(applyGuard);
   lockWindow?.show();
   lockWindow?.setKiosk(true);
   lockWindow?.setAlwaysOnTop(true, "screen-saver");
@@ -307,8 +315,12 @@ app.whenReady().then(() => {
    * Запреты снимаются на старте. Прошлая сессия могла оборваться падением
    * агента или машины, и тогда проводник остался бы закрытым до следующей
    * оплаты — на машине с диском это состояние переживает и перезагрузку.
+   *
+   * А диспетчер задач, regedit, выход и смена пользователя закрываются сразу,
+   * до первого гостя: иначе экран блокировки снимается через Ctrl+Shift+Esc.
    */
-  void releaseLockdown();
+  void releaseLockdown().then(applyGuard);
+  startTaskManagerGuard();
 
   try {
     // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
@@ -387,9 +399,9 @@ function asText(error: unknown): string {
 
 /*
  * Пока экран заблокирован, выйти из агента нельзя: Alt+F4 по окну и «Закрыть»
- * из панели задач не должны отдавать машину бесплатно. Это не защита от
- * диспетчера задач — тот закрывает процесс мимо Electron, и разбирается с ним
- * служба-сторож (см. docs/deploy.md).
+ * из панели задач не должны отдавать машину бесплатно. От диспетчера задач,
+ * который закрывает процесс мимо Electron, защищают политика DisableTaskMgr
+ * (lockdown.ts, ставится с запуска агента) и сторож (см. docs/deploy.md).
  */
 app.on("before-quit", (event) => {
   /*
@@ -405,6 +417,7 @@ app.on("before-quit", (event) => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  stopTaskManagerGuard();
   // Осознанный выход не должен оставлять машину с закрытым проводником.
   void releaseLockdown();
 });
