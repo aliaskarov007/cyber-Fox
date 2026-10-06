@@ -49,6 +49,7 @@ model Tenant {
   subscription Subscription?
   invoices     Invoice[]
   paymentIntents PaymentIntent[]
+  phoneVerifications PhoneVerification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -209,6 +210,9 @@ model Club {
   lowBalanceWarnMinutes Int @default(10)
   /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
   bonusPercent Int @default(0)
+  /// Подарок за согласие на приглашения, в тиын. Начисляется один раз на
+  /// гостя, в кошелёк этого зала. 0 — подарок выключен.
+  consentBonus Int @default(50000)
 
   /// Ключ клуба для бездисковых залов. Один на весь клуб, кладётся в общий
   /// образ рядом с агентом: машины называют себя MAC-адресом, а этот ключ
@@ -336,6 +340,41 @@ model ClubApp {
 ///
 /// Гость возвращается к двум-трём играм из сорока, и каждый раз искать их среди
 /// остальных — лишняя работа. Отмеченные встают первыми.
+enum ConsentSource {
+  /// Сам за игровым ПК.
+  AGENT
+  /// Администратор на стойке со слов гостя.
+  DESK
+}
+
+/// Регистрация с игрового ПК, ждущая подтверждения номера через WhatsApp.
+///
+/// Гость пишет код клубу с того самого номера — так доказывается, что номер
+/// его. Аккаунт появляется только после подтверждения: до него есть лишь эта
+/// запись, и по истечении срока она ничего не значит.
+model PhoneVerification {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId     String
+  computerId String
+
+  /// В виде +7XXXXXXXXXX.
+  phone   String
+  code    String
+  pinHash String
+
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  guestId    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, code])
+  @@index([computerId, createdAt])
+  @@index([tenantId])
+}
+
 model GuestFavourite {
   guestId String
   guest   Guest   @relation(fields: [guestId], references: [id], onDelete: Cascade)
@@ -480,6 +519,23 @@ model Guest {
   pinLockedUntil    DateTime?
 
   bonusPoints Int @default(0)
+
+  /// Номер подтверждён: гость написал с него в WhatsApp или его завёл
+  /// администратор, видя гостя перед собой. Неподтверждённый номер может забрать
+  /// его настоящий владелец (docs/guest-access.md, раздел 2).
+  phoneVerifiedAt DateTime?
+  /// Где зарегистрировался: по нему выбирают, кого звать на ивенты филиала.
+  registeredClubId String?
+
+  /// Согласие на приглашения. Хранится с текстом, который гость видел, и
+  /// местом, где он согласился: это доказательство согласия, а не галочка.
+  marketingConsentAt     DateTime?
+  marketingConsentSource ConsentSource?
+  marketingConsentText   String?
+  /// Отписка. Согласие при этом остаётся в истории, но рассылка ему не идёт.
+  marketingOptOutAt      DateTime?
+  /// Подарок за согласие выдан — второй раз не выдаётся, даже после отписки.
+  consentBonusGrantedAt  DateTime?
 
   wallets  GuestWallet[]
   packages GuestPackage[]

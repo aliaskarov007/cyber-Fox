@@ -11,8 +11,12 @@ import bcrypt from "bcryptjs";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
+import { normalizePhone, phoneTail } from "../common/phone.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
+import { canInvite } from "./consent.rules.js";
+import { ConsentService } from "./consent.service.js";
+import { findGuestByPhone } from "./guest-lookup.js";
 import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
 import { WalletService } from "./wallet.service.js";
 
@@ -29,6 +33,10 @@ export interface PublicGuest {
   phone: string;
   bonusPoints: number;
   hasPin: boolean;
+  /** Номер подтверждён через WhatsApp или администратором. */
+  phoneVerified: boolean;
+  /** Согласен на приглашения и не отписался. */
+  marketingConsent: boolean;
   createdAt: Date;
 }
 
@@ -113,6 +121,8 @@ export function toPublicGuest(guest: Guest): PublicGuest {
     phone: guest.phone,
     bonusPoints: guest.bonusPoints,
     hasPin: guest.pinHash !== null,
+    phoneVerified: guest.phoneVerifiedAt !== null,
+    marketingConsent: canInvite(guest),
     createdAt: guest.createdAt,
   };
 }
@@ -123,6 +133,7 @@ export class GuestsService {
     private readonly prisma: PrismaService,
     private readonly access: ClubAccessService,
     private readonly wallets: WalletService,
+    private readonly consents: ConsentService,
   ) {}
 
   async search(staff: AuthenticatedStaff, clubId: string, query: string): Promise<PublicGuest[]> {
@@ -138,6 +149,8 @@ export class GuestsService {
           ? {
               OR: [
                 { phone: { contains: trimmed } },
+                // «8 701 123 45 67» на стойке находит «+77011234567» в базе.
+                ...(normalizePhone(trimmed) ? [{ phone: normalizePhone(trimmed) as string }] : []),
                 { fullName: { contains: trimmed, mode: "insensitive" } },
               ],
             }
@@ -156,23 +169,70 @@ export class GuestsService {
     dto: CreateGuestDto,
   ): Promise<PublicGuest> {
     await this.access.requireClub(staff, clubId);
-    const phone = dto.phone.trim();
+    const phone = normalizePhone(dto.phone);
+    if (!phone) throw new BadRequestException("Проверьте номер телефона");
 
-    const existing = await this.prisma.guest.findUnique({
-      where: { tenantId_phone: { tenantId: staff.tenantId, phone } },
-    });
-    if (existing) throw new BadRequestException("Гость с таким телефоном уже есть");
+    const name = dto.fullName?.trim() || `Гость ${phoneTail(phone)}`;
+    const pinHash = dto.pin ? await bcrypt.hash(dto.pin, 10) : null;
+    // Администратор видит гостя перед собой — номер считается подтверждённым.
+    const verifiedNow = new Date();
 
-    const guest = await this.prisma.guest.create({
-      data: {
-        tenantId: staff.tenantId,
-        fullName: dto.fullName.trim(),
-        phone,
-        pinHash: dto.pin ? await bcrypt.hash(dto.pin, 10) : null,
-      },
-    });
+    const existing = await findGuestByPhone(this.prisma, staff.tenantId, phone);
+    let guest: Guest;
+    if (existing && existing.phoneVerifiedAt) {
+      throw new BadRequestException("Гость с таким телефоном уже есть");
+    } else if (existing) {
+      /*
+       * Номер записал себе кто-то за игровым ПК, но не подтвердил. Владелец
+       * номера пришёл на стойку — аккаунт переходит к нему, а PIN того, кто
+       * регистрировался, перестаёт действовать.
+       */
+      guest = await this.prisma.guest.update({
+        where: { id: existing.id },
+        data: {
+          fullName: name,
+          phone,
+          pinHash,
+          failedPinAttempts: 0,
+          pinLockedUntil: null,
+          phoneVerifiedAt: verifiedNow,
+        },
+      });
+    } else {
+      guest = await this.prisma.guest.create({
+        data: {
+          tenantId: staff.tenantId,
+          fullName: name,
+          phone,
+          pinHash,
+          phoneVerifiedAt: verifiedNow,
+          registeredClubId: clubId,
+        },
+      });
+    }
+
+    if (dto.marketingConsent) {
+      await this.consents.give(guest.id, clubId, "DESK", this.prisma);
+      guest = await this.prisma.guest.findUniqueOrThrow({ where: { id: guest.id } });
+    }
 
     return toPublicGuest(guest);
+  }
+
+  /** Согласие на приглашения со слов гостя на стойке — или отказ от них. */
+  async setConsent(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    guestId: string,
+    consent: boolean,
+  ): Promise<{ bonus: number }> {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+    if (!consent) {
+      await this.consents.withdraw(guest.id);
+      return { bonus: 0 };
+    }
+    return { bonus: await this.consents.give(guest.id, clubId, "DESK", this.prisma) };
   }
 
   /** Карточка гостя глазами конкретного клуба: баланс его кошелька и минуты этого зала. */
@@ -395,8 +455,13 @@ export class GuestsService {
         // Сотрудник, меняющий PIN, заодно снимает блокировку после перебора.
         failedPinAttempts: 0,
         pinLockedUntil: null,
+        // PIN задают гостю, стоящему у стойки, — его номер тем самым подтверждён.
+        phoneVerifiedAt: guest.phoneVerifiedAt ?? new Date(),
       },
     });
+
+    // Согласие могло ждать подтверждения номера — тогда подарок выдаётся сейчас.
+    await this.consents.grantBonus(this.prisma, guest.id, clubId);
   }
 
   private async requireGuest(tenantId: string, guestId: string): Promise<Guest> {

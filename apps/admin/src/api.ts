@@ -21,6 +21,8 @@ export interface Club {
   lowBalanceWarnMinutes: number;
   /** Процент от потраченного, возвращаемый бонусами. 0 — программа выключена. */
   bonusPercent: number;
+  /** Подарок за согласие на приглашения, в тиын. */
+  consentBonus: number;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -488,6 +490,7 @@ export const api = {
       packageValidityDays: number;
       lowBalanceWarnMinutes: number;
       bonusPercent: number;
+      consentBonus: number;
     }>,
   ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
 

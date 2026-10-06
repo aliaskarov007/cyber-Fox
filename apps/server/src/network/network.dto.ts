@@ -61,6 +61,13 @@ export class UpdateClubDto {
   @Min(0)
   @Max(100)
   bonusPercent?: number;
+
+  /** Подарок за согласие на приглашения, в тиын. 0 — без подарка. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  consentBonus?: number;
 }
 
 export class CreateStaffDto {

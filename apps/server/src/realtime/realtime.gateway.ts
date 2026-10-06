@@ -15,6 +15,7 @@ import type { OfflineOperationInput } from "../offline/offline.service.js";
 import { OfflineService } from "../offline/offline.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
+import { GuestSignupService } from "../guest-signup/guest-signup.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
@@ -45,6 +46,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly offline: OfflineService,
     private readonly sessions: SessionsService,
     private readonly library: LibraryService,
+    private readonly signup: GuestSignupService,
   ) {}
 
   onModuleInit(): void {
@@ -204,6 +206,47 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     return this.agents.guestLogin(computerId, body.phone, body.pin);
+  }
+
+  /** Первый шаг входа: знаком ли номер. */
+  @SubscribeMessage("guest.lookup")
+  async guestLookup(@ConnectedSocket() client: Socket, @MessageBody() body: { phone: string }) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    return this.signup.lookup(computerId, String(body?.phone ?? ""));
+  }
+
+  /** Регистрация нового гостя прямо за ПК. */
+  @SubscribeMessage("guest.register")
+  async guestRegister(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { phone: string; pin: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    return this.signup.register(computerId, String(body?.phone ?? ""), String(body?.pin ?? ""));
+  }
+
+  /** Экран ждёт, когда гость отправит код в WhatsApp. */
+  @SubscribeMessage("guest.register.status")
+  async guestRegisterStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { verificationId: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { state: "EXPIRED" };
+    return this.signup.status(computerId, String(body?.verificationId ?? ""));
+  }
+
+  /** Ответ на вопрос о приглашениях сразу после регистрации. */
+  @SubscribeMessage("guest.consent")
+  async guestConsent(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { guestId: string; accept: boolean },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, bonus: 0, reason: "ПК не опознан" };
+    return this.signup.answerConsent(computerId, String(body?.guestId ?? ""), body?.accept === true);
   }
 
   @SubscribeMessage("session.start")

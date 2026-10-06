@@ -1,5 +1,6 @@
 import { PaymentMethod } from "@prisma/client";
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -10,18 +11,29 @@ import {
 } from "class-validator";
 
 export class CreateGuestDto {
+  /** Необязательно: без имени гость записывается как «Гость 4567». */
+  @IsOptional()
   @IsString()
-  @MinLength(2)
-  fullName!: string;
+  fullName?: string;
 
   @IsString()
   @MinLength(5)
   phone!: string;
 
-  /** PIN для самостоятельного входа за игровым ПК. */
+  /** PIN для самостоятельного входа. Можно не задавать — гость придумает сам за ПК. */
   @IsOptional()
   @Matches(/^\d{4}$/, { message: "PIN — четыре цифры" })
   pin?: string;
+
+  /** Гость сказал администратору, что согласен на приглашения. */
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
+}
+
+export class ConsentDto {
+  @IsBoolean()
+  consent!: boolean;
 }
 
 export class TopUpDto {

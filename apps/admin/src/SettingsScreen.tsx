@@ -93,6 +93,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
   const [validity, setValidity] = useState(String(club.packageValidityDays));
   const [warn, setWarn] = useState(String(club.lowBalanceWarnMinutes));
   const [bonus, setBonus] = useState(String(club.bonusPercent));
+  const [consentBonus, setConsentBonus] = useState(String(club.consentBonus / 100));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +104,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
     setValidity(String(club.packageValidityDays));
     setWarn(String(club.lowBalanceWarnMinutes));
     setBonus(String(club.bonusPercent));
+    setConsentBonus(String(club.consentBonus / 100));
   }, [club]);
 
   async function submit(event: FormEvent): Promise<void> {
@@ -115,6 +117,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         packageValidityDays: Number(validity),
         lowBalanceWarnMinutes: Number(warn),
         bonusPercent: Number(bonus),
+        consentBonus: toTiyn(consentBonus),
       });
       onSaved("Настройки зала сохранены");
     } catch (cause) {
@@ -146,6 +149,14 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         <label>
           Бонусы, % от потраченного
           <input inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} />
+        </label>
+        <label>
+          Подарок за подписку на приглашения, ₸ (0 — без подарка)
+          <input
+            inputMode="decimal"
+            value={consentBonus}
+            onChange={(e) => setConsentBonus(e.target.value)}
+          />
         </label>
         <button className="primary" type="submit" disabled={busy}>
           Сохранить
