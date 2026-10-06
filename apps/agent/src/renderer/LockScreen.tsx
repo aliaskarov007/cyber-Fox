@@ -32,7 +32,7 @@ type Step =
       businessNumber: string;
       expiresAt: number;
     }
-  | { kind: "consent"; guestId: string; text: string; bonus: number };
+  | { kind: "consent"; guestId: string; text: string; bonus: number; verified: boolean };
 
 /** Как часто экран спрашивает, пришло ли сообщение в WhatsApp. */
 const STATUS_POLL_MS = 2000;
@@ -146,7 +146,14 @@ export function LockScreen({
           expiresAt: new Date(result.expiresAt).getTime(),
         });
       } else {
-        setStep({ kind: "consent", guestId: result.guestId, text: result.consentText, bonus: result.bonus });
+        // WhatsApp не подключён: аккаунт есть, номер подтвердит администратор.
+        setStep({
+          kind: "consent",
+          guestId: result.guestId,
+          text: result.consentText,
+          bonus: result.bonus,
+          verified: false,
+        });
       }
     } catch (cause) {
       setPin("");
@@ -167,7 +174,13 @@ export function LockScreen({
         .then((status) => {
           if (stopped) return;
           if (status.state === "DONE") {
-            setStep({ kind: "consent", guestId: status.guestId, text: status.consentText, bonus: status.bonus });
+            setStep({
+              kind: "consent",
+              guestId: status.guestId,
+              text: status.consentText,
+              bonus: status.bonus,
+              verified: true,
+            });
           } else if (status.state === "EXPIRED") {
             setPin("");
             setStep({ kind: "newPin" });
@@ -326,7 +339,7 @@ export function LockScreen({
   if (step.kind === "consent") {
     return (
       <div className="card">
-        <h1>Готово, номер подтверждён!</h1>
+        <h1>{step.verified ? "Готово, номер подтверждён!" : "Готово, аккаунт создан!"}</h1>
         {error && <div className="error">{error}</div>}
         <div className="consent-offer">
           {step.bonus > 0 && <div className="gift">+{formatMoney(step.bonus)}</div>}
@@ -434,9 +447,13 @@ export function LockScreen({
         <button type="button" disabled={busy || !online} onClick={() => press("0")}>
           0
         </button>
-        <button type="button" className="ghost" disabled={busy} onClick={() => press("back")}>
-          {pinStep ? "⌫" : ""}
-        </button>
+        {pinStep ? (
+          <button type="button" className="ghost" disabled={busy} onClick={() => press("back")}>
+            ⌫
+          </button>
+        ) : (
+          <span />
+        )}
       </div>
 
       {busy && <div className="waiting">Проверяем…</div>}
