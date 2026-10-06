@@ -15,6 +15,7 @@ import type { OfflineOperationInput } from "../offline/offline.service.js";
 import { OfflineService } from "../offline/offline.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
+import { AfishaService } from "../afisha/afisha.service.js";
 import { GuestSignupService } from "../guest-signup/guest-signup.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
@@ -47,6 +48,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly sessions: SessionsService,
     private readonly library: LibraryService,
     private readonly signup: GuestSignupService,
+    private readonly afisha: AfishaService,
   ) {}
 
   onModuleInit(): void {
@@ -81,6 +83,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
      */
     this.bus.on("library.changed", (e) => {
       this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
+    });
+    this.bus.on("afisha.changed", (e) => {
+      for (const clubId of e.clubIds) this.server.to(clubAgentsRoom(clubId)).emit("afisha.changed", {});
     });
   }
 
@@ -209,6 +214,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     return this.agents.guestLogin(computerId, body.phone, body.pin);
+  }
+
+  /** Афиша сети и её подпись для экрана блокировки. */
+  @SubscribeMessage("afisha.fetch")
+  async afishaFetch(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, events: [], brand: null };
+    return { ok: true, ...(await this.afisha.forScreen(computerId)) };
   }
 
   /** Первый шаг входа: знаком ли номер. */

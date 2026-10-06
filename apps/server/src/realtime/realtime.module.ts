@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module.js";
+import { AfishaModule } from "../afisha/afisha.module.js";
 import { GuestSignupModule } from "../guest-signup/guest-signup.module.js";
 import { GuestsModule } from "../guests/guests.module.js";
 import { LibraryModule } from "../library/library.module.js";
@@ -10,7 +11,7 @@ import { AgentService } from "./agent.service.js";
 import { RealtimeGateway } from "./realtime.gateway.js";
 
 @Module({
-  imports: [AuthModule, SessionsModule, GuestsModule, GuestSignupModule, OfflineModule, LibraryModule],
+  imports: [AfishaModule, AuthModule, SessionsModule, GuestsModule, GuestSignupModule, OfflineModule, LibraryModule],
   providers: [RealtimeGateway, AgentService],
 })
 export class RealtimeModule {}

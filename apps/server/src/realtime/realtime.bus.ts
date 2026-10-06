@@ -41,6 +41,8 @@ export interface RealtimeEvents {
    * список всем сорока при каждой правке дороже, чем сказать «обнови».
    */
   "library.changed": { clubId: string };
+  /* Афиша или подпись сети изменились: ПК всех клубов сети забирают их заново. */
+  "afisha.changed": { clubIds: string[] };
 }
 
 @Injectable()

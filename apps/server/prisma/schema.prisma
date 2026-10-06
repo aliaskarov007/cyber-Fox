@@ -43,6 +43,9 @@ model Tenant {
   /// Аккаунт и история визитов общие в обоих случаях.
   sharedBalance Boolean @default(false)
 
+  /// Лозунг под названием сети на экране блокировки.
+  slogan String @default("территория эпичных побед")
+
   clubs        Club[]
   guests       Guest[]
   staff        Staff[]
@@ -50,6 +53,7 @@ model Tenant {
   invoices     Invoice[]
   paymentIntents PaymentIntent[]
   phoneVerifications PhoneVerification[]
+  events       ClubEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -237,6 +241,7 @@ model Club {
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
+  events    ClubEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -340,6 +345,36 @@ model ClubApp {
 ///
 /// Гость возвращается к двум-трём играм из сорока, и каждый раз искать их среди
 /// остальных — лишняя работа. Отмеченные встают первыми.
+/// Ивент в афише: турнир, LAN-вечеринка, акция. Показывается на экранах
+/// блокировки всех ПК сети, пока не начался, и ещё немного после начала.
+model ClubEvent {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Где проходит. Пусто — во всей сети или онлайн.
+  clubId String?
+  club   Club?   @relation(fields: [clubId], references: [id], onDelete: SetNull)
+
+  title    String
+  /// Что за ивент одной строкой: «Турнир CS2, команды 5 на 5».
+  subtitle String?
+  startsAt DateTime
+
+  /// Строки афиши — свободным текстом: призы, взносы и места у разных ивентов
+  /// выглядят по-разному, и подгонять их под числа незачем.
+  prize     String?
+  fee       String?
+  seats     String?
+  howToJoin String?
+
+  isPublished Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, startsAt])
+}
+
 enum ConsentSource {
   /// Сам за игровым ПК.
   AGENT

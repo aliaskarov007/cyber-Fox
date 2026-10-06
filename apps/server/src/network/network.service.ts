@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { RealtimeBus } from "../realtime/realtime.bus.js";
 import type {
   CreateClubDto,
   CreateStaffDto,
@@ -29,7 +30,10 @@ export interface PublicStaff {
  */
 @Injectable()
 export class NetworkService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bus: RealtimeBus,
+  ) {}
 
   async tenant(staff: AuthenticatedStaff): Promise<Tenant> {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
@@ -159,6 +163,13 @@ export class NetworkService {
   async updateTenant(staff: AuthenticatedStaff, dto: UpdateTenantDto): Promise<Tenant> {
     this.requireOwner(staff);
     const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
+
+    if (dto.slogan !== undefined) {
+      await this.prisma.tenant.update({ where: { id: tenant.id }, data: { slogan: dto.slogan.trim() } });
+      // Подпись видна на экранах ПК — пусть обновится сразу, а не после перезапуска.
+      const clubs = await this.prisma.club.findMany({ where: { tenantId: tenant.id }, select: { id: true } });
+      this.bus.emit("afisha.changed", { clubIds: clubs.map((c) => c.id) });
+    }
 
     if (dto.sharedBalance === undefined || dto.sharedBalance === tenant.sharedBalance) {
       return this.prisma.tenant.update({

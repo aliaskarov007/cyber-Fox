@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from "class-validator";
@@ -125,6 +126,13 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsBoolean()
   sharedBalance?: boolean;
+
+  /** Лозунг под названием сети на экране блокировки. */
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(48)
+  slogan?: string;
 
   /**
    * Куда переносить остатки при выключении общего кошелька.

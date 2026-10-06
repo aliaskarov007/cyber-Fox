@@ -6,6 +6,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 
 import { ApiThrottlerGuard } from "./common/throttler.guard.js";
 
+import { AfishaModule } from "./afisha/afisha.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { SubscriptionModule } from "./billing-platform/subscription.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
@@ -57,6 +58,7 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     ProductsModule,
     LibraryModule,
     NetworkModule,
+    AfishaModule,
     ReportsModule,
     SignupModule,
     ImportModule,
