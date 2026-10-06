@@ -63,20 +63,6 @@ export function LockScreen({
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  /* Молчащая кнопка вызова заставляет гостя жать её ещё несколько раз, а на
-     стойке это выглядит как несколько вызовов с одной машины. */
-  const [called, setCalled] = useState(false);
-
-  /*
-   * Кнопка возвращается в исходное через минуту. Таймер снимается при уходе с
-   * экрана: сессия заканчивается блокировкой, компонент исчезает, и оставленный
-   * таймер дёргал бы состояние уже несуществующего экрана.
-   */
-  useEffect(() => {
-    if (!called) return;
-    const timer = setTimeout(() => setCalled(false), 60_000);
-    return () => clearTimeout(timer);
-  }, [called]);
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
 
@@ -435,7 +421,7 @@ export function LockScreen({
   }
 
   if (step.kind === "choose") {
-    const giftLabel = consentBonus > 0 ? `+${formatMoney(consentBonus)} в подарок` : null;
+    const gift = consentBonus > 0 ? `+${formatMoney(consentBonus)}` : null;
     return (
       <div className="choice">
         {error && <div className="error">{error}</div>}
@@ -445,37 +431,22 @@ export function LockScreen({
             администратору.
           </div>
         )}
-        <div className="choice-tiles">
-          <button type="button" className="entry" disabled={!online} onClick={() => choose("login")}>
-            <span className="entry-icon" aria-hidden>
-              👤
-            </span>
+        <button type="button" className="entry" disabled={!online} onClick={() => choose("login")}>
+          <span>
             <span className="entry-title">У меня есть аккаунт</span>
-            <span className="entry-text">Войдите по номеру телефона и PIN — 5 секунд.</span>
-            <span className="entry-cta">Войти</span>
-          </button>
-          <button type="button" className="entry new" disabled={!online} onClick={() => choose("register")}>
-            <span className="entry-icon" aria-hidden>
-              ✨
+            <span className="entry-text">Вход по номеру и PIN — 5 секунд.</span>
+          </span>
+          <span className="entry-act">Войти</span>
+        </button>
+        <button type="button" className="entry new" disabled={!online} onClick={() => choose("register")}>
+          <span>
+            <span className="entry-title">
+              Я здесь впервые
+              {gift && <span className="entry-gift">{gift}</span>}
             </span>
-            <span className="entry-title">Я здесь впервые</span>
-            <span className="entry-text">
-              Регистрация за 30 секунд: номер, PIN и подтверждение в WhatsApp.
-            </span>
-            {giftLabel && <span className="entry-badge">{giftLabel}</span>}
-            <span className="entry-cta">Зарегистрироваться</span>
-          </button>
-        </div>
-        <button
-          className="ghost call"
-          type="button"
-          disabled={called}
-          onClick={() => {
-            setCalled(true);
-            void client.callStaff();
-          }}
-        >
-          {called ? "Администратор идёт" : "Позвать администратора"}
+            <span className="entry-text">Номер, PIN и WhatsApp — 30 секунд.</span>
+          </span>
+          <span className="entry-act">Зарегистрироваться</span>
         </button>
       </div>
     );
@@ -561,17 +532,6 @@ export function LockScreen({
         <div className="note">Поминутный тариф этой зоны — {formatMoney(perMinutePrice)}/мин.</div>
       )}
 
-      <button
-        className="ghost"
-        type="button"
-        disabled={called}
-        onClick={() => {
-          setCalled(true);
-          void client.callStaff();
-        }}
-      >
-        {called ? "Администратор идёт" : "Позвать администратора"}
-      </button>
     </div>
   );
 }

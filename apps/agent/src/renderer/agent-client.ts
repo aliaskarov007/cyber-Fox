@@ -33,6 +33,25 @@ export interface GuestLoginResult {
   minutesAffordable: number | null;
 }
 
+/** Ивент в афише на экране блокировки. */
+export interface AfishaEvent {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  startsAt: string;
+  clubName: string | null;
+  prize: string | null;
+  fee: string | null;
+  seats: string | null;
+  howToJoin: string | null;
+}
+
+export interface Afisha {
+  ok: boolean;
+  brand: { name: string; slogan: string } | null;
+  events: AfishaEvent[];
+}
+
 export type LookupResult =
   | { ok: true; phone: string; next: "PIN" | "REGISTER" }
   | { ok: false; reason: string };
@@ -109,6 +128,8 @@ export class AgentClient {
     onRejected: (reason: string) => void;
     /** Каталог клуба изменился: полки надо перечитать. */
     onLibraryChanged: () => void;
+    /** Афиша или подпись сети изменились. */
+    onAfishaChanged: () => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
 
@@ -141,6 +162,7 @@ export class AgentClient {
     this.socket.on("session.switched", handlers.onSwitched);
     this.socket.on("lock", handlers.onLock);
     this.socket.on("library.changed", handlers.onLibraryChanged);
+    this.socket.on("afisha.changed", handlers.onAfishaChanged);
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
@@ -148,6 +170,11 @@ export class AgentClient {
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {
     return this.request("guest.login", { phone, pin });
+  }
+
+  /** Афиша сети и её подпись для экрана блокировки. */
+  afisha(): Promise<Afisha> {
+    return this.request("afisha.fetch", {});
   }
 
   /** Первый шаг: знаком ли номер — дальше PIN или регистрация. */

@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AgentSettings } from "../shared/settings.js";
-import { AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
+import { type Afisha, AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
+import { splitBrand } from "./afisha-format.js";
 import type { LibraryApp } from "../shared/library.js";
 import { LockScreen } from "./LockScreen.js";
+import { Poster } from "./Poster.js";
+import { Scene } from "./Scene.js";
 import { Shell } from "./Shell.js";
 import { SessionBar } from "./SessionBar.js";
 import { SetupScreen } from "./SetupScreen.js";
@@ -42,6 +45,8 @@ export function App() {
   const [favourites, setFavourites] = useState<string[]>([]);
   /** Локальный остаток на время обрыва: показываем его вместо серверного. */
   const [localMinutes, setLocalMinutes] = useState<number | null>(null);
+  /** Афиша сети и её подпись для экрана блокировки. */
+  const [afisha, setAfisha] = useState<Afisha | null>(null);
   const started = useRef(false);
   const journal = useRef<JournalState>(emptyJournal());
 
@@ -50,6 +55,12 @@ export function App() {
     if (!result?.ok) return;
     setApps(result.apps);
     setFavourites(result.favourites ?? []);
+  }, [client]);
+
+  const loadAfisha = useCallback(async () => {
+    const result = await client.afisha().catch(() => null);
+    // Старый сервер о рекламе не знает — экран просто остаётся без неё.
+    if (result?.ok) setAfisha(result);
   }, [client]);
 
   /** Досылка накопленного. Очередь чистится только по подтверждению сервера. */
@@ -101,6 +112,7 @@ export function App() {
         // Полки нужны раньше, чем гость сядет: пустая оболочка в момент старта
         // сессии выглядит как сломанная система.
         void loadLibrary();
+        void loadAfisha();
         /*
          * Заодно рассказываем, что на машине установлено. Владелец увидит
          * список в кассе и отберёт, что показывать гостю: заводить сорок игр
@@ -112,6 +124,7 @@ export function App() {
           .catch(() => null);
       },
       onLibraryChanged: () => void loadLibrary(),
+      onAfishaChanged: () => void loadAfisha(),
       onRejected: setRejection,
       onTick: (next) => {
         setTick(next);
@@ -302,43 +315,136 @@ export function App() {
     );
   }
 
+  const [brandHead, brandDash, brandTail] = splitBrand(afisha?.brand?.name ?? "Cyber-Fox");
+
   return (
-    <div className="screen">
-      <div className="pc-id">
-        <div className="name">{paired?.computerName ?? "—"}</div>
-        <div className="zone">
-          {paired ? `${paired.clubName} · ${paired.zoneName}` : "Подключаемся к серверу"}
+    <LockStage>
+      <Scene />
+      <div className="frame">
+        <div className="brand">
+          <div className="word">
+            {brandHead}
+            {brandDash && <span>{brandDash}</span>}
+            {brandTail}
+          </div>
+          <div className="sub">{afisha?.brand?.slogan ?? "территория эпичных побед"}</div>
         </div>
+
+        <section className="win login">
+          <div className="pc">
+            {/* Номер ПК крупно: его гость называет администратору. */}
+            <div className="num">{paired?.computerName ?? "—"}</div>
+            <div className="where">
+              {paired ? (
+                <>
+                  {paired.zoneName}
+                  <br />
+                  {paired.clubName}
+                </>
+              ) : (
+                "Подключаемся к серверу"
+              )}
+            </div>
+          </div>
+
+          {switchNote && <div className="banner info">{switchNote}</div>}
+
+          {!online && displayTick && (
+            <div className="banner warn">
+              Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
+              связь вернётся.
+            </div>
+          )}
+
+          <LockScreen
+            client={client}
+            perMinutePrice={null}
+            consentBonus={paired?.consentBonus ?? 0}
+            online={online}
+            onStarted={() => {
+              started.current = true;
+              void window.cyberfox.unlock();
+            }}
+          />
+
+          {/* Обрыв связи прятать нельзя: гость должен понимать, почему не проходит вход. */}
+          <div className="foot">
+            <span className={`online ${online ? "" : "off"}`}>
+              <i />
+              {online
+                ? "Связь с сервером есть"
+                : `Нет связи с сервером${queued > 0 ? ` · в очереди операций: ${queued}` : ""}`}
+            </span>
+            <CallStaff client={client} />
+          </div>
+        </section>
+
+        <Poster events={afisha?.events ?? []} consentBonus={paired?.consentBonus ?? 0} />
       </div>
+    </LockStage>
+  );
+}
 
-      {switchNote && <div className="banner info">{switchNote}</div>}
+/**
+ * Экран блокировки рисуется на холсте 1920×1080 и целиком масштабируется под
+ * монитор. В зале стоят и 1366×768, и 2560×1440: подгонять сетку под каждый
+ * значит получить разъехавшиеся окна на половине машин, а масштаб сохраняет
+ * композицию одинаковой везде.
+ */
+function LockStage({ children }: { children: ReactNode }) {
+  const [fit, setFit] = useState(() => stageFit());
 
-      {!online && displayTick && (
-        <div className="banner warn">
-          Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
-          связь вернётся.
-        </div>
-      )}
+  useEffect(() => {
+    const onResize = (): void => setFit(stageFit());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
-      {(
-        <LockScreen
-          client={client}
-          perMinutePrice={null}
-          consentBonus={paired?.consentBonus ?? 0}
-          online={online}
-          onStarted={() => {
-            started.current = true;
-            void window.cyberfox.unlock();
-          }}
-        />
-      )}
-
-      {/* Обрыв связи прятать нельзя: гость должен понимать, почему не проходит вход. */}
-      <div className={`status ${online ? "" : "offline"}`}>
-        {online
-          ? "связь с сервером есть"
-          : `нет связи с сервером${queued > 0 ? ` · в очереди операций: ${queued}` : ""}`}
+  return (
+    <div className="stage-backdrop">
+      <div
+        className="stage"
+        style={{ transform: `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` }}
+      >
+        {children}
       </div>
     </div>
+  );
+}
+
+function stageFit(): { scale: number; x: number; y: number } {
+  const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  return {
+    scale,
+    x: (window.innerWidth - 1920 * scale) / 2,
+    y: (window.innerHeight - 1080 * scale) / 2,
+  };
+}
+
+/**
+ * Вызов администратора. Молчащая кнопка заставляет гостя жать её ещё
+ * несколько раз, а на стойке это выглядит как несколько вызовов с одной машины.
+ */
+function CallStaff({ client }: { client: AgentClient }) {
+  const [called, setCalled] = useState(false);
+
+  useEffect(() => {
+    if (!called) return;
+    const timer = setTimeout(() => setCalled(false), 60_000);
+    return () => clearTimeout(timer);
+  }, [called]);
+
+  return (
+    <button
+      type="button"
+      className="call"
+      disabled={called}
+      onClick={() => {
+        setCalled(true);
+        void client.callStaff();
+      }}
+    >
+      {called ? "Администратор идёт" : "Позвать администратора"}
+    </button>
   );
 }
