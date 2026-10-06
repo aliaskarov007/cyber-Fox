@@ -165,7 +165,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       zoneId: string;
       name: string;
       zone: { name: string };
-      club: { name: string };
+      club: { name: string; consentBonus: number };
     },
   ): Promise<void> {
     client.data.computerId = computer.id;
