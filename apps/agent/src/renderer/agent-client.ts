@@ -19,6 +19,8 @@ export interface PairedInfo {
   computerName: string;
   zoneName: string;
   clubName: string;
+  /** Подарок за подписку на приглашения, в тиын. У старого сервера поля нет. */
+  consentBonus?: number;
 }
 
 export interface GuestLoginResult {

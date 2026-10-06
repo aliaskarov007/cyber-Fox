@@ -324,6 +324,7 @@ export function App() {
         <LockScreen
           client={client}
           perMinutePrice={null}
+          consentBonus={paired?.consentBonus ?? 0}
           online={online}
           onStarted={() => {
             started.current = true;

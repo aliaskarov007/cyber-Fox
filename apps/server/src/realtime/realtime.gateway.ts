@@ -178,6 +178,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       computerName: computer.name,
       zoneName: computer.zone.name,
       clubName: computer.club.name,
+      // Подарок за подписку показывается ещё на первом экране — как повод
+      // зарегистрироваться.
+      consentBonus: computer.club.consentBonus,
     });
 
     // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние

@@ -9,19 +9,25 @@ import { NATIONAL_LENGTH, addDigit, formatNational, fullPhone } from "./phone-in
 import { encodeQr, qrPath } from "./qr.js";
 
 /**
- * Экран блокировки: один путь для всех.
+ * Экран блокировки.
  *
- * Гость набирает номер — дальше система сама решает, что нужно: знакомому
- * номеру PIN, новому — придумать PIN и подтвердить номер через WhatsApp.
- * Кнопок «Войти» и «Регистрация» нет: десятая цифра номера и четвёртая цифра
- * PIN сами отправляют запрос (docs/guest-access.md, раздел 2).
+ * Первым делом гость выбирает одно из двух: «У меня есть аккаунт» или «Я здесь
+ * впервые». Выбор нужен ради понятности — новичок видит, куда ему, — но ничего
+ * не ломает, если сделан неверно: дальше всё равно решает номер. Знакомому
+ * номеру нужен PIN, новому — придумать PIN и подтвердить номер через WhatsApp.
+ * Десятая цифра номера и четвёртая цифра PIN сами отправляют запрос
+ * (docs/guest-access.md, раздел 2).
  *
  * Всё набирается экранной клавиатурой мышью или цифрами на клавиатуре — что
  * гостю ближе.
  */
 
+/** Что выбрал гость на первом экране. */
+type Intent = "login" | "register";
+
 type Step =
-  | { kind: "phone" }
+  | { kind: "choose" }
+  | { kind: "phone"; intent: Intent }
   | { kind: "pin" }
   | { kind: "newPin" }
   | {
@@ -40,16 +46,19 @@ const STATUS_POLL_MS = 2000;
 export function LockScreen({
   client,
   perMinutePrice,
+  consentBonus,
   online,
   onStarted,
 }: {
   client: AgentClient;
   perMinutePrice: number | null;
+  /** Подарок за подписку — на первом экране как повод зарегистрироваться. */
+  consentBonus: number;
   /** Без связи с сервером вход невозможен: проверить PIN и баланс некому. */
   online: boolean;
   onStarted: () => void;
 }) {
-  const [step, setStep] = useState<Step>({ kind: "phone" });
+  const [step, setStep] = useState<Step>({ kind: "choose" });
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -72,7 +81,7 @@ export function LockScreen({
   const [card, setCard] = useState<GuestLoginResult | null>(null);
 
   function restart(message: string | null = null): void {
-    setStep({ kind: "phone" });
+    setStep({ kind: "choose" });
     setPhone("");
     setPin("");
     setCard(null);
@@ -95,8 +104,21 @@ export function LockScreen({
     [client, phone],
   );
 
-  /** Номер набран полностью — спрашиваем сервер, что дальше. */
-  async function submitPhone(digits: string): Promise<void> {
+  function choose(intent: Intent): void {
+    setError(null);
+    setNotice(null);
+    setPhone("");
+    setPin("");
+    setStep({ kind: "phone", intent });
+  }
+
+  /**
+   * Номер набран полностью — спрашиваем сервер, что дальше.
+   *
+   * Если гость ошибся кнопкой на первом экране, не возвращаем его назад, а
+   * спокойно ведём туда, куда нужно, и говорим об этом одной строкой.
+   */
+  async function submitPhone(digits: string, intent: Intent): Promise<void> {
     setBusy(true);
     setError(null);
     try {
@@ -105,7 +127,15 @@ export function LockScreen({
         setError(result.reason);
         return;
       }
-      setStep({ kind: result.next === "PIN" ? "pin" : "newPin" });
+      if (result.next === "PIN") {
+        setNotice(intent === "register" ? "Этот номер уже зарегистрирован — просто введите PIN." : null);
+        setStep({ kind: "pin" });
+      } else {
+        setNotice(
+          intent === "login" ? "Этого номера ещё нет в клубе — давайте зарегистрируем, это 30 секунд." : null,
+        );
+        setStep({ kind: "newPin" });
+      }
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -219,12 +249,23 @@ export function LockScreen({
   const press = useCallback(
     (key: string): void => {
       if (busy) return;
+      if (step.kind === "choose") {
+        // Начал набирать цифры сразу — значит, знает, что делать: ведём как вход.
+        if (/^\d$/.test(key)) {
+          setError(null);
+          setPin("");
+          setNotice(null);
+          setPhone(addDigit("", key));
+          setStep({ kind: "phone", intent: "login" });
+        }
+        return;
+      }
       if (step.kind === "phone") {
         if (key === "back") setPhone((d) => d.slice(0, -1));
         else {
           const next = addDigit(phone, key);
           setPhone(next);
-          if (next.length === NATIONAL_LENGTH && next !== phone) void submitPhone(next);
+          if (next.length === NATIONAL_LENGTH && next !== phone) void submitPhone(next, step.intent);
         }
         return;
       }
@@ -362,6 +403,7 @@ export function LockScreen({
     return (
       <div className="card">
         <h1>Подтвердите номер в WhatsApp</h1>
+        <div className="note">Шаг 3 из 3</div>
         {error && <div className="error">{error}</div>}
         {qr && (
           <svg
@@ -392,16 +434,64 @@ export function LockScreen({
     );
   }
 
+  if (step.kind === "choose") {
+    const giftLabel = consentBonus > 0 ? `+${formatMoney(consentBonus)} в подарок` : null;
+    return (
+      <div className="choice">
+        {error && <div className="error">{error}</div>}
+        {!online && (
+          <div className="banner warn">
+            Нет связи с сервером — самостоятельный вход временно недоступен. Подойдите к
+            администратору.
+          </div>
+        )}
+        <div className="choice-tiles">
+          <button type="button" className="tile" disabled={!online} onClick={() => choose("login")}>
+            <span className="tile-icon" aria-hidden>
+              👤
+            </span>
+            <span className="tile-title">У меня есть аккаунт</span>
+            <span className="tile-text">Войдите по номеру телефона и PIN — 5 секунд.</span>
+            <span className="tile-cta">Войти</span>
+          </button>
+          <button type="button" className="tile new" disabled={!online} onClick={() => choose("register")}>
+            <span className="tile-icon" aria-hidden>
+              ✨
+            </span>
+            <span className="tile-title">Я здесь впервые</span>
+            <span className="tile-text">
+              Регистрация за 30 секунд: номер, PIN и подтверждение в WhatsApp.
+            </span>
+            {giftLabel && <span className="tile-badge">{giftLabel}</span>}
+            <span className="tile-cta">Зарегистрироваться</span>
+          </button>
+        </div>
+        <button
+          className="ghost call"
+          type="button"
+          disabled={called}
+          onClick={() => {
+            setCalled(true);
+            void client.callStaff();
+          }}
+        >
+          {called ? "Администратор идёт" : "Позвать администратора"}
+        </button>
+      </div>
+    );
+  }
+
   const pinStep = step.kind === "pin" || step.kind === "newPin";
 
   return (
     <div className="card">
       <h1>
-        {step.kind === "phone" && "Вход в клуб"}
+        {step.kind === "phone" && (step.intent === "login" ? "Вход" : "Регистрация")}
         {step.kind === "pin" && "Введите PIN"}
         {step.kind === "newPin" && "Придумайте PIN из 4 цифр"}
       </h1>
 
+      {notice && <div className="banner info">{notice}</div>}
       {error && <div className="error">{error}</div>}
 
       {/* Проверить PIN и остаток без сервера нельзя — честно говорим об этом,
@@ -415,12 +505,15 @@ export function LockScreen({
 
       {step.kind === "phone" ? (
         <>
-          <div className="note">Номер телефона — новый гость зарегистрируется за минуту</div>
+          <div className="note">
+            {step.intent === "login" ? "Ваш номер телефона" : "Шаг 1 из 3 · ваш номер телефона"}
+          </div>
           <div className={`display ${phone.length === 0 ? "empty" : ""}`}>{formatNational(phone)}</div>
         </>
       ) : (
         <>
           <div className="note">
+            {step.kind === "newPin" && "Шаг 2 из 3 · "}
             {formatNational(phone)}
             {step.kind === "newPin" && " · этот PIN понадобится для входа"}
           </div>
@@ -441,8 +534,14 @@ export function LockScreen({
             {d}
           </button>
         ))}
-        <button type="button" className="ghost" disabled={busy} onClick={() => (pinStep ? restart() : press("back"))}>
-          {pinStep ? "Назад" : "⌫"}
+        {/* Пустой номер — стирать нечего, кнопка ведёт обратно к выбору. */}
+        <button
+          type="button"
+          className="ghost"
+          disabled={busy}
+          onClick={() => (pinStep || phone.length === 0 ? restart() : press("back"))}
+        >
+          {pinStep || phone.length === 0 ? "Назад" : "⌫"}
         </button>
         <button type="button" disabled={busy || !online} onClick={() => press("0")}>
           0
