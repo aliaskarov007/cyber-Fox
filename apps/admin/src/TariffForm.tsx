@@ -50,8 +50,12 @@ export function TariffForm({
   const minutePrice = kind === "PER_MINUTE" && pricePerMinute ? toTiyn(pricePerMinute) : 0;
   const overCredit = minutePrice > club.creditLimit;
 
-  /** Тариф той же зоны с тем же окном — обычная причина «почему считается не тот». */
-  const sameWindow = tariffs.some(
+  /**
+   * Поминутный тариф той же зоны с тем же окном — обычная причина «почему
+   * считается не тот». Пакетов в зоне бывает несколько намеренно: 2+1, ночь,
+   * абонемент — для них это не ошибка.
+   */
+  const sameWindow = kind === "PER_MINUTE" && tariffs.some(
     (other) =>
       other.id !== editing?.id &&
       other.zoneId === zoneId &&
