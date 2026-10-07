@@ -3,38 +3,21 @@ import { ConfigService } from "@nestjs/config";
 
 import { Public } from "../auth/guards.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { WhatsappMonitor } from "./whatsapp.monitor.js";
 
-/** Состояние подключения WhatsApp для экрана настроек кассы. */
+/**
+ * Политика конфиденциальности на сервере клуба. Гость, которому пишут из
+ * WhatsApp, вправе знать, что происходит с его номером, а своего сайта у клуба
+ * может не быть.
+ */
 @Controller("whatsapp")
-export class WhatsappStatusController {
+export class PrivacyController {
   constructor(
     private readonly config: ConfigService,
-    private readonly monitor: WhatsappMonitor,
     private readonly prisma: PrismaService,
   ) {}
 
-  @Get("status")
-  status() {
-    const value = (name: string): string => this.config.get<string>(name)?.trim() ?? "";
-    const number = value("WHATSAPP_NUMBER");
-    return {
-      number: number || null,
-      // Сами секреты наружу не отдаём — только то, что они вписаны.
-      hasAppSecret: value("WHATSAPP_APP_SECRET") !== "",
-      hasVerifyToken: value("WHATSAPP_VERIFY_TOKEN") !== "",
-      /** Регистрация с ПК ждёт сообщения в WhatsApp только когда это true. */
-      active: number !== "" && value("WHATSAPP_APP_SECRET") !== "",
-      lastVerifiedAt: this.monitor.lastVerifiedAt,
-      lastMessageAt: this.monitor.lastMessageAt,
-      lastMessageFrom: this.monitor.lastMessageFrom,
-      lastSignatureFailureAt: this.monitor.lastSignatureFailureAt,
-    };
-  }
-
   /**
-   * Политика конфиденциальности. Meta не переводит приложение WhatsApp в рабочий
-   * режим без ссылки на неё, а у клуба своего сайта может не быть.
+   * Политика конфиденциальности.
    *
    * Реквизиты берутся из настроек сервера (PRIVACY_COMPANY, PRIVACY_CONTACT), а
    * название — из сети. Текст — образец: перед публикацией его стоит показать юристу.

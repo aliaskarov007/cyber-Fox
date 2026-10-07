@@ -54,6 +54,7 @@ model Tenant {
   paymentIntents PaymentIntent[]
   phoneVerifications PhoneVerification[]
   events       ClubEvent[]
+  whatsapp     WhatsAppChannel?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -380,6 +381,10 @@ model ClubEvent {
 
   isPublished Boolean @default(true)
 
+  /// Когда последний раз разослали приглашения в WhatsApp. Пусто — не рассылали.
+  invitesSentAt DateTime?
+  invites       EventInvite[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -597,6 +602,7 @@ model Guest {
   /// Подарок за согласие выдан — второй раз не выдаётся, даже после отписки.
   consentBonusGrantedAt  DateTime?
 
+  invites  EventInvite[]
   wallets  GuestWallet[]
   packages GuestPackage[]
   sessions Session[]
@@ -1036,4 +1042,68 @@ model Shift {
   /// Открытая смена в клубе должна быть одна: две кассы одновременно не сверить.
   @@index([clubId, openedAt])
   @@index([clubId, closedAt])
+}
+
+/**
+ * Подключение сети к WhatsApp через Green-API.
+ *
+ * Green-API держит сессию обычного WhatsApp или WhatsApp Business на телефоне
+ * клуба и даёт к ней HTTP-доступ. Один номер на сеть: на него гости пишут код
+ * регистрации, с него уходят приглашения, на него же приходят ответы.
+ * Токен инстанса наружу не отдаётся — с ним можно писать от имени клуба.
+ */
+model WhatsAppChannel {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Адрес API из кабинета Green-API (у новых инстансов он свой).
+  apiUrl     String @default("https://api.green-api.com")
+  instanceId String @unique
+  apiToken   String
+  /// Секрет входящих уведомлений: Green-API присылает его в заголовке Authorization.
+  webhookToken String @unique @default(uuid())
+
+  /// Номер, привязанный к инстансу. Сервер узнаёт его у Green-API сам.
+  phone String?
+  /// Последнее известное состояние инстанса: authorized, notAuthorized и т.п.
+  lastState     String?
+  lastCheckAt   DateTime?
+  /// Когда пришло последнее входящее сообщение — видно в настройках кассы.
+  lastIncomingAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum InviteStatus {
+  /// В очереди на отправку.
+  PENDING
+  SENT
+  FAILED
+  GOING
+  DECLINED
+}
+
+/** Приглашение гостя на ивент афиши через WhatsApp. */
+model EventInvite {
+  id      String    @id @default(uuid())
+  eventId String
+  event   ClubEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId String
+  guest   Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  status InviteStatus @default(PENDING)
+  providerMessageId String?
+  error       String?
+  sentAt      DateTime?
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Один гость — одно приглашение на ивент: повторная рассылка не спамит.
+  @@unique([eventId, guestId])
+  @@index([status, createdAt])
+  @@index([guestId, sentAt])
 }

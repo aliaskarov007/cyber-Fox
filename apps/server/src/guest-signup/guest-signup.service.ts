@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import bcrypt from "bcryptjs";
 
 import { normalizePhone, phoneTail } from "../common/phone.js";
@@ -70,15 +69,17 @@ export class GuestSignupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly consents: ConsentService,
-    private readonly config: ConfigService,
   ) {}
 
-  /** Номер клуба в WhatsApp. Пусто — подтверждение через WhatsApp выключено. */
-  private businessNumber(): string | null {
-    const number = this.config.get<string>("WHATSAPP_NUMBER")?.trim();
-    const secret = this.config.get<string>("WHATSAPP_APP_SECRET")?.trim();
-    // Без ключа приложения входящие не проверить — значит, и ждать их нельзя.
-    return number && secret ? number : null;
+  /**
+   * Номер сети в WhatsApp. Пусто — подтверждение через WhatsApp выключено.
+   *
+   * Номер сервер узнаёт у Green-API, когда владелец подключает инстанс в кассе;
+   * пока телефон клуба не привязан по QR, номера нет и ждать сообщений нельзя.
+   */
+  private async businessNumber(tenantId: string): Promise<string | null> {
+    const channel = await this.prisma.whatsAppChannel.findUnique({ where: { tenantId } });
+    return channel?.phone && channel.lastState === "authorized" ? channel.phone : null;
   }
 
   private async computer(computerId: string) {
@@ -103,7 +104,7 @@ export class GuestSignupService {
 
   /**
    * `viaDesk` — гость не смог подтвердить номер через WhatsApp (нет камеры,
-   * нет WhatsApp, подключение у Meta ещё не заработало): аккаунт создаётся
+   * нет WhatsApp, связь с Green-API пропала): аккаунт создаётся
    * сразу, номер подтвердит администратор. Застрять на экране с QR гость не должен.
    */
   async register(computerId: string, rawPhone: string, pin: string, viaDesk = false): Promise<RegisterResult> {
@@ -128,7 +129,7 @@ export class GuestSignupService {
     }
 
     const pinHash = await bcrypt.hash(pin, 10);
-    const number = viaDesk ? null : this.businessNumber();
+    const number = viaDesk ? null : await this.businessNumber(tenantId);
 
     if (number) {
       const code = newCode();
@@ -255,26 +256,26 @@ export class GuestSignupService {
    * Номер отправителя WhatsApp удостоверяет сам — на этом и держится
    * подтверждение. Код при этом связывает сообщение с конкретным экраном.
    */
-  async handleIncoming(message: IncomingMessage): Promise<void> {
+  async handleIncoming(tenantId: string, message: IncomingMessage): Promise<"verified" | "stopped" | null> {
     const phone = normalizePhone(message.from);
-    if (!phone) return;
+    if (!phone) return null;
 
     if (isStop(message.text)) {
       const count = await this.consents.optOutByPhone(phone);
       this.logger.log(`Отписка из WhatsApp: ${count} аккаунт(ов)`);
-      return;
+      return "stopped";
     }
 
     const code = extractCode(message.text);
-    if (!code) return;
+    if (!code) return null;
 
     const verification = await this.prisma.phoneVerification.findFirst({
-      where: { phone, code, verifiedAt: null, expiresAt: { gt: new Date() } },
+      where: { tenantId, phone, code, verifiedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
     });
-    // Код набран с другого номера или просрочен — молчим: ответ платный, а
-    // гость и так видит на экране, что подтверждение не пришло.
-    if (!verification) return;
+    // Код набран с другого номера или просрочен — молчим: гость и так видит
+    // на экране, что подтверждение не пришло.
+    if (!verification) return null;
 
     await this.prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -315,5 +316,6 @@ export class GuestSignupService {
       // Согласие, данное раньше без подтверждённого номера, получает подарок сейчас.
       await this.consents.grantBonus(tx, guest.id, verification.clubId);
     });
+    return "verified";
   }
 }

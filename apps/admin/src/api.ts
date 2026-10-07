@@ -512,7 +512,35 @@ export const api = {
 
   tenant: () => request<Tenant>("/network/tenant"),
 
-  whatsappStatus: () => request<WhatsappStatus>("/whatsapp/status"),
+  // --- WhatsApp (Green-API) и приглашения ---
+
+  whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
+
+  saveWhatsApp: (body: { apiUrl?: string; instanceId: string; apiToken?: string; publicUrl?: string }) =>
+    request<WhatsAppChannel & { warning: string | null }>("/network/whatsapp", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  checkWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp/check", { method: "POST" }),
+
+  testWhatsApp: (phone: string) =>
+    request<{ ok: true }>("/network/whatsapp/test", { method: "POST", body: JSON.stringify({ phone }) }),
+
+  disconnectWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp", { method: "DELETE" }),
+
+  inviteSummaries: () => request<Record<string, InviteSummary>>("/network/events/invites"),
+
+  eventAudience: (eventId: string, audience: InviteAudience) =>
+    request<{ guests: number; unverified: number }>(`/network/events/${eventId}/audience?audience=${audience}`),
+
+  sendInvites: (eventId: string, audience: InviteAudience) =>
+    request<{ queued: number }>(`/network/events/${eventId}/invites`, {
+      method: "POST",
+      body: JSON.stringify({ audience }),
+    }),
+
+  eventInvites: (eventId: string) => request<EventInvite[]>(`/network/events/${eventId}/invites`),
 
   events: () => request<ClubEvent[]>("/network/events"),
 
@@ -702,16 +730,41 @@ export interface Tenant {
   slogan: string;
 }
 
-/** Состояние подключения WhatsApp — экран в настройках. */
-export interface WhatsappStatus {
-  number: string | null;
-  hasAppSecret: boolean;
-  hasVerifyToken: boolean;
-  active: boolean;
-  lastVerifiedAt: string | null;
-  lastMessageAt: string | null;
-  lastMessageFrom: string | null;
-  lastSignatureFailureAt: string | null;
+/** Подключение WhatsApp через Green-API — экран в настройках. */
+export interface WhatsAppChannel {
+  connected: boolean;
+  apiUrl: string | null;
+  instanceId: string | null;
+  apiTokenHint: string | null;
+  /** Номер клуба в WhatsApp: на него гости пишут код регистрации с QR. */
+  phone: string | null;
+  /** authorized — номер привязан и может писать. */
+  state: string | null;
+  lastCheckAt: string | null;
+  /** Когда пришло последнее сообщение от гостя. */
+  lastIncomingAt: string | null;
+  webhookPath: string;
+}
+
+export type InviteAudience = "NETWORK" | "CLUB";
+export type InviteStatus = "PENDING" | "SENT" | "FAILED" | "GOING" | "DECLINED";
+
+export interface InviteSummary {
+  total: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  going: number;
+  declined: number;
+}
+
+export interface EventInvite {
+  id: string;
+  status: InviteStatus;
+  error: string | null;
+  sentAt: string | null;
+  respondedAt: string | null;
+  guest: { id: string; fullName: string; phone: string };
 }
 
 /** Ивент в афише на экранах ПК. */

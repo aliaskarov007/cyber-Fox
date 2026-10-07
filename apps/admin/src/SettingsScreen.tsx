@@ -60,7 +60,8 @@ export function SettingsScreen({
 
       <ClubSettings club={club} onSaved={(msg) => void run(async () => onClubsChanged(), msg)} />
 
-      {canManageHall && <WhatsappSection />}
+      {/* Номер всей сети подключает владелец: сервер закрывает правку ролью. */}
+      {isOwner && <WhatsappSection />}
 
       {/*
        * Зоны и машины правит владелец или управляющий: сервер закрывает эти
