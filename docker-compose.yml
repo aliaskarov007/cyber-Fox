@@ -53,6 +53,8 @@ services:
       WHATSAPP_NUMBER: ${WHATSAPP_NUMBER:-}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      PRIVACY_COMPANY: ${PRIVACY_COMPANY:-}
+      PRIVACY_CONTACT: ${PRIVACY_CONTACT:-}
       TZ: ${TZ:-Asia/Almaty}
     volumes:
       # Загруженные обложки живут отдельно от образа: пересборка сервера не

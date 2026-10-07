@@ -179,6 +179,25 @@ export function LockScreen({
     }
   }
 
+  async function registerViaDesk(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await client.register(fullPhone(phone), pin, true);
+      if (!result.ok) {
+        setError(result.reason);
+        return;
+      }
+      if (result.mode === "DONE") {
+        setStep({ kind: "consent", guestId: result.guestId, text: result.consentText, bonus: result.bonus, verified: false });
+      }
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /* Ждём сообщение в WhatsApp: сервер узнаёт о нём сам, экран лишь спрашивает. */
   const waitingFor = step.kind === "whatsapp" ? step.verificationId : null;
   useEffect(() => {
@@ -415,9 +434,15 @@ export function LockScreen({
           действует ещё {minutesLeft} мин.
         </div>
         <div className="waiting">Ждём сообщение…</div>
-        <button className="ghost" onClick={() => restart()}>
-          Другой номер
-        </button>
+        <div className="row-actions">
+          <button className="ghost" onClick={() => restart()}>
+            Другой номер
+          </button>
+          {/* Нет WhatsApp или камеры — не застревать на QR: номер подтвердит стойка. */}
+          <button className="ghost" disabled={busy} onClick={() => void registerViaDesk()}>
+            Нет WhatsApp — подтвердит администратор
+          </button>
+        </div>
       </div>
     );
   }

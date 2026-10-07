@@ -1149,3 +1149,10 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* Две равные ссылки-кнопки под QR: другой номер и подтверждение на стойке. */
+.row-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}

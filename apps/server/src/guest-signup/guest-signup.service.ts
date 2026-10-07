@@ -101,7 +101,12 @@ export class GuestSignupService {
     return { ok: true, phone, next: ready ? "PIN" : "REGISTER" };
   }
 
-  async register(computerId: string, rawPhone: string, pin: string): Promise<RegisterResult> {
+  /**
+   * `viaDesk` — гость не смог подтвердить номер через WhatsApp (нет камеры,
+   * нет WhatsApp, подключение у Meta ещё не заработало): аккаунт создаётся
+   * сразу, номер подтвердит администратор. Застрять на экране с QR гость не должен.
+   */
+  async register(computerId: string, rawPhone: string, pin: string, viaDesk = false): Promise<RegisterResult> {
     const phone = normalizePhone(rawPhone);
     if (!phone) return { ok: false, reason: "Проверьте номер телефона" };
     if (!/^\d{4}$/.test(pin)) return { ok: false, reason: "PIN — четыре цифры" };
@@ -123,7 +128,7 @@ export class GuestSignupService {
     }
 
     const pinHash = await bcrypt.hash(pin, 10);
-    const number = this.businessNumber();
+    const number = viaDesk ? null : this.businessNumber();
 
     if (number) {
       const code = newCode();

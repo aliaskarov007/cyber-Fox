@@ -16,6 +16,7 @@ import type { Request } from "express";
 
 import { Public } from "../auth/guards.js";
 import { GuestSignupService } from "./guest-signup.service.js";
+import { WhatsappMonitor } from "./whatsapp.monitor.js";
 import { parseIncoming, signatureValid } from "./whatsapp.rules.js";
 
 /**
@@ -30,6 +31,7 @@ export class WhatsappController {
   constructor(
     private readonly signup: GuestSignupService,
     private readonly config: ConfigService,
+    private readonly monitor: WhatsappMonitor,
   ) {}
 
   /** Проверка адреса при подключении: Meta ждёт обратно свой challenge. */
@@ -44,6 +46,7 @@ export class WhatsappController {
     if (!expected || mode !== "subscribe" || token !== expected) {
       throw new ForbiddenException("Неверный токен проверки");
     }
+    this.monitor.verified();
     return challenge;
   }
 
@@ -60,10 +63,13 @@ export class WhatsappController {
 
     const raw = request.rawBody?.toString("utf8") ?? "";
     if (!signatureValid(raw, signature, secret)) {
+      // Чаще всего это не атака, а не тот App Secret в настройках сервера.
+      this.monitor.signatureFailed();
       throw new ForbiddenException("Подпись не сходится");
     }
 
     for (const message of parseIncoming(body)) {
+      this.monitor.message(message.from);
       try {
         await this.signup.handleIncoming(message);
       } catch (error) {

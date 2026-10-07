@@ -236,11 +236,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("guest.register")
   async guestRegister(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { phone: string; pin: string },
+    @MessageBody() body: { phone: string; pin: string; viaDesk?: boolean },
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
-    return this.signup.register(computerId, String(body?.phone ?? ""), String(body?.pin ?? ""));
+    return this.signup.register(
+      computerId,
+      String(body?.phone ?? ""),
+      String(body?.pin ?? ""),
+      body?.viaDesk === true,
+    );
   }
 
   /** Экран ждёт, когда гость отправит код в WhatsApp. */

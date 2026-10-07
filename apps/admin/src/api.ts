@@ -512,6 +512,8 @@ export const api = {
 
   tenant: () => request<Tenant>("/network/tenant"),
 
+  whatsappStatus: () => request<WhatsappStatus>("/whatsapp/status"),
+
   events: () => request<ClubEvent[]>("/network/events"),
 
   createEvent: (body: ClubEventInput) =>
@@ -698,6 +700,18 @@ export interface Tenant {
   sharedBalance: boolean;
   /** Лозунг под названием сети на экранах ПК. */
   slogan: string;
+}
+
+/** Состояние подключения WhatsApp — экран в настройках. */
+export interface WhatsappStatus {
+  number: string | null;
+  hasAppSecret: boolean;
+  hasVerifyToken: boolean;
+  active: boolean;
+  lastVerifiedAt: string | null;
+  lastMessageAt: string | null;
+  lastMessageFrom: string | null;
+  lastSignatureFailureAt: string | null;
 }
 
 /** Ивент в афише на экранах ПК. */

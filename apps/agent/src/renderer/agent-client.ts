@@ -190,8 +190,8 @@ export class AgentClient {
   }
 
   /** Регистрация нового гостя прямо за этим ПК. */
-  register(phone: string, pin: string): Promise<RegisterResult> {
-    return this.request("guest.register", { phone, pin });
+  register(phone: string, pin: string, viaDesk = false): Promise<RegisterResult> {
+    return this.request("guest.register", { phone, pin, viaDesk });
   }
 
   /** Пришло ли сообщение с кодом в WhatsApp клуба. */
