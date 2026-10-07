@@ -84,6 +84,16 @@ export function WhatsAppSettings({ onSaved }: { onSaved: (message: string) => vo
       {error && <div className="error">{error}</div>}
       {warning && <div className="notice warn">{warning}</div>}
 
+      {channel?.connected && (
+        <div className="rows">
+          <div className="row">
+            <span className="k">Номер клуба</span>
+            {/* Номер нужен регистрации за ПК: без него экран не покажет QR. */}
+            <span>{channel.phone ? `+${channel.phone}` : "станет известен после привязки по QR"}</span>
+          </div>
+        </div>
+      )}
+
       <div className="notice">
         Через этот номер гости получают код подтверждения и приглашения на ивенты. Заведите инстанс
         в кабинете green-api.com, привяжите к нему телефон клуба по QR-коду и перенесите сюда

@@ -51,6 +51,7 @@ model Tenant {
   paymentIntents PaymentIntent[]
   whatsapp     WhatsAppChannel?
   events       Event[]
+  guestSignups GuestSignup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -942,6 +943,10 @@ model WhatsAppChannel {
   /// Секрет входящих уведомлений: Green-API присылает его в заголовке Authorization.
   webhookToken String @unique @default(uuid())
 
+  /// Номер, привязанный к инстансу, — на него гость пишет код регистрации.
+  /// Сервер узнаёт его у Green-API сам: вводить вручную — значит ошибиться.
+  phone String?
+
   /// Последнее известное состояние инстанса: authorized, notAuthorized и т.п.
   lastState   String?
   lastCheckAt DateTime?
@@ -1029,4 +1034,44 @@ model EventInvite {
   @@unique([eventId, guestId])
   @@index([status, createdAt])
   @@index([guestId, sentAt])
+}
+
+enum GuestSignupStatus {
+  /// QR на экране, ждём сообщения от гостя.
+  WAITING
+  /// Гость прислал код со своего номера — номер его.
+  CONFIRMED
+  /// Аккаунт создан или PIN задан заново.
+  COMPLETED
+}
+
+/**
+ * Регистрация гостя за игровым ПК.
+ *
+ * Гость сканирует QR и сам отправляет код на номер клуба. Номер отправителя
+ * WhatsApp подставляет сам — подделать его нельзя, поэтому отдельный код
+ * подтверждения не нужен, а клуб не пишет первым незнакомому номеру.
+ */
+model GuestSignup {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId     String
+  computerId String
+
+  /// Код вида CF-7K2Q из сообщения гостя.
+  code   String            @unique
+  status GuestSignupStatus @default(WAITING)
+
+  /// Номер отправителя, известен после подтверждения.
+  phone   String?
+  /// Аккаунт с этим номером уже есть — гостю задаётся новый PIN, а не новый аккаунт.
+  guestId String?
+
+  expiresAt   DateTime
+  confirmedAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([computerId, createdAt])
 }

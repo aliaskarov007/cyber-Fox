@@ -6,7 +6,9 @@ import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { type GreenApiCredentials, GreenApiClient, type SendResult } from "./green-api.client.js";
 import type { SaveWhatsAppDto } from "./whatsapp.dto.js";
-import { normalizePhone, parseInviteReply, readIncoming, replyAck, samePhone } from "./whatsapp.rules.js";
+import { findGuestByPhone } from "../guests/guest-phone.js";
+import { GuestSignupService } from "./guest-signup.service.js";
+import { findSignupCode, parseInviteReply, readIncoming, replyAck } from "./whatsapp.rules.js";
 
 /** Канал глазами кассового экрана: без токена, с которым можно писать от имени клуба. */
 export interface PublicChannel {
@@ -15,6 +17,8 @@ export interface PublicChannel {
   instanceId: string | null;
   /** Последние символы токена — чтобы было видно, какой стоит, но не сам токен. */
   apiTokenHint: string | null;
+  /** Номер клуба в WhatsApp — на него пишут гости. */
+  phone: string | null;
   state: string | null;
   lastCheckAt: Date | null;
   /** Куда Green-API шлёт ответы гостей. Пусто — ещё не прописан. */
@@ -40,6 +44,7 @@ export class WhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly greenApi: GreenApiClient,
+    private readonly signups: GuestSignupService,
   ) {}
 
   private toPublic(channel: WhatsAppChannel | null): PublicChannel {
@@ -48,6 +53,7 @@ export class WhatsAppService {
       apiUrl: channel?.apiUrl ?? null,
       instanceId: channel?.instanceId ?? null,
       apiTokenHint: channel ? `…${channel.apiToken.slice(-4)}` : null,
+      phone: channel?.phone ?? null,
       state: channel?.lastState ?? null,
       lastCheckAt: channel?.lastCheckAt ?? null,
       webhookPath: WEBHOOK_PATH,
@@ -83,15 +89,19 @@ export class WhatsAppService {
     const state = await this.greenApi.getState(credentials);
     if (!state.ok) throw new BadRequestException(state.error);
 
+    // Номер нужен регистрации за ПК: на него гость отправляет код из QR.
+    const phone = state.state === "authorized" ? await this.greenApi.getAccountPhone(credentials) : null;
+
     const channel = await this.prisma.whatsAppChannel.upsert({
       where: { tenantId: staff.tenantId },
       create: {
         tenantId: staff.tenantId,
         ...credentials,
+        phone,
         lastState: state.state,
         lastCheckAt: new Date(),
       },
-      update: { ...credentials, lastState: state.state, lastCheckAt: new Date() },
+      update: { ...credentials, phone, lastState: state.state, lastCheckAt: new Date() },
     });
 
     let warning: string | null = null;
@@ -115,9 +125,12 @@ export class WhatsAppService {
     const state = await this.greenApi.getState(credentialsOf(channel));
     if (!state.ok) throw new BadRequestException(state.error);
 
+    const phone =
+      state.state === "authorized" ? await this.greenApi.getAccountPhone(credentialsOf(channel)) : null;
     const updated = await this.prisma.whatsAppChannel.update({
       where: { id: channel.id },
-      data: { lastState: state.state, lastCheckAt: new Date() },
+      // Номер переживает временную потерю связи: стираем его, только если узнали новый.
+      data: { lastState: state.state, lastCheckAt: new Date(), ...(phone ? { phone } : {}) },
     });
     return this.toPublic(updated);
   }
@@ -170,10 +183,22 @@ export class WhatsAppService {
       return;
     }
 
+    // Код регистрации с игрового ПК — его ищем первым: в сообщении он один,
+    // и спутать его с ответом на приглашение нельзя.
+    const signupCode = findSignupCode(incoming.text);
+    if (signupCode) {
+      const ackText = await this.signups.confirm(channel.tenantId, signupCode, incoming.phone);
+      if (ackText) {
+        const ack = await this.greenApi.sendText(credentialsOf(channel), incoming.phone, ackText);
+        if (!ack.ok) this.logger.warn(`Подтверждение регистрации гостю не ушло: ${ack.error}`);
+      }
+      return;
+    }
+
     const reply = parseInviteReply(incoming.text);
     if (!reply) return;
 
-    const guest = await this.findGuestByPhone(channel.tenantId, incoming.phone);
+    const guest = await findGuestByPhone(this.prisma, channel.tenantId, incoming.phone);
     if (!guest) return;
 
     let eventTitle: string | null = null;
@@ -209,26 +234,5 @@ export class WhatsAppService {
 
     const ack = await this.greenApi.sendText(credentialsOf(channel), incoming.phone, replyAck(reply, eventTitle));
     if (!ack.ok) this.logger.warn(`Подтверждение ответа гостю не ушло: ${ack.error}`);
-  }
-
-  /**
-   * Гость по номеру отправителя. В базе номер хранится так, как его ввели
-   * на стойке, поэтому сначала сужаем по последним цифрам, потом сравниваем
-   * нормализованные номера.
-   */
-  private async findGuestByPhone(tenantId: string, phone: string) {
-    const normalized = normalizePhone(phone);
-    if (!normalized) return null;
-
-    // Две последние цифры почти никогда не разделяют пробелом или дефисом,
-    // а выборку они сужают в сотню раз.
-    const candidates = await this.prisma.guest.findMany({
-      where: { tenantId, phone: { contains: normalized.slice(-2) } },
-      select: { id: true, phone: true, phoneVerifiedAt: true },
-    });
-    // Подтверждённый номер надёжнее: при дублях (один номер у двух карточек)
-    // выбираем того, кто доказал, что номер его.
-    const matches = candidates.filter((c) => samePhone(c.phone, normalized));
-    return matches.find((c) => c.phoneVerifiedAt !== null) ?? matches[0] ?? null;
   }
 }

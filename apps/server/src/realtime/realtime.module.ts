@@ -5,11 +5,12 @@ import { GuestsModule } from "../guests/guests.module.js";
 import { LibraryModule } from "../library/library.module.js";
 import { OfflineModule } from "../offline/offline.module.js";
 import { SessionsModule } from "../sessions/sessions.module.js";
+import { WhatsAppModule } from "../whatsapp/whatsapp.module.js";
 import { AgentService } from "./agent.service.js";
 import { RealtimeGateway } from "./realtime.gateway.js";
 
 @Module({
-  imports: [AuthModule, SessionsModule, GuestsModule, OfflineModule, LibraryModule],
+  imports: [AuthModule, SessionsModule, GuestsModule, OfflineModule, LibraryModule, WhatsAppModule],
   providers: [RealtimeGateway, AgentService],
 })
 export class RealtimeModule {}

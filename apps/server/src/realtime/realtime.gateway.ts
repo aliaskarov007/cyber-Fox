@@ -17,6 +17,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
+import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
@@ -45,6 +46,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly offline: OfflineService,
     private readonly sessions: SessionsService,
     private readonly library: LibraryService,
+    private readonly signups: GuestSignupService,
   ) {}
 
   onModuleInit(): void {
@@ -79,6 +81,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
      */
     this.bus.on("library.changed", (e) => {
       this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
+    });
+    this.bus.on("signup.confirmed", (e) => {
+      this.server.to(agentRoom(e.computerId)).emit("signup.confirmed", {
+        code: e.code,
+        existingName: e.existingName,
+      });
     });
   }
 
@@ -204,6 +212,34 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     return this.agents.guestLogin(computerId, body.phone, body.pin);
+  }
+
+  /** Новый гость: QR со ссылкой на WhatsApp клуба и кодом регистрации. */
+  @SubscribeMessage("signup.start")
+  async signupStart(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    try {
+      return await this.signups.start(computerId);
+    } catch (error) {
+      this.logger.error("Регистрация не началась", error as Error);
+      return { ok: false, reason: "Не удалось начать регистрацию" };
+    }
+  }
+
+  @SubscribeMessage("signup.complete")
+  async signupComplete(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { code: string; nickname: string; pin: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    try {
+      return await this.signups.complete(computerId, body.code ?? "", body.nickname ?? "", body.pin ?? "");
+    } catch (error) {
+      this.logger.error("Регистрация не завершилась", error as Error);
+      return { ok: false, reason: "Не удалось завершить регистрацию" };
+    }
   }
 
   @SubscribeMessage("session.start")

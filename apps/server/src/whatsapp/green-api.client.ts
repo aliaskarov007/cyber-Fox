@@ -16,9 +16,9 @@ export type SendResult =
 /**
  * Сколько ждать ответа Green-API. Дольше — значит, сервис лежит. Запрос
  * сотрудника живёт в транзакции с пределом в 20 секунд, а сохранение
- * настроек делает два обращения подряд — оба должны в него уложиться.
+ * настроек делает до трёх обращений подряд — все должны в него уложиться.
  */
-const TIMEOUT_MS = 8_000;
+const TIMEOUT_MS = 6_000;
 
 /**
  * Тонкий клиент Green-API: отправить текст, узнать состояние инстанса,
@@ -85,6 +85,17 @@ export class GreenApiClient {
     const result = await this.call<{ stateInstance?: string }>(credentials, "getStateInstance");
     if (!result.ok) return result;
     return { ok: true, state: result.data.stateInstance ?? "unknown" };
+  }
+
+  /**
+   * Номер, к которому привязан инстанс. Green-API отдаёт его в настройках
+   * как идентификатор чата («77011234567@c.us»); у непривязанного инстанса его нет.
+   */
+  async getAccountPhone(credentials: GreenApiCredentials): Promise<string | null> {
+    const result = await this.call<{ wid?: string }>(credentials, "getSettings");
+    if (!result.ok || !result.data.wid) return null;
+    const match = /^(\d{10,15})@c\.us$/.exec(result.data.wid);
+    return match ? match[1] : null;
   }
 
   /**

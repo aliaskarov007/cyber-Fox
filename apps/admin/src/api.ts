@@ -688,6 +688,8 @@ export interface WhatsAppChannel {
   apiUrl: string | null;
   instanceId: string | null;
   apiTokenHint: string | null;
+  /** Номер клуба в WhatsApp: на него гости пишут код регистрации с QR. */
+  phone: string | null;
   /** authorized — номер привязан и может писать. */
   state: string | null;
   lastCheckAt: string | null;

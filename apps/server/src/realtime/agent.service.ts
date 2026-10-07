@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import { minutesAffordable, pickPerMinuteTariff } from "../billing/billing.rules.js";
 import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import { toLocalMoment } from "../common/local-time.js";
+import { findGuestByPhone } from "../guests/guest-phone.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
@@ -189,11 +190,8 @@ export class AgentService {
       minutesAffordable: null,
     };
 
-    const guest = await this.prisma.guest.findUnique({
-      where: {
-        tenantId_phone: { tenantId: computer.club.tenantId, phone: phone.trim() },
-      },
-    });
+    // Номер гость набирает как привык: «8 701…» должен найти «+7 701…».
+    const guest = await findGuestByPhone(this.prisma, computer.club.tenantId, phone);
 
     if (!guest?.pinHash) {
       return { ...empty, reason: "Неверный номер или PIN" };

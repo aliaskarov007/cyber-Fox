@@ -190,3 +190,44 @@ export function replyAck(reply: InviteReply, eventTitle: string | null): string 
       return "Вы снова будете получать приглашения на ивенты.";
   }
 }
+
+// --- Регистрация за игровым ПК ---
+
+/** Без похожих друг на друга знаков: 0/O, 1/I/L гость на экране перепутает. */
+export const SIGNUP_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+/** QR живёт десять минут: дольше гость у экрана не стоит. */
+export const SIGNUP_TTL_MS = 10 * 60 * 1000;
+
+/** Код вида CF-7K2Q. random — источник случайности, чтобы правило проверялось без него. */
+export function makeSignupCode(random: (max: number) => number): string {
+  let code = "";
+  for (let i = 0; i < 4; i++) code += SIGNUP_ALPHABET[random(SIGNUP_ALPHABET.length)];
+  return `CF-${code}`;
+}
+
+/**
+ * Код регистрации в сообщении гостя. Ищем внутри текста: WhatsApp присылает
+ * его вместе с подготовленной фразой, а кто-то допишет «привет» от себя.
+ */
+export function findSignupCode(text: string): string | null {
+  const match = /(?:^|[^A-Z0-9])CF[-\s]?([2-9A-HJ-NP-Z]{4})(?![A-Z0-9])/i.exec(text);
+  return match ? `CF-${match[1].toUpperCase()}` : null;
+}
+
+/** Ссылка, которая открывает WhatsApp с готовым сообщением на номер клуба. */
+export function signupLink(clubPhone: string, code: string, clubName: string): string {
+  const text = `Регистрация в ${clubName}: ${code}`;
+  return `https://wa.me/${clubPhone}?text=${encodeURIComponent(text)}`;
+}
+
+/** Имя или ник гостя: без лишних пробелов, от 2 до 24 знаков. */
+export function cleanNickname(raw: string): string | null {
+  const cleaned = raw.replace(/\s+/g, " ").trim();
+  return cleaned.length >= 2 && cleaned.length <= 24 ? cleaned : null;
+}
+
+export function signupConfirmedMessage(computerName: string, existingName: string | null): string {
+  return existingName
+    ? `Номер подтверждён ✅ Вернитесь к ${computerName} и задайте новый PIN для аккаунта «${existingName}».`
+    : `Номер подтверждён ✅ Вернитесь к ${computerName}: осталось ввести ник и придумать PIN.`;
+}

@@ -41,6 +41,11 @@ export interface RealtimeEvents {
    * список всем сорока при каждой правке дороже, чем сказать «обнови».
    */
   "library.changed": { clubId: string };
+  /*
+   * Гость отправил код регистрации со своего WhatsApp. Экран машины, на
+   * которой висит QR, переходит к вводу ника и PIN.
+   */
+  "signup.confirmed": { computerId: string; code: string; existingName: string | null };
 }
 
 @Injectable()

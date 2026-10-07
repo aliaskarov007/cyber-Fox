@@ -5,6 +5,7 @@ import {
   type GuestLoginResult,
   formatMoney,
 } from "./agent-client.js";
+import { SignupScreen } from "./SignupScreen.js";
 
 /**
  * Экран блокировки: вход по телефону и PIN.
@@ -43,13 +44,13 @@ export function LockScreen({
   }, [called]);
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
+  const [signingUp, setSigningUp] = useState(false);
 
-  async function submit(event: FormEvent): Promise<void> {
-    event.preventDefault();
+  async function login(withPhone: string, withPin: string): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      const result = await client.login(phone, pin);
+      const result = await client.login(withPhone, withPin);
       if (!result.ok) setError(result.reason ?? "Не удалось войти");
       else setCard(result);
     } catch (cause) {
@@ -57,6 +58,11 @@ export function LockScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    await login(phone, pin);
   }
 
   async function start(tariffId?: string): Promise<void> {
@@ -70,6 +76,22 @@ export function LockScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (signingUp && !card?.guest) {
+    return (
+      <SignupScreen
+        client={client}
+        onCancel={() => setSigningUp(false)}
+        onDone={(newPhone, newPin) => {
+          // Аккаунт готов — входим сразу, не заставляя набирать то же самое.
+          setSigningUp(false);
+          setPhone(newPhone);
+          setPin("");
+          void login(newPhone, newPin);
+        }}
+      />
+    );
   }
 
   if (card?.guest) {
@@ -171,6 +193,11 @@ export function LockScreen({
 
       <button className="primary" type="submit" disabled={busy || pin.length !== 4}>
         {busy ? "Проверяем…" : "Войти"}
+      </button>
+
+      {/* Новый гость регистрируется сам: QR → сообщение в WhatsApp клуба → ник и PIN. */}
+      <button className="ghost" type="button" disabled={!online} onClick={() => setSigningUp(true)}>
+        Я здесь впервые — регистрация
       </button>
 
       {perMinutePrice !== null && (

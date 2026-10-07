@@ -31,6 +31,16 @@ export interface GuestLoginResult {
   minutesAffordable: number | null;
 }
 
+export type SignupStart =
+  | { ok: true; code: string; link: string; clubPhone: string; expiresAt: string }
+  | { ok: false; reason: string };
+
+export interface SignupConfirmed {
+  code: string;
+  /** Аккаунт с этим номером уже есть — гость задаёт ему новый PIN. */
+  existingName: string | null;
+}
+
 export interface Tick {
   sessionId: string;
   /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
@@ -120,6 +130,30 @@ export class AgentClient {
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
+  }
+
+  /** Регистрация нового гостя: код и ссылка для QR. */
+  startSignup(): Promise<SignupStart> {
+    return this.request("signup.start", {});
+  }
+
+  completeSignup(
+    code: string,
+    nickname: string,
+    pin: string,
+  ): Promise<{ ok: true; phone: string } | { ok: false; reason: string }> {
+    return this.request("signup.complete", { code, nickname, pin });
+  }
+
+  /**
+   * Гость отправил код из своего WhatsApp. Подписка живёт, пока открыт экран
+   * регистрации, — возвращается функция отписки.
+   */
+  onSignupConfirmed(listener: (event: SignupConfirmed) => void): () => void {
+    this.socket?.on("signup.confirmed", listener);
+    return () => {
+      this.socket?.off("signup.confirmed", listener);
+    };
   }
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {

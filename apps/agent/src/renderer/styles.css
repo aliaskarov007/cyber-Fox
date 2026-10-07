@@ -570,3 +570,29 @@ button:disabled {
 .session-guest-name {
   font-weight: 650;
 }
+
+/* --- Регистрация через WhatsApp --- */
+
+/* QR крупный и на белом поле: камера телефона читает его с расстояния вытянутой руки. */
+.qr {
+  display: block;
+  width: 240px;
+  height: 240px;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.code {
+  font-family: var(--mono);
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}

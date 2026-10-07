@@ -3,12 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   CODE_MAX_ATTEMPTS,
   checkCode,
+  cleanNickname,
+  findSignupCode,
   inviteMessage,
+  makeSignupCode,
   normalizePhone,
   parseInviteReply,
   phoneFromChatId,
   readIncoming,
   samePhone,
+  signupLink,
   toChatId,
 } from "./whatsapp.rules.js";
 
@@ -145,5 +149,40 @@ describe("текст приглашения", () => {
     expect(text).toContain("20:00");
     expect(text).toContain("Cyber-Fox Центр, Алматы");
     expect(text).toContain("СТОП");
+  });
+});
+
+describe("регистрация за ПК", () => {
+  it("код из алфавита без похожих знаков", () => {
+    let i = 0;
+    const code = makeSignupCode((max) => (i++ * 7) % max);
+    expect(/^CF-[2-9A-HJ-NP-Z]{4}$/.test(code)).toBe(true);
+  });
+
+  it("находит код в подготовленном сообщении", () => {
+    expect(findSignupCode("Регистрация в Cyber-Fox Центр: CF-7K2Q")).toBe("CF-7K2Q");
+  });
+
+  it("прощает строчные буквы и пропущенный дефис", () => {
+    expect(findSignupCode("cf7k2q")).toBe("CF-7K2Q");
+    expect(findSignupCode("привет cf 7k2q")).toBe("CF-7K2Q");
+  });
+
+  it("не принимает похожее, но чужое", () => {
+    expect(findSignupCode("CF-7K2Q9")).toBeNull();
+    expect(findSignupCode("CF-0OIL")).toBeNull();
+    expect(findSignupCode("да")).toBeNull();
+  });
+
+  it("ссылка wa.me с закодированным текстом", () => {
+    expect(signupLink("77011234567", "CF-7K2Q", "Клуб")).toBe(
+      "https://wa.me/77011234567?text=" + encodeURIComponent("Регистрация в Клуб: CF-7K2Q"),
+    );
+  });
+
+  it("ник чистится и проверяется по длине", () => {
+    expect(cleanNickname("  Shadow   Fox ")).toBe("Shadow Fox");
+    expect(cleanNickname("A")).toBeNull();
+    expect(cleanNickname("x".repeat(25))).toBeNull();
   });
 });
