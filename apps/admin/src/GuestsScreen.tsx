@@ -11,6 +11,7 @@ import {
   toTiyn,
 } from "./api.js";
 import { GuestNewForm } from "./GuestNewForm.js";
+import { GuestPhoneVerify } from "./GuestPhoneVerify.js";
 import { GuestPinForm } from "./GuestPinForm.js";
 
 const TRANSACTION_LABEL: Record<string, string> = {
@@ -61,6 +62,7 @@ export function GuestsScreen({ club }: { club: Club }) {
               <th>Телефон</th>
               <th>Бонусы</th>
               <th>PIN</th>
+              <th>WhatsApp</th>
               <th />
             </tr>
           </thead>
@@ -71,6 +73,7 @@ export function GuestsScreen({ club }: { club: Club }) {
                 <td className="num">{guest.phone}</td>
                 <td className="num">{formatMoney(guest.bonusPoints)}</td>
                 <td>{guest.hasPin ? "задан" : "—"}</td>
+                <td>{guest.phoneVerified ? (guest.invitesOptOut ? "отписан" : "✓") : "—"}</td>
                 <td>
                   <button onClick={() => setSelectedId(guest.id)}>Карточка</button>
                 </td>
@@ -78,7 +81,7 @@ export function GuestsScreen({ club }: { club: Club }) {
             ))}
             {guests.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: "var(--muted)" }}>
+                <td colSpan={6} style={{ color: "var(--muted)" }}>
                   Никого не нашли
                 </td>
               </tr>
@@ -161,6 +164,18 @@ function GuestCardPanel({
           club={club}
           guestId={guestId}
           hasPin={card.guest.hasPin}
+          onChanged={() => {
+            void load();
+            onChanged();
+          }}
+        />
+      </div>
+
+      <div className="section">
+        <h3>Номер телефона</h3>
+        <GuestPhoneVerify
+          club={club}
+          guest={card.guest}
           onChanged={() => {
             void load();
             onChanged();

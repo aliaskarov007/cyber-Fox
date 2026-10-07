@@ -29,6 +29,10 @@ export interface PublicGuest {
   phone: string;
   bonusPoints: number;
   hasPin: boolean;
+  /** Номер подтверждён кодом из WhatsApp: только таким гостям уходят приглашения. */
+  phoneVerified: boolean;
+  /** Гость ответил «СТОП» на рассылку. */
+  invitesOptOut: boolean;
   createdAt: Date;
 }
 
@@ -113,6 +117,8 @@ export function toPublicGuest(guest: Guest): PublicGuest {
     phone: guest.phone,
     bonusPoints: guest.bonusPoints,
     hasPin: guest.pinHash !== null,
+    phoneVerified: guest.phoneVerifiedAt !== null,
+    invitesOptOut: guest.invitesOptOutAt !== null,
     createdAt: guest.createdAt,
   };
 }

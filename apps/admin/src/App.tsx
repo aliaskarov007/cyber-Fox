@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { BarScreen } from "./BarScreen.js";
+import { EventsScreen } from "./EventsScreen.js";
 import { PlatformLogin, PlatformScreen } from "./PlatformScreen.js";
 import { getPlatformToken } from "./platform-api.js";
 import { LibraryScreen } from "./LibraryScreen.js";
@@ -21,6 +22,7 @@ export type Tab =
   | "hall"
   | "bar"
   | "guests"
+  | "events"
   | "tariffs"
   | "library"
   | "network"
@@ -31,6 +33,7 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: bo
   { id: "hall", label: "Зал" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
+  { id: "events", label: "Ивенты" },
   { id: "tariffs", label: "Тарифы" },
   // Витрину зала собирает владелец или управляющий: сервер закрывает правку ролью.
   { id: "library", label: "Игры", manageOnly: true },
@@ -167,6 +170,8 @@ function ClubApp() {
         <BarScreen club={club} staff={staff} />
       ) : tab === "guests" ? (
         <GuestsScreen club={club} />
+      ) : tab === "events" ? (
+        <EventsScreen club={club} staff={staff} />
       ) : tab === "library" ? (
         <LibraryScreen club={club} />
       ) : tab === "network" ? (

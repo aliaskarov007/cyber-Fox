@@ -49,6 +49,8 @@ model Tenant {
   subscription Subscription?
   invoices     Invoice[]
   paymentIntents PaymentIntent[]
+  whatsapp     WhatsAppChannel?
+  events       Event[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,6 +235,7 @@ model Club {
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
+  events    Event[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -481,6 +484,14 @@ model Guest {
 
   bonusPoints Int @default(0)
 
+  /// Когда гость подтвердил номер кодом из WhatsApp. Пусто — номер не проверен,
+  /// и приглашений на ивенты такой гость не получает: писать на чужой или
+  /// опечатанный номер — прямой путь к блокировке номера клуба.
+  phoneVerifiedAt DateTime?
+  /// Гость ответил «СТОП» на рассылку. Приглашения ему больше не уходят,
+  /// пока он сам не напишет «СТАРТ».
+  invitesOptOutAt DateTime?
+
   wallets  GuestWallet[]
   packages GuestPackage[]
   sessions Session[]
@@ -488,6 +499,8 @@ model Guest {
   payments Payment[]
   sales    ProductSale[]
   paymentIntents PaymentIntent[]
+  phoneCodes PhoneVerification[]
+  invites    EventInvite[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -908,4 +921,112 @@ model Shift {
   /// Открытая смена в клубе должна быть одна: две кассы одновременно не сверить.
   @@index([clubId, openedAt])
   @@index([clubId, closedAt])
+}
+
+/**
+ * Подключение сети к WhatsApp через Green-API.
+ *
+ * Один номер на сеть: гость общий для всех залов, и писать ему должен один
+ * и тот же отправитель, иначе ответ «иду» уйдёт не туда.
+ * Токен инстанса наружу не отдаётся — с ним можно писать от имени клуба.
+ */
+model WhatsAppChannel {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Адрес API из личного кабинета Green-API (у новых инстансов он свой).
+  apiUrl     String @default("https://api.green-api.com")
+  instanceId String @unique
+  apiToken   String
+  /// Секрет входящих уведомлений: Green-API присылает его в заголовке Authorization.
+  webhookToken String @unique @default(uuid())
+
+  /// Последнее известное состояние инстанса: authorized, notAuthorized и т.п.
+  lastState   String?
+  lastCheckAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/** Код подтверждения номера гостя. Хранится хешем, живёт несколько минут. */
+model PhoneVerification {
+  id      String @id @default(uuid())
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([guestId, createdAt])
+}
+
+enum EventAudience {
+  /// Все гости сети с подтверждённым номером.
+  NETWORK
+  /// Только те, кто хоть раз играл в зале ивента.
+  CLUB
+}
+
+/** Ивент в зале: турнир, LAN-вечер, ночь с акцией. Приглашения расходятся по сети. */
+model Event {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String
+  club     Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  startsAt    DateTime
+  audience    EventAudience @default(NETWORK)
+
+  createdById String?
+  /// Когда разослали приглашения. Пусто — черновик.
+  sentAt     DateTime?
+  canceledAt DateTime?
+
+  invites EventInvite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, startsAt])
+  @@index([clubId, startsAt])
+}
+
+enum InviteStatus {
+  /// В очереди на отправку.
+  PENDING
+  SENT
+  FAILED
+  GOING
+  DECLINED
+}
+
+model EventInvite {
+  id      String @id @default(uuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  status InviteStatus @default(PENDING)
+  providerMessageId String?
+  error       String?
+  sentAt      DateTime?
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Один гость — одно приглашение на ивент: повторная рассылка не спамит.
+  @@unique([eventId, guestId])
+  @@index([status, createdAt])
+  @@index([guestId, sentAt])
 }

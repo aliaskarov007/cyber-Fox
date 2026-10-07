@@ -71,6 +71,10 @@ export interface Guest {
   phone: string;
   bonusPoints: number;
   hasPin: boolean;
+  /** Номер подтверждён кодом из WhatsApp — только таким гостям уходят приглашения. */
+  phoneVerified: boolean;
+  /** Гость ответил «СТОП» на рассылку. */
+  invitesOptOut: boolean;
 }
 
 export interface Computer {
@@ -551,6 +555,54 @@ export const api = {
   payInvoice: (invoiceId: string) =>
     request<Checkout>(`/subscription/invoices/${invoiceId}/pay`, { method: "POST" }),
 
+  // --- WhatsApp и ивенты ---
+
+  whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
+
+  saveWhatsApp: (body: { apiUrl?: string; instanceId: string; apiToken?: string; publicUrl?: string }) =>
+    request<WhatsAppChannel & { warning: string | null }>("/network/whatsapp", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  checkWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp/check", { method: "POST" }),
+
+  testWhatsApp: (phone: string) =>
+    request<{ ok: true }>("/network/whatsapp/test", { method: "POST", body: JSON.stringify({ phone }) }),
+
+  disconnectWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp", { method: "DELETE" }),
+
+  sendPhoneCode: (clubId: string, guestId: string) =>
+    request<{ sentTo: string; expiresAt: string }>(`/clubs/${clubId}/guests/${guestId}/phone/send-code`, {
+      method: "POST",
+    }),
+
+  /** Ошибка ввода приходит ответом, а не статусом: так сервер честно считает попытки. */
+  confirmPhoneCode: (clubId: string, guestId: string, code: string) =>
+    request<{ ok: true; phoneVerifiedAt: string } | { ok: false; error: string }>(
+      `/clubs/${clubId}/guests/${guestId}/phone/confirm`,
+      { method: "POST", body: JSON.stringify({ code }) },
+    ),
+
+  events: (clubId: string) => request<ClubEvent[]>(`/clubs/${clubId}/events`),
+
+  eventAudience: (clubId: string, audience: EventAudience) =>
+    request<{ guests: number; unverified: number }>(`/clubs/${clubId}/events/audience?audience=${audience}`),
+
+  createEvent: (
+    clubId: string,
+    body: { title: string; description?: string; startsAt: string; audience: EventAudience },
+  ) => request<ClubEvent>(`/clubs/${clubId}/events`, { method: "POST", body: JSON.stringify(body) }),
+
+  sendEvent: (clubId: string, eventId: string) =>
+    request<{ queued: number }>(`/clubs/${clubId}/events/${eventId}/send`, { method: "POST" }),
+
+  cancelEvent: (clubId: string, eventId: string) =>
+    request<ClubEvent>(`/clubs/${clubId}/events/${eventId}/cancel`, { method: "POST" }),
+
+  eventInvites: (clubId: string, eventId: string) =>
+    request<EventInvite[]>(`/clubs/${clubId}/events/${eventId}/invites`),
+
   // --- Перенос данных ---
 
   importCsv: (clubId: string, kind: "guests" | "computers" | "tariffs", csv: string) =>
@@ -629,6 +681,48 @@ function periodQuery(period: { from?: string; to?: string }): string {
   if (period.to) params.set("to", period.to);
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+export interface WhatsAppChannel {
+  connected: boolean;
+  apiUrl: string | null;
+  instanceId: string | null;
+  apiTokenHint: string | null;
+  /** authorized — номер привязан и может писать. */
+  state: string | null;
+  lastCheckAt: string | null;
+  webhookPath: string;
+}
+
+export type EventAudience = "NETWORK" | "CLUB";
+export type InviteStatus = "PENDING" | "SENT" | "FAILED" | "GOING" | "DECLINED";
+
+export interface ClubEvent {
+  id: string;
+  clubId: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  audience: EventAudience;
+  sentAt: string | null;
+  canceledAt: string | null;
+  invites?: {
+    total: number;
+    pending: number;
+    sent: number;
+    failed: number;
+    going: number;
+    declined: number;
+  };
+}
+
+export interface EventInvite {
+  id: string;
+  status: InviteStatus;
+  error: string | null;
+  sentAt: string | null;
+  respondedAt: string | null;
+  guest: { id: string; fullName: string; phone: string };
 }
 
 export interface Tenant {

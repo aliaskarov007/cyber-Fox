@@ -25,6 +25,8 @@ import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
 import { SignupModule } from "./signup/signup.module.js";
 import { UploadsModule } from "./uploads/uploads.module.js";
+import { EventsModule } from "./events/events.module.js";
+import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { UploadsModule } from "./uploads/uploads.module.js";
     PaymentsModule,
     PlatformModule,
     RealtimeModule,
+    WhatsAppModule,
+    EventsModule,
   ],
   providers: [
     // Закрыто по умолчанию: публичные точки помечаются явно декоратором @Public.
