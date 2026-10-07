@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
+import { AfishaScreen } from "./AfishaScreen.js";
 import { BarScreen } from "./BarScreen.js";
 import { PlatformLogin, PlatformScreen } from "./PlatformScreen.js";
 import { getPlatformToken } from "./platform-api.js";
@@ -23,6 +24,7 @@ export type Tab =
   | "guests"
   | "tariffs"
   | "library"
+  | "afisha"
   | "network"
   | "onboarding"
   | "settings";
@@ -34,6 +36,8 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: bo
   { id: "tariffs", label: "Тарифы" },
   // Витрину зала собирает владелец или управляющий: сервер закрывает правку ролью.
   { id: "library", label: "Игры", manageOnly: true },
+  // Афиша общая на сеть: ивенты заводят владелец и управляющие.
+  { id: "afisha", label: "Афиша", manageOnly: true },
   { id: "network", label: "Сеть", ownerOnly: true },
   { id: "onboarding", label: "Подключение" },
   { id: "settings", label: "Настройки" },
@@ -169,6 +173,8 @@ function ClubApp() {
         <GuestsScreen club={club} />
       ) : tab === "library" ? (
         <LibraryScreen club={club} />
+      ) : tab === "afisha" ? (
+        <AfishaScreen clubs={clubs} isOwner={staff.role === "OWNER"} />
       ) : tab === "network" ? (
         <NetworkScreen clubs={clubs} />
       ) : tab === "onboarding" ? (

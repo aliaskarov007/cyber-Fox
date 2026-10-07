@@ -19,6 +19,8 @@ export interface PairedInfo {
   computerName: string;
   zoneName: string;
   clubName: string;
+  /** Подарок за подписку на приглашения, в тиын. У старого сервера поля нет. */
+  consentBonus?: number;
 }
 
 export interface GuestLoginResult {
@@ -29,7 +31,50 @@ export interface GuestLoginResult {
   packagesElsewhere: Array<{ id: string; zoneName: string; minutesRemaining: number }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;
+  /** Абонемент скоро кончится: продлите — часть остатка переедет. */
+  renewalHint?: string | null;
 }
+
+/** Ивент в афише на экране блокировки. */
+export interface AfishaEvent {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  startsAt: string;
+  clubName: string | null;
+  prize: string | null;
+  fee: string | null;
+  seats: string | null;
+  howToJoin: string | null;
+}
+
+export interface Afisha {
+  ok: boolean;
+  brand: { name: string; slogan: string } | null;
+  events: AfishaEvent[];
+}
+
+export type LookupResult =
+  | { ok: true; phone: string; next: "PIN" | "REGISTER" }
+  | { ok: false; reason: string };
+
+export type RegisterResult =
+  | {
+      ok: true;
+      mode: "WHATSAPP";
+      verificationId: string;
+      link: string;
+      code: string;
+      businessNumber: string;
+      expiresAt: string;
+    }
+  | { ok: true; mode: "DONE"; guestId: string; consentText: string; bonus: number }
+  | { ok: false; reason: string };
+
+export type RegisterStatus =
+  | { state: "WAITING" }
+  | { state: "EXPIRED" }
+  | { state: "DONE"; guestId: string; consentText: string; bonus: number };
 
 export interface Tick {
   sessionId: string;
@@ -42,6 +87,11 @@ export interface Tick {
   minutesAffordable: number | null;
   creditLeft: number | null;
   accruedCost: number;
+  /** После пакета: цена поминутки и на сколько минут хватит баланса. */
+  afterPackagePrice?: number | null;
+  afterPackageMinutes?: number | null;
+  /** За сколько минут до конца предупреждать — настройка зала. */
+  warnMinutes?: number;
 }
 
 declare global {
@@ -85,6 +135,8 @@ export class AgentClient {
     onRejected: (reason: string) => void;
     /** Каталог клуба изменился: полки надо перечитать. */
     onLibraryChanged: () => void;
+    /** Афиша или подпись сети изменились. */
+    onAfishaChanged: () => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
 
@@ -117,6 +169,7 @@ export class AgentClient {
     this.socket.on("session.switched", handlers.onSwitched);
     this.socket.on("lock", handlers.onLock);
     this.socket.on("library.changed", handlers.onLibraryChanged);
+    this.socket.on("afisha.changed", handlers.onAfishaChanged);
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
@@ -124,6 +177,31 @@ export class AgentClient {
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {
     return this.request("guest.login", { phone, pin });
+  }
+
+  /** Афиша сети и её подпись для экрана блокировки. */
+  afisha(): Promise<Afisha> {
+    return this.request("afisha.fetch", {});
+  }
+
+  /** Первый шаг: знаком ли номер — дальше PIN или регистрация. */
+  lookup(phone: string): Promise<LookupResult> {
+    return this.request("guest.lookup", { phone });
+  }
+
+  /** Регистрация нового гостя прямо за этим ПК. */
+  register(phone: string, pin: string): Promise<RegisterResult> {
+    return this.request("guest.register", { phone, pin });
+  }
+
+  /** Пришло ли сообщение с кодом в WhatsApp клуба. */
+  registerStatus(verificationId: string): Promise<RegisterStatus> {
+    return this.request("guest.register.status", { verificationId });
+  }
+
+  /** Ответ на вопрос о приглашениях сразу после регистрации. */
+  consent(guestId: string, accept: boolean): Promise<{ ok: boolean; bonus: number; reason?: string }> {
+    return this.request("guest.consent", { guestId, accept });
   }
 
   startSession(guestId: string, tariffId?: string): Promise<{ ok: boolean; reason?: string }> {

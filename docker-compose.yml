@@ -50,6 +50,9 @@ services:
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-manual}
       PAYMENT_CHECKOUT_URL: ${PAYMENT_CHECKOUT_URL:-}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
+      WHATSAPP_NUMBER: ${WHATSAPP_NUMBER:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       TZ: ${TZ:-Asia/Almaty}
     volumes:
       # Загруженные обложки живут отдельно от образа: пересборка сервера не

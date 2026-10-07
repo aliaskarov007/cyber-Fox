@@ -826,3 +826,24 @@ tr.muted td {
  */
 /* Пустые места видны только когда расставляют: в обычном виде они шум. */
 /* Та же шкала состояний, что у карточек: занятость читается цветом. */
+/* Галочка с подписью в одну строку — согласие гостя на стойке. */
+label.check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+label.check input {
+  width: auto;
+}
+
+/* Шаблоны частых пакетов над формой тарифа. */
+.presets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}

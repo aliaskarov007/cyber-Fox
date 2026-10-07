@@ -22,6 +22,7 @@ import {
   decideNextMinute,
   minutesAffordable,
   pickNextPackage,
+  pickFallbackPerMinute,
   pickPerMinuteTariff,
 } from "../billing/billing.rules.js";
 import { ClubAccessService } from "../common/club-access.service.js";
@@ -640,8 +641,9 @@ export class SessionsService {
       kind = TariffKind.PACKAGE;
       guestPackageId = pkg.id;
     } else {
-      const fallback = pickPerMinuteTariff(await this.loadPerMinuteTariffs(session.zoneId), moment);
-      if (!fallback) throw new BadRequestException("В зоне нет действующего поминутного тарифа");
+      // Продолжение уже идущей игры — пробел в расписании тарифов её не обрывает.
+      const fallback = pickFallbackPerMinute(await this.loadPerMinuteTariffs(session.zoneId), moment);
+      if (!fallback) throw new BadRequestException("В зоне нет поминутного тарифа");
       tariffId = fallback.id;
       kind = TariffKind.PER_MINUTE;
     }
@@ -730,7 +732,7 @@ export class SessionsService {
           },
         });
       } else {
-        const fallback = pickPerMinuteTariff(
+        const fallback = pickFallbackPerMinute(
           await this.loadPerMinuteTariffs(target.zoneId),
           moment,
         );
@@ -918,6 +920,11 @@ export class SessionsService {
     guestName: string | null;
     bonusPoints: number | null;
     tariffName: string | null;
+    /* Что будет после пакета: цена поминутки и на сколько минут хватит баланса. */
+    afterPackagePrice: number | null;
+    afterPackageMinutes: number | null;
+    /** За сколько минут до конца предупреждать — настройка зала. */
+    warnMinutes: number;
   } | null> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
@@ -943,6 +950,15 @@ export class SessionsService {
       : null;
     const price = tariff?.pricePerMinute ?? 0;
 
+    // Гость на пакете заранее видит, во что обойдётся игра после него: переход
+    // на поминутку автоматический, и сюрпризом он быть не должен.
+    const after = pkg
+      ? pickFallbackPerMinute(
+          await this.loadPerMinuteTariffs(session.zoneId),
+          toLocalMoment(new Date(), session.club.timezone),
+        )
+      : null;
+
     return {
       clubId: session.clubId,
       computerId: session.computerId,
@@ -956,6 +972,10 @@ export class SessionsService {
       guestName: session.guest?.fullName ?? null,
       bonusPoints: session.guest?.bonusPoints ?? null,
       tariffName: tariff?.name ?? null,
+      afterPackagePrice: after?.pricePerMinute ?? null,
+      afterPackageMinutes:
+        after && wallet && after.pricePerMinute > 0 ? minutesAffordable(wallet, after.pricePerMinute) : null,
+      warnMinutes: session.club.lowBalanceWarnMinutes,
     };
   }
 

@@ -39,3 +39,10 @@ export function toLocalMoment(at: Date, timezone: string): LocalMoment {
     at,
   };
 }
+
+/** День и месяц по часам клуба — для дат в сообщениях гостю. */
+export function toLocalDate(at: Date, timezone: string): { day: number; month: number } {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, day: "numeric", month: "numeric" }).formatToParts(at);
+  const pick = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { day: pick("day"), month: pick("month") };
+}

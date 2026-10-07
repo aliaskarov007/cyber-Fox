@@ -122,12 +122,8 @@ export function TariffsScreen({ club }: { club: Club }) {
                 <tr key={tariff.id} className={tariff.isActive ? "" : "muted"}>
                   <td>{tariff.name}</td>
                   <td>{zoneName(tariff.zoneId)}</td>
-                  <td>{tariff.kind === "PACKAGE" ? "Пакет" : "Поминутно"}</td>
-                  <td className="num">
-                    {tariff.kind === "PACKAGE"
-                      ? `${formatMoney(tariff.packagePrice ?? 0)} за ${tariff.packageMinutes} мин`
-                      : `${formatMoney(tariff.pricePerMinute ?? 0)}/мин`}
-                  </td>
+                  <td>{kindLabel(tariff)}</td>
+                  <td className="num">{priceLabel(tariff)}</td>
                   <td className="num">{formatWindow(tariff)}</td>
                   <td>{tariff.isActive ? "работает" : "выключен"}</td>
                   <td className="actions">
@@ -151,4 +147,20 @@ export function TariffsScreen({ club }: { club: Club }) {
       </section>
     </main>
   );
+}
+
+function kindLabel(tariff: Tariff): string {
+  if (tariff.kind === "PER_MINUTE") return "Поминутно";
+  if (tariff.packageFormat === "NIGHT") return "Ночной пакет";
+  if (tariff.packageFormat === "SUBSCRIPTION") return "Абонемент";
+  return tariff.bonusMinutes > 0 ? "Пакет с подарком" : "Пакет";
+}
+
+function priceLabel(tariff: Tariff): string {
+  if (tariff.kind === "PER_MINUTE") return `${formatMoney(tariff.pricePerMinute ?? 0)}/мин`;
+  const price = formatMoney(tariff.packagePrice ?? 0);
+  if (tariff.packageFormat === "NIGHT") return `${price} до конца ночи`;
+  const paid = tariff.packageMinutes ?? 0;
+  if (tariff.bonusMinutes > 0) return `${price} за ${paid + tariff.bonusMinutes} мин (${paid} + ${tariff.bonusMinutes} в подарок)`;
+  return `${price} за ${paid} мин`;
 }

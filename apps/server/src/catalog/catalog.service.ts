@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { type Computer, type Tariff, TariffKind, type Zone } from "@prisma/client";
+import { type Computer, PackageFormat, type Tariff, TariffKind, type Zone } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -142,6 +142,8 @@ export class CatalogService {
         pricePerMinute: dto.pricePerMinute ?? null,
         packageMinutes: dto.packageMinutes ?? null,
         packagePrice: dto.packagePrice ?? null,
+        packageFormat: dto.packageFormat ?? PackageFormat.MINUTES,
+        bonusMinutes: dto.bonusMinutes ?? 0,
         validityDays: dto.validityDays ?? null,
         fallbackTariffId: dto.fallbackTariffId ?? null,
         activeFromMinute: dto.activeFromMinute ?? null,
@@ -183,16 +185,24 @@ export class CatalogService {
       }
     }
 
-    if (dto.kind === TariffKind.PACKAGE) {
-      if (!dto.packageMinutes || dto.packagePrice === undefined) {
-        throw new BadRequestException("Для пакета нужны минуты и цена");
-      }
-    }
-
     const hasFrom = dto.activeFromMinute !== undefined && dto.activeFromMinute !== null;
     const hasTo = dto.activeToMinute !== undefined && dto.activeToMinute !== null;
     if (hasFrom !== hasTo) {
       throw new BadRequestException("Окно действия задаётся началом и концом сразу");
+    }
+
+    if (dto.kind === TariffKind.PACKAGE) {
+      if (dto.packageFormat === PackageFormat.NIGHT) {
+        // Минут у ночного нет: он длится до конца окна, сколько бы ни осталось.
+        if (dto.packagePrice === undefined || dto.packagePrice === null) {
+          throw new BadRequestException("Для ночного пакета нужна цена");
+        }
+        if (!hasFrom) {
+          throw new BadRequestException("Ночному пакету нужно окно: например, с 22:00 до 08:00");
+        }
+      } else if (!dto.packageMinutes || dto.packagePrice === undefined) {
+        throw new BadRequestException("Для пакета нужны минуты и цена");
+      }
     }
   }
 

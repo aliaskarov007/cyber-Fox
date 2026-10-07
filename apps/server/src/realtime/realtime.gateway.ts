@@ -15,6 +15,8 @@ import type { OfflineOperationInput } from "../offline/offline.service.js";
 import { OfflineService } from "../offline/offline.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
+import { AfishaService } from "../afisha/afisha.service.js";
+import { GuestSignupService } from "../guest-signup/guest-signup.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
@@ -45,6 +47,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly offline: OfflineService,
     private readonly sessions: SessionsService,
     private readonly library: LibraryService,
+    private readonly signup: GuestSignupService,
+    private readonly afisha: AfishaService,
   ) {}
 
   onModuleInit(): void {
@@ -79,6 +83,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
      */
     this.bus.on("library.changed", (e) => {
       this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
+    });
+    this.bus.on("afisha.changed", (e) => {
+      for (const clubId of e.clubIds) this.server.to(clubAgentsRoom(clubId)).emit("afisha.changed", {});
     });
   }
 
@@ -163,7 +170,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       zoneId: string;
       name: string;
       zone: { name: string };
-      club: { name: string };
+      club: { name: string; consentBonus: number };
     },
   ): Promise<void> {
     client.data.computerId = computer.id;
@@ -176,6 +183,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       computerName: computer.name,
       zoneName: computer.zone.name,
       clubName: computer.club.name,
+      // Подарок за подписку показывается ещё на первом экране — как повод
+      // зарегистрироваться.
+      consentBonus: computer.club.consentBonus,
     });
 
     // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние
@@ -204,6 +214,55 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     return this.agents.guestLogin(computerId, body.phone, body.pin);
+  }
+
+  /** Афиша сети и её подпись для экрана блокировки. */
+  @SubscribeMessage("afisha.fetch")
+  async afishaFetch(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, events: [], brand: null };
+    return { ok: true, ...(await this.afisha.forScreen(computerId)) };
+  }
+
+  /** Первый шаг входа: знаком ли номер. */
+  @SubscribeMessage("guest.lookup")
+  async guestLookup(@ConnectedSocket() client: Socket, @MessageBody() body: { phone: string }) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    return this.signup.lookup(computerId, String(body?.phone ?? ""));
+  }
+
+  /** Регистрация нового гостя прямо за ПК. */
+  @SubscribeMessage("guest.register")
+  async guestRegister(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { phone: string; pin: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    return this.signup.register(computerId, String(body?.phone ?? ""), String(body?.pin ?? ""));
+  }
+
+  /** Экран ждёт, когда гость отправит код в WhatsApp. */
+  @SubscribeMessage("guest.register.status")
+  async guestRegisterStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { verificationId: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { state: "EXPIRED" };
+    return this.signup.status(computerId, String(body?.verificationId ?? ""));
+  }
+
+  /** Ответ на вопрос о приглашениях сразу после регистрации. */
+  @SubscribeMessage("guest.consent")
+  async guestConsent(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { guestId: string; accept: boolean },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, bonus: 0, reason: "ПК не опознан" };
+    return this.signup.answerConsent(computerId, String(body?.guestId ?? ""), body?.accept === true);
   }
 
   @SubscribeMessage("session.start")

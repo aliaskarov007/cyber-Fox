@@ -570,3 +570,582 @@ button:disabled {
 .session-guest-name {
   font-weight: 650;
 }
+
+/* --- Экран блокировки: сцена леса, окно входа и афиша --- */
+
+/*
+ * Палитра сцены: ночной лес, мятное свечение и фирменный оранжевый. Оранжевым
+ * выделено только главное действие, лиса и подарок — иначе он перестаёт
+ * указывать, куда нажать.
+ */
+.stage-backdrop {
+  --moss: #5fe3b0;
+  --fox: #e1521c;
+  --fox-hi: #f26430;
+  --ember: #ffb36b;
+  --mist: #a9bcb6;
+  --glass: rgba(8, 14, 16, 0.74);
+  --glass-line: rgba(95, 227, 176, 0.16);
+  --glass-line-strong: rgba(95, 227, 176, 0.28);
+  --display: Bahnschrift, "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #05090c;
+}
+
+/* Холст 1920×1080; масштаб под монитор задаёт LockStage. */
+.stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mist.m1 {
+  animation: mist-drift 22s ease-in-out infinite alternate;
+}
+
+.mist.m2 {
+  animation: mist-drift 30s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes mist-drift {
+  to {
+    transform: translateX(120px);
+  }
+}
+
+.fireflies circle {
+  animation: firefly-rise linear infinite;
+}
+
+@keyframes firefly-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 0.9; }
+  60% { transform: translate(22px, -150px); opacity: 0.7; }
+  100% { transform: translate(-14px, -300px); opacity: 0; }
+}
+
+.fx {
+  stroke: #ff9a5e;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.fx.body { fill: #b9461a; }
+.fx.head { fill: #e1521c; }
+.fx.chest { fill: #ffe6d2; stroke: none; }
+.fx.tail { fill: #9c3a14; }
+.fx.tailtip { fill: #ffe6d2; stroke: none; }
+.fx.ear { fill: #3a1408; stroke: none; }
+
+.fx.tail,
+.fx.tailtip {
+  transform-origin: -10px -10px;
+  animation: fox-tail 4s ease-in-out infinite alternate;
+}
+
+@keyframes fox-tail {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(5deg); }
+}
+
+.fox-eye {
+  fill: var(--moss);
+  animation: fox-blink 6s infinite;
+}
+
+@keyframes fox-blink {
+  0%, 93%, 100% { opacity: 1; }
+  96% { opacity: 0; }
+}
+
+/* «Уменьшить движение» в Windows — сцена замирает. */
+@media (prefers-reduced-motion: reduce) {
+  .stage * {
+    animation: none !important;
+  }
+}
+
+/* Сетка: всё стоит на двух общих линиях — верх 200 и низ 880. */
+.frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 72px 456px 1fr 760px 40px 448px 72px;
+  grid-template-rows: 200px minmax(680px, auto) 1fr;
+}
+
+.brand {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  display: grid;
+  gap: 8px;
+}
+
+.brand .word {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 56px;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+.brand .word span {
+  color: var(--fox);
+}
+
+.brand .sub {
+  color: var(--mist);
+  font-size: 20px;
+}
+
+.win {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: 22px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 40px 90px -40px #000;
+}
+
+/* --- Окно входа --- */
+
+.login {
+  grid-column: 4;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+}
+
+.login .pc {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+}
+
+.login .pc .num {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+}
+
+.login .pc .where {
+  color: var(--mist);
+  font-size: 17px;
+  text-align: right;
+  line-height: 1.4;
+}
+
+/* Шаги входа живут прямо в окне — своя рамка им не нужна. */
+.login .card {
+  flex: 1;
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  gap: 14px;
+}
+
+.login h1 {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 650;
+}
+
+.login .note {
+  font-size: 17px;
+}
+
+.choice {
+  flex: 1;
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 16px;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 1fr 226px;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 28px 28px 32px;
+  border-radius: 16px;
+  border: 1px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.025);
+  text-align: left;
+  font-weight: 400;
+}
+
+.entry > span:first-child {
+  display: grid;
+  gap: 8px;
+}
+
+.entry:hover:not(:disabled) {
+  border-color: var(--glass-line-strong);
+}
+
+.entry-title {
+  font-family: var(--display);
+  font-weight: 650;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.entry-text {
+  color: var(--mist);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.entry-gift {
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 650;
+  color: #1d0d05;
+  background: var(--ember);
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.entry-act {
+  display: grid;
+  place-items: center;
+  height: 64px;
+  border-radius: 12px;
+  font-weight: 650;
+  font-size: 19px;
+  border: 1px solid var(--glass-line-strong);
+}
+
+.entry.new {
+  border-color: rgba(225, 82, 28, 0.55);
+  background: linear-gradient(110deg, rgba(225, 82, 28, 0.16), rgba(225, 82, 28, 0.04) 60%);
+}
+
+.entry.new:hover:not(:disabled) {
+  border-color: var(--fox-hi);
+}
+
+.entry.new .entry-act {
+  background: var(--fox);
+  border-color: var(--fox);
+  color: #fff;
+}
+
+.login .foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 0;
+  color: var(--mist);
+  font-size: 15px;
+}
+
+.login .online {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login .online i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--moss);
+  box-shadow: 0 0 10px var(--moss);
+}
+
+.login .online.off {
+  color: #f0c04d;
+}
+
+.login .online.off i {
+  background: var(--danger);
+  box-shadow: none;
+}
+
+.login .call {
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-line);
+  background: none;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* --- Набор номера и PIN в окне --- */
+
+.display {
+  font-family: var(--mono);
+  font-size: 30px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.display.empty {
+  color: var(--mist);
+}
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.pin-dots span {
+  width: 58px;
+  height: 66px;
+  border-radius: 12px;
+  border: 2px solid var(--glass-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 650;
+}
+
+.pin-dots span.filled {
+  border-color: var(--fox);
+}
+
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.numpad button {
+  font-size: 28px;
+  font-weight: 600;
+  padding: 11px 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--glass-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.numpad button.ghost {
+  font-size: 19px;
+}
+
+.waiting {
+  text-align: center;
+  color: var(--mist);
+  font-size: 16px;
+}
+
+.qr {
+  width: 210px;
+  height: 210px;
+  margin: 0 auto;
+  display: block;
+  border-radius: 10px;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+  font-size: 17px;
+}
+
+.code {
+  font-family: var(--mono);
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.consent-offer {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  font-size: 20px;
+}
+
+.consent-offer .gift {
+  font-family: var(--display);
+  font-size: 56px;
+  font-weight: 700;
+  color: var(--ember);
+}
+
+/* --- Афиша --- */
+
+.poster {
+  grid-column: 6;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: 300px 1fr auto;
+  overflow: hidden;
+}
+
+.poster .art {
+  position: relative;
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background:
+    radial-gradient(90% 80% at 80% 0%, rgba(225, 82, 28, 0.35), transparent 60%),
+    radial-gradient(80% 70% at 0% 100%, rgba(95, 227, 176, 0.18), transparent 60%),
+    #0b1513;
+}
+
+.poster .date {
+  position: absolute;
+  top: 14px;
+  right: 26px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 96px;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(255, 179, 107, 0.55);
+  letter-spacing: -0.04em;
+}
+
+.poster .kind {
+  color: var(--moss);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.poster h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 44px;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+}
+
+.poster .when {
+  margin-top: 12px;
+  font-size: 18px;
+}
+
+.poster .details {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-bottom: 8px;
+}
+
+.poster dl {
+  margin: 0;
+  padding: 6px 30px 0;
+}
+
+.poster dl div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--glass-line);
+}
+
+.poster dl div:last-child {
+  border-bottom: 0;
+}
+
+.poster dt {
+  color: var(--mist);
+  font-size: 16px;
+}
+
+.poster dd {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.poster dd.prize {
+  font-family: var(--display);
+  font-size: 30px;
+  color: var(--ember);
+}
+
+.poster .how {
+  margin: 0 30px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(95, 227, 176, 0.08);
+  border: 1px solid var(--glass-line);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.poster.empty {
+  grid-template-rows: 1fr auto;
+  padding-bottom: 30px;
+}
+
+/* Без ивентов окно не пустует сверху: приглашение стоит по центру. */
+.poster.empty .art {
+  justify-content: center;
+}
+
+.poster.empty h3 {
+  font-size: 40px;
+}
+
+.rotate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 30px 24px;
+  color: var(--mist);
+  font-size: 14px;
+}
+
+.rotate .bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.rotate .bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--moss);
+  animation: poster-fill linear forwards;
+}
+
+@keyframes poster-fill {
+  to {
+    width: 100%;
+  }
+}

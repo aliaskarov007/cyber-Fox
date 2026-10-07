@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from "class-validator";
@@ -61,6 +62,46 @@ export class UpdateClubDto {
   @Min(0)
   @Max(100)
   bonusPercent?: number;
+
+  /** Подарок за согласие на приглашения, в тиын. 0 — без подарка. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  consentBonus?: number;
+
+  /** Перенос остатка абонемента: процент при продлении. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverPercent?: number;
+
+  /** То же с третьего абонемента подряд. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverStreakPercent?: number;
+
+  /** Потолок переноса, процент от оплаченных минут нового абонемента. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  rolloverCapPercent?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  renewBeforeDays?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  renewAfterDays?: number;
 }
 
 export class CreateStaffDto {
@@ -118,6 +159,13 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsBoolean()
   sharedBalance?: boolean;
+
+  /** Лозунг под названием сети на экране блокировки. */
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(48)
+  slogan?: string;
 
   /**
    * Куда переносить остатки при выключении общего кошелька.

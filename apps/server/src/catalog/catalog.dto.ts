@@ -1,5 +1,5 @@
 import { PartialType } from "@nestjs/mapped-types";
-import { TariffKind } from "@prisma/client";
+import { PackageFormat, TariffKind } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -98,6 +98,17 @@ export class CreateTariffDto {
   @IsInt()
   @Min(0)
   packagePrice?: number;
+
+  /** Формат пакета: обычный (в том числе «N+M»), ночной, абонемент. */
+  @IsOptional()
+  @IsEnum(PackageFormat)
+  packageFormat?: PackageFormat;
+
+  /** Подарочные минуты сверх оплаченных: у «2+1» это 60. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bonusMinutes?: number;
 
   /** Срок жизни пакета; пусто — берём настройку клуба. */
   @IsOptional()

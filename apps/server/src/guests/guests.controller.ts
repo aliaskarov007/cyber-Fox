@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
-import { BuyPackageDto, CreateGuestDto, SetPinDto, TopUpDto } from "./guests.dto.js";
+import { BuyPackageDto, ConsentDto, CreateGuestDto, SetPinDto, TopUpDto } from "./guests.dto.js";
 import { GuestsService } from "./guests.service.js";
 
 @Controller("clubs/:clubId/guests")
@@ -74,5 +74,24 @@ export class GuestsController {
   ) {
     await this.guests.setPin(staff, clubId, guestId, dto.pin);
     return { ok: true };
+  }
+
+  @Post(":guestId/consent")
+  setConsent(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+    @Body() dto: ConsentDto,
+  ) {
+    return this.guests.setConsent(staff, clubId, guestId, dto.consent);
+  }
+
+  @Post(":guestId/verify-phone")
+  verifyPhone(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+  ) {
+    return this.guests.verifyPhone(staff, clubId, guestId);
   }
 }

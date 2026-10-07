@@ -1,6 +1,15 @@
 import { type FormEvent, useState } from "react";
 
-import { type Club, type Tariff, type TariffInput, type Zone, api, formatMoney, toTiyn } from "./api.js";
+import {
+  type Club,
+  type PackageFormat,
+  type Tariff,
+  type TariffInput,
+  type Zone,
+  api,
+  formatMoney,
+  toTiyn,
+} from "./api.js";
 import { hhmm, toMinuteOfDay } from "./tariff-window.js";
 
 /** Создание и правка тарифа. Пустое `editing` означает новый тариф. */
@@ -24,6 +33,8 @@ export function TariffForm({
   const [kind, setKind] = useState<"PACKAGE" | "PER_MINUTE">(editing?.kind ?? "PER_MINUTE");
   const [pricePerMinute, setPricePerMinute] = useState(money(editing?.pricePerMinute));
   const [packageMinutes, setPackageMinutes] = useState(count(editing?.packageMinutes));
+  const [format, setFormat] = useState<PackageFormat>(editing?.packageFormat ?? "MINUTES");
+  const [bonusMinutes, setBonusMinutes] = useState(editing?.bonusMinutes ? String(editing.bonusMinutes) : "");
   const [packagePrice, setPackagePrice] = useState(money(editing?.packagePrice));
   const [validityDays, setValidityDays] = useState(count(editing?.validityDays));
   const [activeFrom, setActiveFrom] = useState(time(editing?.activeFromMinute));
@@ -39,8 +50,12 @@ export function TariffForm({
   const minutePrice = kind === "PER_MINUTE" && pricePerMinute ? toTiyn(pricePerMinute) : 0;
   const overCredit = minutePrice > club.creditLimit;
 
-  /** Тариф той же зоны с тем же окном — обычная причина «почему считается не тот». */
-  const sameWindow = tariffs.some(
+  /**
+   * Поминутный тариф той же зоны с тем же окном — обычная причина «почему
+   * считается не тот». Пакетов в зоне бывает несколько намеренно: 2+1, ночь,
+   * абонемент — для них это не ошибка.
+   */
+  const sameWindow = kind === "PER_MINUTE" && tariffs.some(
     (other) =>
       other.id !== editing?.id &&
       other.zoneId === zoneId &&
@@ -48,6 +63,47 @@ export function TariffForm({
       other.isActive &&
       (other.activeFromMinute === null) === (activeFrom.trim() === ""),
   );
+
+  /*
+   * Шаблоны частых пакетов. Цену «N+M» подставляем из поминутки зоны — пакет
+   * для того и придуман, чтобы платить за N часов. Цену ночного и абонемента
+   * владелец задаёт сам: у них нет «честной» цены по минутам.
+   */
+  function preset(kind: "2+1" | "3+2" | "night" | "subscription"): void {
+    const perMinute = tariffs.find(
+      (t) => t.zoneId === zoneId && t.kind === "PER_MINUTE" && t.isActive && t.activeFromMinute === null,
+    )?.pricePerMinute;
+    const priceFor = (minutes: number): string => (perMinute ? String((perMinute * minutes) / 100) : "");
+
+    setKind("PACKAGE");
+    setActiveFrom("");
+    setActiveTo("");
+    if (kind === "2+1" || kind === "3+2") {
+      const [paid, bonus] = kind === "2+1" ? [120, 60] : [180, 120];
+      setName(kind === "2+1" ? "2+1 часа" : "3+2 часа");
+      setFormat("MINUTES");
+      setPackageMinutes(String(paid));
+      setBonusMinutes(String(bonus));
+      setPackagePrice(priceFor(paid));
+      setValidityDays("1");
+    } else if (kind === "night") {
+      setName("Ночь");
+      setFormat("NIGHT");
+      setPackageMinutes("");
+      setBonusMinutes("");
+      setPackagePrice("");
+      setValidityDays("");
+      setActiveFrom("22:00");
+      setActiveTo("08:00");
+    } else {
+      setName("Абонемент 20 часов");
+      setFormat("SUBSCRIPTION");
+      setPackageMinutes("1200");
+      setBonusMinutes("");
+      setPackagePrice("");
+      setValidityDays("30");
+    }
+  }
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -84,10 +140,21 @@ export function TariffForm({
       body.packagePrice = null;
       body.validityDays = null;
     } else {
-      body.packageMinutes = Number(packageMinutes);
+      if (packagePrice.trim() === "") throw new Error("Укажите цену пакета");
+      body.packageFormat = format;
       body.packagePrice = toTiyn(packagePrice);
-      body.validityDays = validityDays.trim() === "" ? null : Number(validityDays);
       body.pricePerMinute = null;
+      if (format === "NIGHT") {
+        // Ночной длится до конца окна: ни минут, ни срока в днях у него нет.
+        body.packageMinutes = null;
+        body.bonusMinutes = 0;
+        body.validityDays = null;
+        if (activeFrom.trim() === "") throw new Error("Ночному пакету нужно окно: например, с 22:00 до 08:00");
+      } else {
+        body.packageMinutes = Number(packageMinutes);
+        body.bonusMinutes = format === "MINUTES" && bonusMinutes.trim() !== "" ? Number(bonusMinutes) : 0;
+        body.validityDays = validityDays.trim() === "" ? null : Number(validityDays);
+      }
     }
 
     const from = toMinuteOfDay(activeFrom);
@@ -103,9 +170,29 @@ export function TariffForm({
     return body;
   }
 
+  const label = format === "MINUTES" && bonusMinutes ? hoursLabel(Number(packageMinutes), Number(bonusMinutes)) : null;
+
   return (
     <form className="settings-grid" onSubmit={submit}>
       {error && <div className="error">{error}</div>}
+
+      {!editing && (
+        <div className="presets">
+          <span>Шаблоны:</span>
+          <button type="button" onClick={() => preset("2+1")}>
+            2+1
+          </button>
+          <button type="button" onClick={() => preset("3+2")}>
+            3+2
+          </button>
+          <button type="button" onClick={() => preset("night")}>
+            Ночь 22–08
+          </button>
+          <button type="button" onClick={() => preset("subscription")}>
+            Абонемент 20 ч / 30 дней
+          </button>
+        </div>
+      )}
 
       <label>
         Название
@@ -143,13 +230,33 @@ export function TariffForm({
       ) : (
         <>
           <label>
-            Минут в пакете
-            <input
-              inputMode="numeric"
-              value={packageMinutes}
-              onChange={(e) => setPackageMinutes(e.target.value)}
-            />
+            Формат
+            <select value={format} onChange={(e) => setFormat(e.target.value as PackageFormat)}>
+              <option value="MINUTES">Пакет минут (в том числе 2+1)</option>
+              <option value="NIGHT">Ночной — до конца окна</option>
+              <option value="SUBSCRIPTION">Абонемент — с переносом остатка</option>
+            </select>
           </label>
+          {format !== "NIGHT" && (
+            <label>
+              {format === "MINUTES" ? "Оплаченных минут" : "Минут в абонементе"}
+              <input
+                inputMode="numeric"
+                value={packageMinutes}
+                onChange={(e) => setPackageMinutes(e.target.value)}
+              />
+            </label>
+          )}
+          {format === "MINUTES" && (
+            <label>
+              Минут в подарок{label ? ` — пакет «${label}»` : " (пусто — без подарка)"}
+              <input
+                inputMode="numeric"
+                value={bonusMinutes}
+                onChange={(e) => setBonusMinutes(e.target.value)}
+              />
+            </label>
+          )}
           <label>
             Цена пакета, ₸
             <input
@@ -158,24 +265,30 @@ export function TariffForm({
               onChange={(e) => setPackagePrice(e.target.value)}
             />
           </label>
-          <label>
-            Живёт дней (пусто — {club.packageValidityDays} из настроек зала)
-            <input
-              inputMode="numeric"
-              value={validityDays}
-              onChange={(e) => setValidityDays(e.target.value)}
-            />
-          </label>
+          {format !== "NIGHT" && (
+            <label>
+              Живёт дней (пусто — {club.packageValidityDays} из настроек зала)
+              <input
+                inputMode="numeric"
+                value={validityDays}
+                onChange={(e) => setValidityDays(e.target.value)}
+              />
+            </label>
+          )}
         </>
       )}
 
       <label>
-        Действует с (пусто — круглосуточно)
+        {kind === "PACKAGE"
+          ? format === "NIGHT"
+            ? "Ночь с"
+            : "Продаётся с (пусто — круглосуточно)"
+          : "Действует с (пусто — круглосуточно)"}
         <input value={activeFrom} onChange={(e) => setActiveFrom(e.target.value)} placeholder="22:00" />
       </label>
 
       <label>
-        Действует до
+        {kind === "PACKAGE" ? (format === "NIGHT" ? "Ночь до" : "Продаётся до") : "Действует до"}
         <input value={activeTo} onChange={(e) => setActiveTo(e.target.value)} placeholder="08:00" />
       </label>
 
@@ -183,6 +296,20 @@ export function TariffForm({
         <div className="error">
           Цена минуты больше лимита игры в долг ({formatMoney(club.creditLimit)}): гость не сможет
           доиграть ни минуты в долг. Поднимите лимит зала или снизьте цену.
+        </div>
+      )}
+
+      {kind === "PACKAGE" && format === "NIGHT" && (
+        <div className="notice">
+          Ночной продаётся только внутри окна и длится ровно до его конца: куплен в 01:00 — играет до
+          08:00 за ту же цену. Когда окно кончится, гость автоматически перейдёт на поминутный тариф.
+        </div>
+      )}
+
+      {kind === "PACKAGE" && format === "SUBSCRIPTION" && (
+        <div className="notice">
+          Продлил вовремя — часть остатка переезжает в новый абонемент. Процент и сроки продления
+          задаются в настройках зала.
         </div>
       )}
 
@@ -216,4 +343,11 @@ function count(value: number | null | undefined): string {
 
 function time(minute: number | null | undefined): string {
   return minute === null || minute === undefined ? "" : hhmm(minute);
+}
+
+/** «2+1», «3+2» — как пакет называют на стойке. */
+function hoursLabel(paid: number, bonus: number): string | null {
+  if (!paid || !bonus) return null;
+  const part = (m: number): string => (m % 60 === 0 ? String(m / 60) : `${m} мин`);
+  return `${part(paid)}+${part(bonus)}`;
 }

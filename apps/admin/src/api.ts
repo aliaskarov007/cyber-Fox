@@ -21,6 +21,16 @@ export interface Club {
   lowBalanceWarnMinutes: number;
   /** Процент от потраченного, возвращаемый бонусами. 0 — программа выключена. */
   bonusPercent: number;
+  /** Подарок за согласие на приглашения, в тиын. */
+  consentBonus: number;
+  /** Перенос остатка абонемента при продлении, процентов. */
+  rolloverPercent: number;
+  /** То же с третьего абонемента подряд. */
+  rolloverStreakPercent: number;
+  /** Потолок переноса, процент от нового абонемента. */
+  rolloverCapPercent: number;
+  renewBeforeDays: number;
+  renewAfterDays: number;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -40,11 +50,17 @@ export interface Tariff {
   pricePerMinute: number | null;
   packageMinutes: number | null;
   packagePrice: number | null;
+  /** Обычный пакет (в том числе «N+M»), ночной или абонемент. */
+  packageFormat: PackageFormat;
+  /** Подарочные минуты сверх оплаченных. */
+  bonusMinutes: number;
   validityDays: number | null;
   activeFromMinute: number | null;
   activeToMinute: number | null;
   isActive: boolean;
 }
+
+export type PackageFormat = "MINUTES" | "NIGHT" | "SUBSCRIPTION";
 
 /**
  * Что отправляет форма тарифа.
@@ -60,6 +76,8 @@ export interface TariffInput {
   pricePerMinute?: number | null;
   packageMinutes?: number | null;
   packagePrice?: number | null;
+  packageFormat?: PackageFormat;
+  bonusMinutes?: number;
   validityDays?: number | null;
   activeFromMinute?: number | null;
   activeToMinute?: number | null;
@@ -71,6 +89,10 @@ export interface Guest {
   phone: string;
   bonusPoints: number;
   hasPin: boolean;
+  /** Номер подтверждён через WhatsApp или администратором. */
+  phoneVerified: boolean;
+  /** Согласен на приглашения и не отписался. */
+  marketingConsent: boolean;
 }
 
 export interface Computer {
@@ -213,6 +235,12 @@ export interface GuestPackage {
   minutesRemaining: number;
   minutesTotal: number;
   expiresAt: string;
+  /** Сколько из minutesTotal перенесено с прошлого абонемента. */
+  carriedMinutes: number;
+  /** Какой по счёту абонемент подряд. */
+  streak: number;
+  /** Абонемент уже продлён — остаток перенесётся, когда он кончится. */
+  renewedById: string | null;
 }
 
 export interface GuestCard {
@@ -340,8 +368,19 @@ export const api = {
   guestCard: (clubId: string, guestId: string) =>
     request<GuestCard>(`/clubs/${clubId}/guests/${guestId}`),
 
-  createGuest: (clubId: string, body: { fullName: string; phone: string; pin?: string }) =>
-    request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+  createGuest: (
+    clubId: string,
+    body: { fullName?: string; phone: string; pin?: string; marketingConsent?: boolean },
+  ) => request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+
+  setGuestConsent: (clubId: string, guestId: string, consent: boolean) =>
+    request<{ bonus: number }>(`/clubs/${clubId}/guests/${guestId}/consent`, {
+      method: "POST",
+      body: JSON.stringify({ consent }),
+    }),
+
+  verifyGuestPhone: (clubId: string, guestId: string) =>
+    request<{ bonus: number }>(`/clubs/${clubId}/guests/${guestId}/verify-phone`, { method: "POST" }),
 
   apps: (clubId: string) => request<ClubApp[]>(`/clubs/${clubId}/apps`),
 
@@ -473,7 +512,23 @@ export const api = {
 
   tenant: () => request<Tenant>("/network/tenant"),
 
-  updateTenant: (body: { name?: string; sharedBalance?: boolean; moveBalancesToClubId?: string }) =>
+  events: () => request<ClubEvent[]>("/network/events"),
+
+  createEvent: (body: ClubEventInput) =>
+    request<ClubEvent>("/network/events", { method: "POST", body: JSON.stringify(body) }),
+
+  updateEvent: (eventId: string, body: Partial<ClubEventInput>) =>
+    request<ClubEvent>(`/network/events/${eventId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  deleteEvent: (eventId: string) =>
+    request<{ ok: true }>(`/network/events/${eventId}`, { method: "DELETE" }),
+
+  updateTenant: (body: {
+    name?: string;
+    sharedBalance?: boolean;
+    moveBalancesToClubId?: string;
+    slogan?: string;
+  }) =>
     request<Tenant>("/network/tenant", { method: "PATCH", body: JSON.stringify(body) }),
 
   createClub: (body: { name: string; city?: string; timezone?: string }) =>
@@ -488,6 +543,12 @@ export const api = {
       packageValidityDays: number;
       lowBalanceWarnMinutes: number;
       bonusPercent: number;
+      consentBonus: number;
+      rolloverPercent: number;
+      rolloverStreakPercent: number;
+      rolloverCapPercent: number;
+      renewBeforeDays: number;
+      renewAfterDays: number;
     }>,
   ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
 
@@ -635,6 +696,34 @@ export interface Tenant {
   id: string;
   name: string;
   sharedBalance: boolean;
+  /** Лозунг под названием сети на экранах ПК. */
+  slogan: string;
+}
+
+/** Ивент в афише на экранах ПК. */
+export interface ClubEvent {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  startsAt: string;
+  clubId: string | null;
+  prize: string | null;
+  fee: string | null;
+  seats: string | null;
+  howToJoin: string | null;
+  isPublished: boolean;
+}
+
+export interface ClubEventInput {
+  title: string;
+  subtitle: string;
+  startsAt: string;
+  clubId: string | null;
+  prize: string;
+  fee: string;
+  seats: string;
+  howToJoin: string;
+  isPublished: boolean;
 }
 
 export interface StaffMember {
