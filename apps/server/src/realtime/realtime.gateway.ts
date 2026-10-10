@@ -19,7 +19,7 @@ import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
 import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
-import { PaymentsService } from "../payments/payments.service.js";
+import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
 import { BarOrdersService } from "../products/bar-orders.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
@@ -60,7 +60,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly signups: GuestSignupService,
     private readonly promos: PromosService,
     private readonly barOrders: BarOrdersService,
-    private readonly payments: PaymentsService,
+    private readonly kaspi: KaspiService,
   ) {}
 
   onModuleInit(): void {
@@ -108,6 +108,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     });
     this.bus.on("topup.pending", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("topup.pending", e);
+    });
+    this.bus.on("topup.failed", (e) => {
+      if (e.computerId) {
+        this.server.to(agentRoom(e.computerId)).emit("topup.failed", { intentId: e.intentId, reason: e.reason });
+      }
     });
     this.bus.on("topup.paid", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("topup.paid", e);
@@ -310,18 +315,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("topup.create")
   async createTopUp(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { amount?: number },
+    @MessageBody() body: { amount?: number; method?: string },
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     const { guestId } = await this.resolveGuest(client);
     if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
     try {
-      return await this.payments.createTopUpForComputer(computerId, guestId, Number(body.amount));
+      const method: TopUpMethod = body.method === "phone" ? "phone" : "qr";
+      return await this.kaspi.createForComputer(computerId, guestId, Number(body.amount), method);
     } catch (error) {
       this.logger.error("Пополнение по QR не создалось", error as Error);
       return { ok: false, reason: "Не удалось создать платёж" };
     }
+  }
+
+  /** Как гость может пополнить счёт с этой машины: через Kaspi и/или по QR клуба. */
+  @SubscribeMessage("topup.options")
+  async topUpOptions(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { kaspi: false, staticQr: false };
+    return this.kaspi.options(computerId);
   }
 
   /** Карточка вошедшего гостя заново — после пополнения на экране блокировки. */

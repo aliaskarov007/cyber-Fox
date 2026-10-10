@@ -57,6 +57,8 @@ export interface RealtimeEvents {
   };
   /* Гость открыл QR на игровом ПК: без подключённого банка кассе ждать перевода. */
   "topup.pending": { clubId: string; intentId: string };
+  /* Счёт Kaspi не состоялся (истёк, отменён, Kaspi отказал) — экран гостя говорит почему. */
+  "topup.failed": { clubId: string; computerId: string | null; intentId: string; reason: string };
   /* Пополнение зачислено — экран, где висел QR, закрывает его сам. */
   "topup.paid": {
     clubId: string;

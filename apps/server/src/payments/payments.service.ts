@@ -51,9 +51,15 @@ export type ComputerTopUp =
       reason: null;
       intentId: string;
       amount: number;
-      mode: "dynamic" | "static";
+      /**
+       * kaspi_qr — QR счёта Kaspi на эту сумму; kaspi_phone — push в приложение
+       * Kaspi на номер гостя. Оба зачисляются сами по уведомлению ApiPay.
+       */
+      mode: "dynamic" | "static" | "kaspi_qr" | "kaspi_phone";
       qrPayload: string | null;
       qrImageUrl: string | null;
+      /** Куда ушёл счёт на телефон, с маской. */
+      phoneMasked: string | null;
       expiresAt: Date;
     }
   | { ok: false; reason: string };
@@ -135,6 +141,7 @@ export class PaymentsService {
       mode: dynamic ? "dynamic" : "static",
       qrPayload: dynamic ? result.qrPayload : null,
       qrImageUrl: dynamic ? null : staticImage,
+      phoneMasked: null,
       expiresAt: result.expiresAt,
     };
   }
@@ -410,6 +417,8 @@ export class PaymentsService {
         computerId: { not: null },
         status: { in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED] },
         checkoutUrl: null,
+        // Счета Kaspi через ApiPay подтверждаются сами — кассе их ждать незачем.
+        provider: { not: "apipay" },
         createdAt: { gte: new Date(Date.now() - 3 * 60 * 60_000) },
       },
       include: { guest: { select: { fullName: true, phone: true } } },

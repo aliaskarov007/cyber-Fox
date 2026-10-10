@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { type Club, type Staff, type StaffMember, type Tenant, api, formatMoney, toTiyn } from "./api.js";
 import { ComputersSection } from "./ComputersSection.js";
 import { ZonesSection } from "./ZonesSection.js";
+import { KaspiSettings } from "./KaspiSettings.js";
 import { WhatsAppSettings } from "./WhatsAppSettings.js";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -84,6 +85,7 @@ export function SettingsScreen({
       {isOwner && tenant && (
         <>
           <WhatsAppSettings onSaved={(msg) => void run(async () => {}, msg)} />
+          <KaspiSettings onSaved={(msg) => void run(async () => {}, msg)} />
           <WalletSettings
             tenant={tenant}
             clubs={clubs}

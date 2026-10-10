@@ -56,6 +56,7 @@ model Tenant {
   promoRedemptions PromoRedemption[]
   barOrders    BarOrder[]
   winbackCampaigns WinbackCampaign[]
+  kaspiChannel KaspiChannel?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1281,4 +1282,32 @@ model WinbackMessage {
   @@unique([campaignId, guestId])
   @@index([status, createdAt])
   @@index([guestId, sentAt])
+}
+
+/**
+ * Приём оплаты через Kaspi Pay сети — сервис ApiPay. Счёт выставляется под
+ * конкретный платёж (QR с суммой или push в приложение Kaspi на номер гостя),
+ * ApiPay сообщает об оплате, и деньги зачисляются без администратора.
+ *
+ * Своя у каждой сети: у каждой свой Kaspi Pay и свои деньги.
+ */
+model KaspiChannel {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Ключ API из кабинета ApiPay. Наружу не отдаётся.
+  apiKey        String
+  /// Секрет подписи уведомлений из кабинета ApiPay (Настройки → Подключение).
+  webhookSecret String
+  /// Часть адреса для уведомлений: по ней сервер узнаёт сеть до проверки подписи.
+  webhookToken  String @unique @default(dbgenerated("(gen_random_uuid())::text"))
+
+  /// Выключенный канал не выставляет счетов; гостю показывается QR клуба.
+  enabled     Boolean   @default(true)
+  lastState   String?
+  lastCheckAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -563,6 +563,13 @@ export const api = {
 
   // --- WhatsApp и ивенты ---
 
+  kaspi: () => request<KaspiChannel>("/network/kaspi"),
+
+  saveKaspi: (body: { apiKey?: string; webhookSecret?: string; enabled?: boolean }) =>
+    request<KaspiChannel>("/network/kaspi", { method: "PUT", body: JSON.stringify(body) }),
+
+  disconnectKaspi: () => request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
+
   whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
 
   saveWhatsApp: (body: { apiUrl?: string; instanceId: string; apiToken?: string; publicUrl?: string }) =>
@@ -796,6 +803,16 @@ export interface PendingQrTopUp {
   guestPhone: string | null;
   computerName: string;
   createdAt: string;
+}
+
+/** Kaspi Pay через ApiPay: пополнения с игровых ПК зачисляются сами. */
+export interface KaspiChannel {
+  connected: boolean;
+  enabled: boolean;
+  /** Путь для уведомлений ApiPay; полный адрес = домен кассы + путь. */
+  webhookPath: string | null;
+  lastState: string | null;
+  lastCheckAt: string | null;
 }
 
 export type PromoKind = "BALANCE" | "BONUS";

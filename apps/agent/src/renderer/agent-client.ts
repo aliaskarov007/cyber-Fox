@@ -74,10 +74,15 @@ export type TopUpStart =
       ok: true;
       intentId: string;
       amount: number;
-      /** dynamic — QR банка уже с суммой; static — QR клуба, сумму гость вводит сам. */
-      mode: "dynamic" | "static";
+      /**
+       * kaspi_qr — QR счёта Kaspi на эту сумму; kaspi_phone — push в приложение
+       * Kaspi на номер гостя (оба зачисляются сами); dynamic — QR банка с суммой;
+       * static — QR клуба, сумму гость вводит сам, подтверждает касса.
+       */
+      mode: "dynamic" | "static" | "kaspi_qr" | "kaspi_phone";
       qrPayload: string | null;
       qrImageUrl: string | null;
+      phoneMasked: string | null;
       expiresAt: string;
     }
   | { ok: false; reason: string };
@@ -221,9 +226,22 @@ export class AgentClient {
     return this.request("bar.order", { items });
   }
 
-  /** Пополнение по единому QR. Сумма в тиын. */
-  createTopUp(amount: number): Promise<TopUpStart> {
-    return this.request("topup.create", { amount });
+  /** Пополнение. Сумма в тиын; способ — QR или счёт в Kaspi на номер гостя. */
+  createTopUp(amount: number, method: "qr" | "phone" = "qr"): Promise<TopUpStart> {
+    return this.request("topup.create", { amount, method });
+  }
+
+  /** Какими способами можно пополнить счёт с этой машины. */
+  topUpOptions(): Promise<{ kaspi: boolean; staticQr: boolean }> {
+    return this.request("topup.options", {});
+  }
+
+  /** Счёт Kaspi не состоялся: истёк, отменён или Kaspi отказал. */
+  onTopUpFailed(listener: (event: { intentId: string; reason: string }) => void): () => void {
+    this.socket?.on("topup.failed", listener);
+    return () => {
+      this.socket?.off("topup.failed", listener);
+    };
   }
 
   /** Карточка вошедшего гостя заново — например, после пополнения. */

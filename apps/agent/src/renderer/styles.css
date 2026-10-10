@@ -730,3 +730,13 @@ button:disabled {
 .bar-total button {
   margin-left: auto;
 }
+
+.topup-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.topup-methods button {
+  font-size: 15px;
+}
