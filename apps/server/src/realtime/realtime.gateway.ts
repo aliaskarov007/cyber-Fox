@@ -21,6 +21,7 @@ import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
 import { BarOrdersService } from "../products/bar-orders.service.js";
+import { ScreenService } from "../screen/screen.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
@@ -61,6 +62,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly promos: PromosService,
     private readonly barOrders: BarOrdersService,
     private readonly kaspi: KaspiService,
+    private readonly screen: ScreenService,
   ) {}
 
   onModuleInit(): void {
@@ -95,6 +97,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
      */
     this.bus.on("library.changed", (e) => {
       this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
+    });
+    // Экран блокировки поменялся — тот же приём, что и с каталогом: только сигнал.
+    this.bus.on("screen.changed", (e) => {
+      for (const clubId of e.clubIds) this.server.to(clubAgentsRoom(clubId)).emit("screen.changed", {});
     });
     this.bus.on("bar.order.placed", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("bar.order.placed", e);
@@ -478,6 +484,26 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
    * не рассылается тем, кто его сейчас не показывает, и приходит свежим ровно
    * тогда, когда оболочка собирается его рисовать.
    */
+  /** Название, слоган и карусель экрана блокировки. */
+  @SubscribeMessage("screen.fetch")
+  async fetchScreen(@ConnectedSocket() client: Socket) {
+    const clubId = client.data.clubId as string | undefined;
+    if (!clubId) return { ok: false, clubName: "", slogan: null, slides: [] };
+    const screen = await this.screen.forClub(clubId);
+    if (!screen) return { ok: false, clubName: "", slogan: null, slides: [] };
+    return { ok: true, ...screen };
+  }
+
+  /** Слайд был на экране — счётчик показов для партнёра. */
+  @SubscribeMessage("screen.impression")
+  async screenImpression(@ConnectedSocket() client: Socket, @MessageBody() body: { slideId?: string }) {
+    const computerId = client.data.computerId as string | undefined;
+    const clubId = client.data.clubId as string | undefined;
+    if (!computerId || !clubId || typeof body?.slideId !== "string") return { ok: false };
+    await this.screen.impression(computerId, clubId, body.slideId);
+    return { ok: true };
+  }
+
   @SubscribeMessage("library.fetch")
   async fetchLibrary(@ConnectedSocket() client: Socket) {
     const clubId = client.data.clubId as string | undefined;

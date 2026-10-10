@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AgentSettings } from "../shared/settings.js";
-import { AgentClient, type AgentConfig, type PairedInfo, type Tick } from "./agent-client.js";
+import { AgentClient, type AgentConfig, type GuestScreen, type PairedInfo, type Tick } from "./agent-client.js";
+import { BrandPanel } from "./BrandPanel.js";
 import type { LibraryApp } from "../shared/library.js";
 import { LockScreen } from "./LockScreen.js";
 import { Shell } from "./Shell.js";
@@ -42,6 +43,8 @@ export function App() {
   const [favourites, setFavourites] = useState<string[]>([]);
   /** Локальный остаток на время обрыва: показываем его вместо серверного. */
   const [localMinutes, setLocalMinutes] = useState<number | null>(null);
+  /** Название, слоган и карусель экрана блокировки. */
+  const [screen, setScreen] = useState<GuestScreen | null>(null);
   const started = useRef(false);
   const journal = useRef<JournalState>(emptyJournal());
 
@@ -51,6 +54,21 @@ export function App() {
     setApps(result.apps);
     setFavourites(result.favourites ?? []);
   }, [client]);
+
+  const loadScreen = useCallback(async () => {
+    const result = await client.screen().catch(() => null);
+    if (result?.ok) setScreen(result);
+  }, [client]);
+
+  /*
+   * Прошедший турнир должен уйти с экрана сам, даже если в настройках ничего
+   * не трогали, — поэтому раз в несколько минут экран перечитывается.
+   */
+  useEffect(() => {
+    if (!paired) return;
+    const timer = setInterval(() => void loadScreen(), 5 * 60_000);
+    return () => clearInterval(timer);
+  }, [paired, loadScreen]);
 
   /** Досылка накопленного. Очередь чистится только по подтверждению сервера. */
   const flush = useCallback(async () => {
@@ -101,6 +119,7 @@ export function App() {
         // Полки нужны раньше, чем гость сядет: пустая оболочка в момент старта
         // сессии выглядит как сломанная система.
         void loadLibrary();
+        void loadScreen();
         /*
          * Заодно рассказываем, что на машине установлено. Владелец увидит
          * список в кассе и отберёт, что показывать гостю: заводить сорок игр
@@ -112,6 +131,7 @@ export function App() {
           .catch(() => null);
       },
       onLibraryChanged: () => void loadLibrary(),
+      onScreenChanged: () => void loadScreen(),
       onRejected: setRejection,
       onTick: (next) => {
         setTick(next);
@@ -158,7 +178,7 @@ export function App() {
         if (isOnline) void flush();
       },
     });
-  }, [client, flush, config]);
+  }, [client, flush, config, loadLibrary, loadScreen]);
 
   /*
    * Локальный таймер на время обрыва. Оплаченная сессия доигрывается без
@@ -303,40 +323,43 @@ export function App() {
   }
 
   return (
-    <div className="screen">
-      <div className="pc-id">
-        <div className="name">{paired?.computerName ?? "—"}</div>
-        <div className="zone">
-          {paired ? `${paired.clubName} · ${paired.zoneName}` : "Подключаемся к серверу"}
+    <div className="lock-layout">
+      <BrandPanel client={client} screen={screen} fallbackName={paired?.clubName ?? null} />
+      <div className="screen">
+        <div className="pc-id">
+          <div className="name">{paired?.computerName ?? "—"}</div>
+          <div className="zone">
+            {paired ? paired.zoneName : "Подключаемся к серверу"}
+          </div>
         </div>
-      </div>
 
-      {switchNote && <div className="banner info">{switchNote}</div>}
+        {switchNote && <div className="banner info">{switchNote}</div>}
 
-      {!online && displayTick && (
-        <div className="banner warn">
-          Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
-          связь вернётся.
+        {!online && displayTick && (
+          <div className="banner warn">
+            Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
+            связь вернётся.
+          </div>
+        )}
+
+        {(
+          <LockScreen
+            client={client}
+            perMinutePrice={null}
+            online={online}
+            onStarted={() => {
+              started.current = true;
+              void window.cyberfox.unlock();
+            }}
+          />
+        )}
+
+        {/* Обрыв связи прятать нельзя: гость должен понимать, почему не проходит вход. */}
+        <div className={`status ${online ? "" : "offline"}`}>
+          {online
+            ? "связь с сервером есть"
+            : `нет связи с сервером${queued > 0 ? ` · в очереди операций: ${queued}` : ""}`}
         </div>
-      )}
-
-      {(
-        <LockScreen
-          client={client}
-          perMinutePrice={null}
-          online={online}
-          onStarted={() => {
-            started.current = true;
-            void window.cyberfox.unlock();
-          }}
-        />
-      )}
-
-      {/* Обрыв связи прятать нельзя: гость должен понимать, почему не проходит вход. */}
-      <div className={`status ${online ? "" : "offline"}`}>
-        {online
-          ? "связь с сервером есть"
-          : `нет связи с сервером${queued > 0 ? ` · в очереди операций: ${queued}` : ""}`}
       </div>
     </div>
   );

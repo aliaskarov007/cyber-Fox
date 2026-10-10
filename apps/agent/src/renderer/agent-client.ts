@@ -21,6 +21,32 @@ export interface PairedInfo {
   clubName: string;
 }
 
+/** Слайд карусели экрана блокировки: турнир из «Ивентов» или реклама. */
+export type ScreenSlide =
+  | {
+      kind: "event";
+      id: string;
+      title: string;
+      text: string | null;
+      startsAt: string;
+      clubName: string | null;
+    }
+  | {
+      kind: "ad";
+      id: string;
+      title: string;
+      text: string | null;
+      imageUrl: string | null;
+      partner: string | null;
+    };
+
+export interface GuestScreen {
+  ok: boolean;
+  clubName: string;
+  slogan: string | null;
+  slides: ScreenSlide[];
+}
+
 export interface GuestLoginResult {
   ok: boolean;
   reason: string | null;
@@ -142,6 +168,8 @@ export class AgentClient {
     onRejected: (reason: string) => void;
     /** Каталог клуба изменился: полки надо перечитать. */
     onLibraryChanged: () => void;
+    /** Название, слоган или карусель поменялись в настройках. */
+    onScreenChanged?: () => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
     this.serverUrl = config.serverUrl;
@@ -175,6 +203,7 @@ export class AgentClient {
     this.socket.on("session.switched", handlers.onSwitched);
     this.socket.on("lock", handlers.onLock);
     this.socket.on("library.changed", handlers.onLibraryChanged);
+    if (handlers.onScreenChanged) this.socket.on("screen.changed", handlers.onScreenChanged);
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
@@ -296,6 +325,16 @@ export class AgentClient {
   /** Полки этой машины: общие игры клуба плюс игры её зоны. */
   library(): Promise<{ ok: boolean; apps: LibraryApp[]; favourites?: string[] }> {
     return this.request("library.fetch", {});
+  }
+
+  /** Название клуба, слоган и карусель для экрана блокировки. */
+  screen(): Promise<GuestScreen> {
+    return this.request("screen.fetch", {});
+  }
+
+  /** Рекламный слайд показан — для отчёта партнёру. */
+  screenImpression(slideId: string): void {
+    this.socket?.emit("screen.impression", { slideId });
   }
 
   /** Гость отметил игру своей или снял отметку. */

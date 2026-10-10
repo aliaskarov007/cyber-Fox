@@ -740,3 +740,176 @@ button:disabled {
 .topup-methods button {
   font-size: 15px;
 }
+
+/* --- Экран блокировки: клуб, слоган, карусель --- */
+
+/*
+ * Слева — клуб и карусель, справа — вход. На мониторе зала места хватает на
+ * обе половины; на узком окне (настройка, отладка) они встают друг под друга.
+ */
+.lock-layout {
+  width: min(1280px, 100vw);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 48px;
+  padding: 40px 56px;
+}
+
+@media (max-width: 1000px) {
+  .lock-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 24px 16px;
+    gap: 24px;
+  }
+}
+
+.brand {
+  display: grid;
+  gap: 32px;
+  align-content: center;
+  min-width: 0;
+}
+
+.brand-head {
+  display: grid;
+  gap: 10px;
+}
+
+.club-name {
+  margin: 0;
+  font-size: clamp(40px, 5.2vw, 76px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.slogan {
+  margin: 0;
+  font-size: clamp(18px, 1.8vw, 26px);
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.carousel {
+  display: grid;
+  gap: 14px;
+}
+
+.slide {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  min-height: 240px;
+  overflow: hidden;
+  animation: slide-in 0.5s ease;
+}
+
+.slide.event {
+  border-left: 4px solid var(--accent);
+  padding: 28px 32px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+}
+
+.slide.ad {
+  display: grid;
+}
+
+.slide.ad.with-image {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+
+.slide-image {
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
+.slide-body {
+  padding: 28px 32px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+}
+
+.slide-tag {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+
+.slide.ad .slide-tag {
+  color: var(--muted);
+}
+
+.slide-title {
+  font-size: clamp(24px, 2.4vw, 36px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.slide-when {
+  font-family: var(--mono);
+  font-size: 18px;
+}
+
+.slide-text {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-hint {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.3s, width 0.3s;
+}
+
+.dots span.on {
+  width: 24px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide {
+    animation: none;
+  }
+}

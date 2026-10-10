@@ -12,6 +12,35 @@ export interface Staff {
   tenant: { name: string; sharedBalance: boolean };
 }
 
+/** Рекламный слайд на экране блокировки. Турниры добавляются из «Ивентов» сами. */
+export interface ScreenSlide {
+  id: string;
+  clubId: string | null;
+  networkWide: boolean;
+  title: string;
+  text: string | null;
+  imageUrl: string | null;
+  partner: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  /** Сколько раз слайд был на экранах — для отчёта партнёру. */
+  impressions: number;
+  createdAt: string;
+}
+
+export interface ScreenSlideInput {
+  title: string;
+  text?: string;
+  imageUrl?: string;
+  partner?: string;
+  startsAt?: string;
+  endsAt?: string;
+  networkWide?: boolean;
+  sortOrder?: number;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -25,6 +54,8 @@ export interface Club {
   barOrdersFromPc: boolean;
   /** Статический QR клуба для пополнения с игрового ПК, пока банк не подключён. */
   paymentQrImageUrl: string | null;
+  /** Слоган под названием клуба на экране блокировки игровых ПК. */
+  slogan: string | null;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -498,6 +529,7 @@ export const api = {
       bonusPercent: number;
       barOrdersFromPc: boolean;
       paymentQrImageUrl: string | null;
+      slogan: string | null;
     }>,
   ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
 
@@ -652,6 +684,18 @@ export const api = {
   // --- Промокоды ---
 
   promos: (clubId: string) => request<Promo[]>(`/clubs/${clubId}/promos`),
+
+  /** Рекламные слайды карусели экрана блокировки. */
+  slides: (clubId: string) => request<ScreenSlide[]>(`/clubs/${clubId}/slides`),
+
+  createSlide: (clubId: string, body: ScreenSlideInput) =>
+    request<ScreenSlide>(`/clubs/${clubId}/slides`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateSlide: (clubId: string, slideId: string, body: { isActive?: boolean; sortOrder?: number }) =>
+    request<ScreenSlide>(`/clubs/${clubId}/slides/${slideId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  deleteSlide: (clubId: string, slideId: string) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/slides/${slideId}`, { method: "DELETE" }),
 
   createPromo: (clubId: string, body: PromoInput) =>
     request<Promo>(`/clubs/${clubId}/promos`, { method: "POST", body: JSON.stringify(body) }),

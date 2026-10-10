@@ -23,6 +23,7 @@ import { PromosModule } from "./promos/promos.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { RetentionModule } from "./retention/retention.module.js";
+import { ScreenModule } from "./screen/screen.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
 import { SignupModule } from "./signup/signup.module.js";
@@ -66,6 +67,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     NetworkModule,
     ReportsModule,
     RetentionModule,
+    ScreenModule,
     SignupModule,
     ImportModule,
     UploadsModule,

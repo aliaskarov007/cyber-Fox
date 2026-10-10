@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { ScreenService } from "../screen/screen.service.js";
 import type {
   CreateClubDto,
   CreateStaffDto,
@@ -29,7 +30,10 @@ export interface PublicStaff {
  */
 @Injectable()
 export class NetworkService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly screen: ScreenService,
+  ) {}
 
   async tenant(staff: AuthenticatedStaff): Promise<Tenant> {
     return this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
@@ -75,7 +79,21 @@ export class NetworkService {
       throw new ForbiddenException("Бар с игровых ПК и QR для оплаты настраивает владелец");
     }
 
-    return this.prisma.club.update({ where: { id: clubId }, data: dto });
+    const { slogan, ...rest } = dto;
+    const updated = await this.prisma.club.update({
+      where: { id: clubId },
+      data: {
+        ...rest,
+        ...(rest.name !== undefined ? { name: rest.name.trim() } : {}),
+        // Пустой слоган — убрать строку с экрана, а не показывать пустоту.
+        ...(slogan !== undefined ? { slogan: slogan?.trim() || null } : {}),
+      },
+    });
+    // Название и слоган видны на экране блокировки — машины зала обновляют его сразу.
+    if (updated.name !== club.name || updated.slogan !== club.slogan) {
+      await this.screen.announce(club.tenantId, club.id);
+    }
+    return updated;
   }
 
   async listStaff(staff: AuthenticatedStaff): Promise<PublicStaff[]> {

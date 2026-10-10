@@ -7,13 +7,14 @@ import { OfflineModule } from "../offline/offline.module.js";
 import { PaymentsModule } from "../payments/payments.module.js";
 import { ProductsModule } from "../products/products.module.js";
 import { PromosModule } from "../promos/promos.module.js";
+import { ScreenModule } from "../screen/screen.module.js";
 import { SessionsModule } from "../sessions/sessions.module.js";
 import { WhatsAppModule } from "../whatsapp/whatsapp.module.js";
 import { AgentService } from "./agent.service.js";
 import { RealtimeGateway } from "./realtime.gateway.js";
 
 @Module({
-  imports: [AuthModule, SessionsModule, GuestsModule, OfflineModule, LibraryModule, WhatsAppModule, PromosModule, ProductsModule, PaymentsModule],
+  imports: [AuthModule, SessionsModule, GuestsModule, OfflineModule, LibraryModule, WhatsAppModule, PromosModule, ProductsModule, PaymentsModule, ScreenModule],
   providers: [RealtimeGateway, AgentService],
 })
 export class RealtimeModule {}

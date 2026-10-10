@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
 
+import { ScreenModule } from "../screen/screen.module.js";
 import { NetworkController } from "./network.controller.js";
 import { NetworkService } from "./network.service.js";
 
 @Module({
+  imports: [ScreenModule],
   controllers: [NetworkController],
   providers: [NetworkService],
   exports: [NetworkService],

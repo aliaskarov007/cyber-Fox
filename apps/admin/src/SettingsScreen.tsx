@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { type Club, type Staff, type StaffMember, type Tenant, api, formatMoney, toTiyn } from "./api.js";
 import { ComputersSection } from "./ComputersSection.js";
 import { ZonesSection } from "./ZonesSection.js";
+import { GuestScreenSettings } from "./GuestScreenSettings.js";
 import { KaspiSettings } from "./KaspiSettings.js";
 import { WhatsAppSettings } from "./WhatsAppSettings.js";
 
@@ -79,6 +80,7 @@ export function SettingsScreen({
         <>
           <ZonesSection club={club} onChanged={() => onClubsChanged()} />
           <ComputersSection club={club} />
+          <GuestScreenSettings club={club} isOwner={isOwner} />
         </>
       )}
 
@@ -101,6 +103,8 @@ export function SettingsScreen({
 }
 
 function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string) => void }) {
+  const [name, setName] = useState(club.name);
+  const [slogan, setSlogan] = useState(club.slogan ?? "");
   const [creditLimit, setCreditLimit] = useState(String(club.creditLimit / 100));
   const [validity, setValidity] = useState(String(club.packageValidityDays));
   const [warn, setWarn] = useState(String(club.lowBalanceWarnMinutes));
@@ -111,6 +115,8 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
   // Поля берут значения из клуба: иначе «Сохранить» затрёт настройку,
   // которую форма не показала.
   useEffect(() => {
+    setName(club.name);
+    setSlogan(club.slogan ?? "");
     setCreditLimit(String(club.creditLimit / 100));
     setValidity(String(club.packageValidityDays));
     setWarn(String(club.lowBalanceWarnMinutes));
@@ -123,6 +129,8 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
     setError(null);
     try {
       await api.updateClub(club.id, {
+        name: name.trim(),
+        slogan: slogan.trim() || null,
         creditLimit: toTiyn(creditLimit),
         packageValidityDays: Number(validity),
         lowBalanceWarnMinutes: Number(warn),
@@ -143,6 +151,19 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
       </div>
       {error && <div className="error">{error}</div>}
       <form className="settings-grid" onSubmit={submit}>
+        <label>
+          Название клуба
+          <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label>
+          Слоган на экране ПК
+          <input
+            value={slogan}
+            maxLength={80}
+            placeholder="Например: Играй как профи"
+            onChange={(e) => setSlogan(e.target.value)}
+          />
+        </label>
         <label>
           Лимит игры в долг, ₸
           <input inputMode="decimal" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />

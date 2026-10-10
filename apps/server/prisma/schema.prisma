@@ -56,6 +56,7 @@ model Tenant {
   promoRedemptions PromoRedemption[]
   barOrders    BarOrder[]
   winbackCampaigns WinbackCampaign[]
+  screenSlides ScreenSlide[]
   kaspiChannel KaspiChannel?
 
   createdAt DateTime @default(now())
@@ -226,6 +227,8 @@ model Club {
   /// Показывается на игровом ПК, пока банк не подключён напрямую: гость платит
   /// по нему, администратор подтверждает поступление.
   paymentQrImageUrl String?
+  /// Слоган под названием клуба на экране блокировки игровых ПК.
+  slogan String?
 
   /// Ключ клуба для бездисковых залов. Один на весь клуб, кладётся в общий
   /// образ рядом с агентом: машины называют себя MAC-адресом, а этот ключ
@@ -254,6 +257,7 @@ model Club {
   promoCodes PromoCode[]
   barOrders BarOrder[]
   winbackCampaigns WinbackCampaign[]
+  screenSlides ScreenSlide[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1310,4 +1314,40 @@ model KaspiChannel {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * Рекламный слайд в карусели экрана блокировки: партнёр, акция бара, ночной
+ * тариф. Турниры в карусель попадают сами из «Ивентов» — слайд нужен только
+ * для того, чего в ивентах нет.
+ */
+model ScreenSlide {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// null — слайд крутится во всех залах сети.
+  clubId   String?
+  club     Club?   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  title    String
+  text     String?
+  imageUrl String?
+  /// Подпись партнёра: «Реклама · Red Bull». Пусто — собственная акция клуба.
+  partner  String?
+
+  /// Показывать с/по. Пусто — без ограничения.
+  startsAt DateTime?
+  endsAt   DateTime?
+  isActive Boolean @default(true)
+  sortOrder Int    @default(0)
+
+  /// Сколько раз слайд был на экране — отчёт для партнёра.
+  impressions Int @default(0)
+
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([clubId])
 }

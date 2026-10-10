@@ -8,6 +8,7 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from "class-validator";
@@ -31,6 +32,7 @@ export class UpdateClubDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
+  @MaxLength(60)
   name?: string;
 
   @IsOptional()
@@ -76,6 +78,12 @@ export class UpdateClubDto {
   @IsString()
   @Matches(/^\/api\/covers\/[\w.-]+$/, { message: "Загрузите картинку QR через настройки" })
   paymentQrImageUrl?: string | null;
+
+  /** Слоган под названием клуба на экране игровых ПК. Пусто — без слогана. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  slogan?: string | null;
 }
 
 export class CreateStaffDto {
