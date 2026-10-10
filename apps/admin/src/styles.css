@@ -855,3 +855,100 @@ textarea {
   line-height: 1.5;
   max-width: 70ch;
 }
+
+/* --- Отток гостей --- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.filters select {
+  width: auto;
+}
+
+/* Второстепенная строка в ячейке: телефон под именем, дата под днями. */
+.sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.message-preview {
+  white-space: pre-wrap;
+  background: #1b2b22;
+  border: 1px solid #27412f;
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 420px;
+}
+
+/*
+ * Один ряд — один цвет, отдельный от акцента (он для действий) и от цветов
+ * состояний ПК. Проверен на контраст и светлоту по тёмной поверхности.
+ */
+.churn-chart {
+  --data: #6f88cc;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  height: 180px;
+  margin-bottom: 8px;
+}
+
+.churn-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  /* Цель наведения — вся колонка, а не тонкий столбик. */
+  cursor: default;
+}
+
+.churn-bar {
+  width: min(36px, 60%);
+  background: var(--data);
+  border-radius: 4px 4px 0 0;
+}
+
+.churn-col:hover .churn-bar {
+  filter: brightness(1.15);
+}
+
+.churn-value {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+  min-height: 15px;
+}
+
+.churn-month {
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}

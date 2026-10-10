@@ -12,6 +12,7 @@ import { LoginScreen } from "./LoginScreen.js";
 import { NetworkScreen } from "./NetworkScreen.js";
 import { OnboardingScreen } from "./OnboardingScreen.js";
 import { PromosScreen } from "./PromosScreen.js";
+import { RetentionScreen } from "./RetentionScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { ShiftBar } from "./ShiftBar.js";
 import { SignupScreen } from "./SignupScreen.js";
@@ -25,6 +26,7 @@ export type Tab =
   | "guests"
   | "events"
   | "promos"
+  | "retention"
   | "tariffs"
   | "library"
   | "network"
@@ -37,6 +39,8 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: bo
   { id: "guests", label: "Гости" },
   { id: "events", label: "Ивенты" },
   { id: "promos", label: "Промокоды" },
+  // Отчёт — список номеров с тратами, рассылка раздаёт деньги: сервер закрывает ролью.
+  { id: "retention", label: "Отток", manageOnly: true },
   { id: "tariffs", label: "Тарифы" },
   // Витрину зала собирает владелец или управляющий: сервер закрывает правку ролью.
   { id: "library", label: "Игры", manageOnly: true },
@@ -175,6 +179,8 @@ function ClubApp() {
         <GuestsScreen club={club} />
       ) : tab === "events" ? (
         <EventsScreen club={club} staff={staff} />
+      ) : tab === "retention" ? (
+        <RetentionScreen club={club} onGoTo={setTab} />
       ) : tab === "promos" ? (
         <PromosScreen club={club} staff={staff} />
       ) : tab === "library" ? (

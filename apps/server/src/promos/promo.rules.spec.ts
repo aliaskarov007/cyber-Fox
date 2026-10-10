@@ -61,6 +61,12 @@ describe("пригодность промокода", () => {
     expect(promoBlocker({ ...base, clubId: "club-a" }, "club-a", now)).toBeNull();
   });
 
+  it("личный код принимается только у своего гостя", () => {
+    const personal = { ...base, guestId: "guest-1" };
+    expect(promoBlocker(personal, "club-a", now, "guest-2")).toMatch(/другого гостя/);
+    expect(promoBlocker(personal, "club-a", now, "guest-1")).toBeNull();
+  });
+
   it("лимит использований", () => {
     expect(promoBlocker({ ...base, maxUses: 3, usedCount: 2 }, "club-a", now)).toBeNull();
     expect(promoBlocker({ ...base, maxUses: 3, usedCount: 3 }, "club-a", now)).toMatch(/разобрали/);

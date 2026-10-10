@@ -625,6 +625,23 @@ export const api = {
   cancelPayment: (intentId: string) =>
     request<{ ok: boolean }>(`/payments/${intentId}/cancel`, { method: "POST" }),
 
+  // --- Отток гостей ---
+
+  retention: (clubId: string, days: number, minVisits: number) =>
+    request<RetentionReport>(`/clubs/${clubId}/retention?days=${days}&minVisits=${minVisits}`),
+
+  winbackCampaigns: (clubId: string) =>
+    request<WinbackCampaign[]>(`/clubs/${clubId}/retention/campaigns`),
+
+  createWinback: (
+    clubId: string,
+    body: { guestIds: string[]; kind: PromoKind; amount: number; validDays: number; message?: string },
+  ) =>
+    request<{ campaignId: string; queued: number; skipped: number }>(
+      `/clubs/${clubId}/retention/campaigns`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
   // --- Промокоды ---
 
   promos: (clubId: string) => request<Promo[]>(`/clubs/${clubId}/promos`),
@@ -782,6 +799,59 @@ export interface PendingQrTopUp {
 }
 
 export type PromoKind = "BALANCE" | "BONUS";
+
+export type RetentionStatus = "active" | "at_risk" | "lost";
+
+export interface RetentionGuest {
+  guestId: string;
+  fullName: string;
+  phone: string;
+  status: RetentionStatus;
+  visits: number;
+  spent: number;
+  /** Сколько приносил в месяц, пока ходил, в тиын. */
+  monthlySpend: number;
+  firstAt: string;
+  lastAt: string;
+  daysSince: number;
+  rhythmDays: number | null;
+  usualZone: string | null;
+  usualTime: string | null;
+  reachable: boolean;
+  /** Почему писать нельзя или не стоит прямо сейчас; null — можно. */
+  blockedReason: string | null;
+  lastWinbackAt: string | null;
+}
+
+export interface RetentionReport {
+  options: { lostAfterDays: number; minVisits: number };
+  totals: {
+    regulars: number;
+    active: number;
+    atRisk: number;
+    lost: number;
+    lostMonthlySpend: number;
+    atRiskMonthlySpend: number;
+  };
+  byMonth: Array<{ month: string; guests: number; monthlySpend: number }>;
+  guests: RetentionGuest[];
+  whatsappConnected: boolean;
+}
+
+export interface WinbackCampaign {
+  id: string;
+  createdAt: string;
+  kind: PromoKind;
+  amount: number;
+  validDays: number;
+  total: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  redeemed: number;
+  returned: number;
+  revenueAfter: number;
+}
 
 export interface Promo {
   id: string;

@@ -81,7 +81,8 @@ export class PromosService {
   async list(staff: AuthenticatedStaff, clubId: string): Promise<PromoListItem[]> {
     await this.access.requireClub(staff, clubId);
     const promos = await this.prisma.promoCode.findMany({
-      where: { tenantId: staff.tenantId, OR: [{ clubId }, { clubId: null }] },
+      // Личные коды ушедшим гостям живут в своих рассылках, а не в общем списке.
+      where: { tenantId: staff.tenantId, guestId: null, OR: [{ clubId }, { clubId: null }] },
       include: { club: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -269,7 +270,7 @@ export class PromosService {
     });
     if (!promo) throw new PromoNotFound();
 
-    const blocker = promoBlocker(promo, params.clubId, new Date());
+    const blocker = promoBlocker(promo, params.clubId, new Date(), params.guestId);
     if (blocker) throw new BadRequestException(blocker);
 
     try {

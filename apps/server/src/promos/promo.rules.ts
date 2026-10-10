@@ -50,6 +50,8 @@ export function generatePromoCode(length = 8, random: () => number = Math.random
 
 export interface PromoState {
   clubId: string | null;
+  /** Личный код — только для этого гостя. */
+  guestId?: string | null;
   maxUses: number | null;
   usedCount: number;
   expiresAt: Date | null;
@@ -57,8 +59,16 @@ export interface PromoState {
 }
 
 /** Почему код сейчас нельзя применить в этом клубе; null — можно. */
-export function promoBlocker(promo: PromoState, clubId: string, now: Date): string | null {
+export function promoBlocker(
+  promo: PromoState,
+  clubId: string,
+  now: Date,
+  guestId?: string,
+): string | null {
   if (promo.disabledAt) return "Промокод больше не действует";
+  if (promo.guestId && guestId !== undefined && promo.guestId !== guestId) {
+    return "Это личный промокод другого гостя";
+  }
   if (promo.expiresAt && promo.expiresAt.getTime() <= now.getTime()) {
     return "Срок действия промокода истёк";
   }

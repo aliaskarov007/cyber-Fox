@@ -22,6 +22,7 @@ import { ProductsModule } from "./products/products.module.js";
 import { PromosModule } from "./promos/promos.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
+import { RetentionModule } from "./retention/retention.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
 import { ShiftsModule } from "./shifts/shifts.module.js";
 import { SignupModule } from "./signup/signup.module.js";
@@ -64,6 +65,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     LibraryModule,
     NetworkModule,
     ReportsModule,
+    RetentionModule,
     SignupModule,
     ImportModule,
     UploadsModule,
