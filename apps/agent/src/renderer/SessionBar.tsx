@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
+import { PromoField } from "./PromoField.js";
 
 /**
  * Полоса состояния над полками.
@@ -34,6 +35,15 @@ export function SessionBar({
    * выглядит как четыре вызова с одной машины.
    */
   const [called, setCalled] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoNote, setPromoNote] = useState<string | null>(null);
+
+  // Сообщение о зачислении висит недолго: новый баланс уже виден в полосе.
+  useEffect(() => {
+    if (!promoNote) return;
+    const timer = setTimeout(() => setPromoNote(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [promoNote]);
 
   /*
    * Кнопка возвращается в исходное через минуту. Таймер снимается при уходе с
@@ -82,6 +92,12 @@ export function SessionBar({
         </div>
 
         <div className="session-actions">
+          {/* Промокод зачисляется на аккаунт — у анонимной посадки его некуда положить. */}
+          {tick.guestName && !promoOpen && (
+            <button className="ghost" disabled={offline} onClick={() => setPromoOpen(true)}>
+              Промокод
+            </button>
+          )}
           <button
             className="ghost"
             disabled={offline || called}
@@ -103,6 +119,26 @@ export function SessionBar({
           </button>
         </div>
       </div>
+
+      {promoOpen && (
+        <div className="promo-panel">
+          <PromoField
+            client={client}
+            disabled={offline}
+            startOpen
+            onClose={() => setPromoOpen(false)}
+            onApplied={(result) =>
+              setPromoNote(
+                result.kind === "BALANCE"
+                  ? `Промокод ${result.code}: на счёт зачислено ${formatMoney(result.amount)}`
+                  : `Промокод ${result.code}: начислено ${formatMoney(result.amount)} бонусами`,
+              )
+            }
+          />
+        </div>
+      )}
+
+      {promoNote && <div className="banner info">{promoNote}</div>}
 
       {inDebt && (
         <div className="banner debt">

@@ -52,6 +52,8 @@ model Tenant {
   whatsapp     WhatsAppChannel?
   events       Event[]
   guestSignups GuestSignup[]
+  promoCodes   PromoCode[]
+  promoRedemptions PromoRedemption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -237,6 +239,7 @@ model Club {
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
   events    Event[]
+  promoCodes PromoCode[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -502,6 +505,7 @@ model Guest {
   paymentIntents PaymentIntent[]
   phoneCodes PhoneVerification[]
   invites    EventInvite[]
+  promoRedemptions PromoRedemption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -787,6 +791,8 @@ enum TransactionType {
   DEBT_WRITE_OFF
   BONUS_ACCRUAL
   BONUS_SPEND
+  /// Деньги по промокоду. Это не платёж: в кассу смены не попадает.
+  PROMO
 }
 
 /// Движение по кошельку гостя. Расход записывается в клуб, где шла сессия,
@@ -1074,4 +1080,76 @@ model GuestSignup {
   createdAt   DateTime  @default(now())
 
   @@index([computerId, createdAt])
+}
+
+enum PromoKind {
+  /// Деньги на счёт гостя.
+  BALANCE
+  /// Бонусные баллы.
+  BONUS
+}
+
+/**
+ * Промокод: деньги на счёт или бонусы. Один гость вводит код один раз.
+ *
+ * clubId пуст — код действует во всех залах сети; иначе только в своём.
+ * Хранится в нормализованном виде (заглавные латинские буквы и цифры), поэтому
+ * «fox 500», «FOX-500» и «ФОХ500» на русской раскладке — один код.
+ */
+model PromoCode {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String?
+  club     Club?   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  code String
+  kind PromoKind
+  /// В тиын: деньги на счёт или баллы (баллы считаются в тех же единицах, что и бонусы).
+  amount Int
+  /// Сколько гостей всего могут ввести код. Пусто — без ограничения.
+  maxUses   Int?
+  usedCount Int  @default(0)
+  expiresAt DateTime?
+  /// Для себя: где раздавали код, к какой акции он относится.
+  comment   String?
+
+  createdById String?
+  /// Отключённый код больше не принимается; уже начисленное остаётся у гостей.
+  disabledAt DateTime?
+
+  redemptions PromoRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([clubId])
+}
+
+/** Кто, где и сколько получил по промокоду. */
+model PromoRedemption {
+  id       String    @id @default(uuid())
+  tenantId String
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  promoId  String
+  promo    PromoCode @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  guestId  String
+  guest    Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  /// Зал, где код введён.
+  clubId String
+  kind   PromoKind
+  amount Int
+
+  /// Ввёл администратор на стойке…
+  staffId    String?
+  /// …или гость сам за игровым ПК.
+  computerId String?
+
+  createdAt DateTime @default(now())
+
+  /// Один гость — один раз.
+  @@unique([promoId, guestId])
+  @@index([guestId])
 }

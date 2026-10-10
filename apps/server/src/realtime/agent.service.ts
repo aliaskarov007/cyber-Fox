@@ -224,6 +224,48 @@ export class AgentService {
       data: { failedPinAttempts: 0, pinLockedUntil: null },
     });
 
+    return this.cardFor(computer, guest);
+  }
+
+  /**
+   * Карточка гостя на экране блокировки: баланс, минуты и можно ли начать.
+   *
+   * Отдельно от входа, потому что пересчитывается и без PIN — после промокода,
+   * введённого прямо на этом экране: гость уже опознан, а баланс поменялся.
+   */
+  async guestCard(computerId: string, guestId: string): Promise<GuestLoginResult> {
+    const computer = await this.prisma.computer.findUnique({
+      where: { id: computerId },
+      include: { club: true, zone: true },
+    });
+    if (!computer) throw new NotFoundException("ПК не найден");
+    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
+    if (!guest || guest.tenantId !== computer.club.tenantId) {
+      throw new NotFoundException("Гость не найден");
+    }
+    return this.cardFor(computer, guest);
+  }
+
+  private async cardFor(
+    computer: {
+      id: string;
+      clubId: string;
+      zoneId: string;
+      status: ComputerStatus;
+      club: { creditLimit: number; timezone: string };
+    },
+    guest: { id: string; fullName: string },
+  ): Promise<GuestLoginResult> {
+    const empty: GuestLoginResult = {
+      ok: false,
+      reason: null,
+      guest: null,
+      packagesInZone: [],
+      packagesElsewhere: [],
+      perMinutePrice: null,
+      minutesAffordable: null,
+    };
+
     if (computer.status === ComputerStatus.RESERVED) {
       return { ...empty, reason: "Место забронировано. Подойдите к администратору." };
     }

@@ -19,6 +19,7 @@ import { PaymentsModule } from "./payments/payments.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProductsModule } from "./products/products.module.js";
+import { PromosModule } from "./promos/promos.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { ReportsModule } from "./reports/reports.module.js";
 import { SessionsModule } from "./sessions/sessions.module.js";
@@ -59,6 +60,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     SessionsModule,
     ShiftsModule,
     ProductsModule,
+    PromosModule,
     LibraryModule,
     NetworkModule,
     ReportsModule,

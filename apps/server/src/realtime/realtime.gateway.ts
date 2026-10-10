@@ -18,6 +18,7 @@ import { SessionsService } from "../sessions/sessions.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
 import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
+import { PromosService } from "../promos/promos.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
@@ -30,6 +31,14 @@ const agentRoom = (computerId: string): string => `agent:${computerId}`;
  * сорок идентификаторов там, где хватает одного клуба.
  */
 const clubAgentsRoom = (clubId: string): string => `agents:${clubId}`;
+
+/*
+ * Сколько гость, вошедший по PIN, считается опознанным на экране блокировки
+ * без сессии. Нужно, чтобы ввести промокод до старта: новичку с нулевым
+ * балансом без кода начать нечем. Окно короткое — встал и ушёл, а следующий за
+ * этой машиной не должен действовать от его имени.
+ */
+const LOGIN_WINDOW_MS = 5 * 60_000;
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
@@ -47,6 +56,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly sessions: SessionsService,
     private readonly library: LibraryService,
     private readonly signups: GuestSignupService,
+    private readonly promos: PromosService,
   ) {}
 
   onModuleInit(): void {
@@ -211,7 +221,65 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
-    return this.agents.guestLogin(computerId, body.phone, body.pin);
+    const result = await this.agents.guestLogin(computerId, body.phone, body.pin);
+    // Гость опознан, даже если начать ему пока нечем: промокод это исправит.
+    if (result.guest) {
+      client.data.loginGuestId = result.guest.id;
+      client.data.loginAt = Date.now();
+    } else {
+      this.forgetLogin(client);
+    }
+    return result;
+  }
+
+  /** «Это не я» на экране блокировки. */
+  @SubscribeMessage("guest.logout")
+  guestLogout(@ConnectedSocket() client: Socket): { ok: boolean } {
+    this.forgetLogin(client);
+    return { ok: true };
+  }
+
+  /**
+   * Промокод с игрового ПК. Гость — тот, кто играет на этой машине, а без
+   * сессии — тот, кто только что вошёл по PIN. Номер гостя от агента не
+   * принимается: иначе код можно было бы зачислить на любой чужой аккаунт.
+   */
+  @SubscribeMessage("promo.redeem")
+  async redeemPromo(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { code?: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+
+    const playing = await this.currentGuest(client);
+    const guestId = playing ?? this.loggedInGuest(client);
+    if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
+
+    const result = await this.promos.redeemAtComputer(computerId, guestId, body.code ?? "");
+    if (!result.ok) return result;
+
+    if (playing) {
+      // Новый баланс — сразу на экран гостя и на карту зала у администратора.
+      await this.promos.pushToSeat(guestId, client.data.clubId as string);
+      return result;
+    }
+
+    // На экране блокировки баланс решает, можно ли начать, — отдаём карточку заново.
+    const card = await this.agents.guestCard(computerId, guestId);
+    return { ...result, card };
+  }
+
+  private loggedInGuest(client: Socket): string | null {
+    const guestId = client.data.loginGuestId as string | undefined;
+    const at = client.data.loginAt as number | undefined;
+    if (!guestId || !at || Date.now() - at > LOGIN_WINDOW_MS) return null;
+    return guestId;
+  }
+
+  private forgetLogin(client: Socket): void {
+    client.data.loginGuestId = undefined;
+    client.data.loginAt = undefined;
   }
 
   /** Новый гость: QR со ссылкой на WhatsApp клуба и кодом регистрации. */
@@ -251,6 +319,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     try {
       const session = await this.agents.startByGuest(computerId, body.guestId, body.tariffId ?? null);
+      // Дальше гостя определяет сессия; после неё машина снова ничья.
+      this.forgetLogin(client);
       return { ok: true, sessionId: session.id };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };

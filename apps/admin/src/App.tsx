@@ -11,6 +11,7 @@ import { HallScreen } from "./HallScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
 import { NetworkScreen } from "./NetworkScreen.js";
 import { OnboardingScreen } from "./OnboardingScreen.js";
+import { PromosScreen } from "./PromosScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { ShiftBar } from "./ShiftBar.js";
 import { SignupScreen } from "./SignupScreen.js";
@@ -23,6 +24,7 @@ export type Tab =
   | "bar"
   | "guests"
   | "events"
+  | "promos"
   | "tariffs"
   | "library"
   | "network"
@@ -34,6 +36,7 @@ const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: bo
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
   { id: "events", label: "Ивенты" },
+  { id: "promos", label: "Промокоды" },
   { id: "tariffs", label: "Тарифы" },
   // Витрину зала собирает владелец или управляющий: сервер закрывает правку ролью.
   { id: "library", label: "Игры", manageOnly: true },
@@ -172,6 +175,8 @@ function ClubApp() {
         <GuestsScreen club={club} />
       ) : tab === "events" ? (
         <EventsScreen club={club} staff={staff} />
+      ) : tab === "promos" ? (
+        <PromosScreen club={club} staff={staff} />
       ) : tab === "library" ? (
         <LibraryScreen club={club} />
       ) : tab === "network" ? (

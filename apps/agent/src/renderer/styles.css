@@ -596,3 +596,33 @@ button:disabled {
   color: var(--ink);
   letter-spacing: 0.08em;
 }
+
+/* --- Промокод --- */
+
+.promo-field {
+  display: grid;
+  gap: 10px;
+}
+
+.promo-row {
+  display: flex;
+  gap: 10px;
+}
+
+.promo-row input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.promo-row button {
+  white-space: nowrap;
+}
+
+/* Во время игры поле открывается полосой под таймером, а не поверх полок. */
+.promo-panel {
+  padding: 12px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}

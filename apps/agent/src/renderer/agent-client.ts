@@ -41,6 +41,19 @@ export interface SignupConfirmed {
   existingName: string | null;
 }
 
+export type PromoRedeem =
+  | {
+      ok: true;
+      code: string;
+      kind: "BALANCE" | "BONUS";
+      amount: number;
+      balance: number;
+      bonusPoints: number;
+      /** Пересчитанная карточка — только на экране блокировки, без сессии. */
+      card?: GuestLoginResult;
+    }
+  | { ok: false; reason: string };
+
 export interface Tick {
   sessionId: string;
   /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
@@ -158,6 +171,16 @@ export class AgentClient {
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {
     return this.request("guest.login", { phone, pin });
+  }
+
+  /** «Это не я»: машина забывает вошедшего гостя. */
+  logout(): Promise<{ ok: boolean }> {
+    return this.request("guest.logout", {});
+  }
+
+  /** Промокод вошедшего или играющего гостя: кому зачислить, решает сервер. */
+  redeemPromo(code: string): Promise<PromoRedeem> {
+    return this.request("promo.redeem", { code });
   }
 
   startSession(guestId: string, tariffId?: string): Promise<{ ok: boolean; reason?: string }> {

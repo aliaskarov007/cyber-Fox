@@ -64,6 +64,8 @@ export const TransactionType = {
   REFUND: "REFUND",
   ADJUSTMENT: "ADJUSTMENT",
   DEBT_WRITE_OFF: "DEBT_WRITE_OFF",
+  /** Деньги по промокоду: не платёж, в кассу смены не попадает. */
+  PROMO: "PROMO",
 } as const;
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType];
 

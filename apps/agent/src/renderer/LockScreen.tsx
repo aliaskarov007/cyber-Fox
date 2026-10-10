@@ -5,6 +5,7 @@ import {
   type GuestLoginResult,
   formatMoney,
 } from "./agent-client.js";
+import { PromoField } from "./PromoField.js";
 import { SignupScreen } from "./SignupScreen.js";
 
 /**
@@ -51,8 +52,12 @@ export function LockScreen({
     setError(null);
     try {
       const result = await client.login(withPhone, withPin);
+      /*
+       * Гость опознан, но начать ему нечем — карточку всё равно показываем:
+       * на ней можно ввести промокод, а причина отказа видна сверху.
+       */
+      if (result.guest) setCard(result);
       if (!result.ok) setError(result.reason ?? "Не удалось войти");
-      else setCard(result);
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -137,16 +142,35 @@ export function LockScreen({
         )}
 
         {minutes ? (
-          <button className="primary" disabled={busy} onClick={() => void start()}>
+          <button className="primary" disabled={busy || !card.ok} onClick={() => void start()}>
             Играть на минутах пакета ({minutes.minutesRemaining} мин)
           </button>
         ) : (
-          <button className="primary" disabled={busy} onClick={() => void start()}>
+          <button className="primary" disabled={busy || !card.ok} onClick={() => void start()}>
             Начать по поминутному тарифу
           </button>
         )}
 
-        <button className="ghost" onClick={() => setCard(null)}>
+        <PromoField
+          client={client}
+          disabled={!online}
+          onApplied={(result) => {
+            // Баланс поменялся — от него зависит, можно ли начать.
+            if (result.card) {
+              setCard(result.card);
+              setError(result.card.ok ? null : (result.card.reason ?? null));
+            }
+          }}
+        />
+
+        <button
+          className="ghost"
+          onClick={() => {
+            setCard(null);
+            setError(null);
+            void client.logout().catch(() => null);
+          }}
+        >
           Это не я
         </button>
       </div>

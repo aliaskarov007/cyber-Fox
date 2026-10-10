@@ -603,6 +603,26 @@ export const api = {
   eventInvites: (clubId: string, eventId: string) =>
     request<EventInvite[]>(`/clubs/${clubId}/events/${eventId}/invites`),
 
+  // --- Промокоды ---
+
+  promos: (clubId: string) => request<Promo[]>(`/clubs/${clubId}/promos`),
+
+  createPromo: (clubId: string, body: PromoInput) =>
+    request<Promo>(`/clubs/${clubId}/promos`, { method: "POST", body: JSON.stringify(body) }),
+
+  disablePromo: (clubId: string, promoId: string) =>
+    request<Promo>(`/clubs/${clubId}/promos/${promoId}/disable`, { method: "POST" }),
+
+  promoRedemptions: (clubId: string, promoId: string) =>
+    request<PromoRedemption[]>(`/clubs/${clubId}/promos/${promoId}/redemptions`),
+
+  /** Администратор вводит код, который гость назвал на стойке. */
+  redeemPromo: (clubId: string, guestId: string, code: string) =>
+    request<PromoRedeemResult>(`/clubs/${clubId}/guests/${guestId}/promo`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
   // --- Перенос данных ---
 
   importCsv: (clubId: string, kind: "guests" | "computers" | "tariffs", csv: string) =>
@@ -716,6 +736,53 @@ export interface ClubEvent {
     going: number;
     declined: number;
   };
+}
+
+export type PromoKind = "BALANCE" | "BONUS";
+
+export interface Promo {
+  id: string;
+  code: string;
+  kind: PromoKind;
+  /** В тиын: деньги на счёт или бонусные баллы. */
+  amount: number;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  comment: string | null;
+  /** null — код действует во всех залах сети. */
+  clubId: string | null;
+  clubName: string | null;
+  disabledAt: string | null;
+  createdAt: string;
+}
+
+export interface PromoInput {
+  code?: string;
+  kind: PromoKind;
+  amount: number;
+  maxUses?: number;
+  expiresAt?: string;
+  networkWide?: boolean;
+  comment?: string;
+}
+
+export interface PromoRedemption {
+  id: string;
+  guest: { fullName: string; phone: string };
+  kind: PromoKind;
+  amount: number;
+  /** Гость ввёл код сам за игровым ПК, а не на стойке. */
+  atComputer: boolean;
+  createdAt: string;
+}
+
+export interface PromoRedeemResult {
+  code: string;
+  kind: PromoKind;
+  amount: number;
+  balance: number;
+  bonusPoints: number;
 }
 
 export interface EventInvite {

@@ -13,6 +13,7 @@ import {
 import { GuestNewForm } from "./GuestNewForm.js";
 import { GuestPhoneVerify } from "./GuestPhoneVerify.js";
 import { GuestPinForm } from "./GuestPinForm.js";
+import { GuestPromoForm } from "./GuestPromoForm.js";
 
 const TRANSACTION_LABEL: Record<string, string> = {
   TOPUP: "Пополнение",
@@ -24,6 +25,7 @@ const TRANSACTION_LABEL: Record<string, string> = {
   DEBT_WRITE_OFF: "Списание долга",
   BONUS_ACCRUAL: "Начисление бонусов",
   BONUS_SPEND: "Списание бонусов",
+  PROMO: "Промокод",
 };
 
 export function GuestsScreen({ club }: { club: Club }) {
@@ -285,6 +287,18 @@ function GuestCardPanel({
             </div>
           </div>
         )}
+      </div>
+
+      <div className="section">
+        <h3>Промокод</h3>
+        <GuestPromoForm
+          club={club}
+          guestId={guestId}
+          onApplied={() => {
+            void load();
+            onChanged();
+          }}
+        />
       </div>
 
       {card.packages.length > 0 && (
