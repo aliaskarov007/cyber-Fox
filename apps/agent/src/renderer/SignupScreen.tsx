@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 
-import { encodeQr, qrSvgPath } from "../shared/qr.js";
 import type { AgentClient, SignupConfirmed } from "./agent-client.js";
+import { Qr } from "./QrCode.js";
 
 type Step =
   | { kind: "loading" }
@@ -15,16 +15,6 @@ function formatPhone(digits: string): string {
   return m ? `+7 ${m[1]} ${m[2]} ${m[3]} ${m[4]}` : `+${digits}`;
 }
 
-function Qr({ text }: { text: string }) {
-  const { path, size } = qrSvgPath(encodeQr(text));
-  return (
-    // Белый фон обязателен: на тёмном экране камера тёмный QR не прочитает.
-    <svg className="qr" viewBox={`0 0 ${size} ${size}`} shapeRendering="crispEdges" role="img" aria-label="QR-код регистрации">
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
-  );
-}
 
 /**
  * Регистрация нового гостя за игровым ПК.

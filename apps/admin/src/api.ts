@@ -21,6 +21,10 @@ export interface Club {
   lowBalanceWarnMinutes: number;
   /** Процент от потраченного, возвращаемый бонусами. 0 — программа выключена. */
   bonusPercent: number;
+  /** Гость заказывает из бара с игрового ПК и платит с баланса. */
+  barOrdersFromPc: boolean;
+  /** Статический QR клуба для пополнения с игрового ПК, пока банк не подключён. */
+  paymentQrImageUrl: string | null;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -492,6 +496,8 @@ export const api = {
       packageValidityDays: number;
       lowBalanceWarnMinutes: number;
       bonusPercent: number;
+      barOrdersFromPc: boolean;
+      paymentQrImageUrl: string | null;
     }>,
   ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
 
@@ -602,6 +608,22 @@ export const api = {
 
   eventInvites: (clubId: string, eventId: string) =>
     request<EventInvite[]>(`/clubs/${clubId}/events/${eventId}/invites`),
+
+  // --- Заказы с игровых ПК и пополнения по QR ---
+
+  barOrders: (clubId: string) => request<BarOrder[]>(`/clubs/${clubId}/bar-orders`),
+
+  completeBarOrder: (clubId: string, orderId: string) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/done`, { method: "POST" }),
+
+  cancelBarOrder: (clubId: string, orderId: string) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/cancel`, { method: "POST" }),
+
+  pendingQrTopUps: (clubId: string) =>
+    request<PendingQrTopUp[]>(`/clubs/${clubId}/payments/qr-pending`),
+
+  cancelPayment: (intentId: string) =>
+    request<{ ok: boolean }>(`/payments/${intentId}/cancel`, { method: "POST" }),
 
   // --- Промокоды ---
 
@@ -736,6 +758,27 @@ export interface ClubEvent {
     going: number;
     declined: number;
   };
+}
+
+export interface BarOrder {
+  id: string;
+  status: "NEW" | "DONE" | "CANCELED";
+  computerName: string;
+  guestName: string;
+  total: number;
+  items: Array<{ productId: string; name: string; quantity: number; price: number }>;
+  createdAt: string;
+  handledAt: string | null;
+}
+
+export interface PendingQrTopUp {
+  id: string;
+  amount: number;
+  status: "PENDING" | "EXPIRED";
+  guestName: string;
+  guestPhone: string | null;
+  computerName: string;
+  createdAt: string;
 }
 
 export type PromoKind = "BALANCE" | "BONUS";

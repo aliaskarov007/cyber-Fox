@@ -6,6 +6,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
   MinLength,
@@ -61,6 +62,20 @@ export class UpdateClubDto {
   @Min(0)
   @Max(100)
   bonusPercent?: number;
+
+  /** Заказ из бара с игрового ПК с оплатой с баланса. */
+  @IsOptional()
+  @IsBoolean()
+  barOrdersFromPc?: boolean;
+
+  /**
+   * Картинка статического QR клуба для пополнения с игрового ПК. Адрес
+   * загруженного файла; null — убрать.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\/api\/covers\/[\w.-]+$/, { message: "Загрузите картинку QR через настройки" })
+  paymentQrImageUrl?: string | null;
 }
 
 export class CreateStaffDto {

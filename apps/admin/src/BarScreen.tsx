@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type Club, type Guest, type Product, type Staff, api, formatMoney } from "./api.js";
 import { ProductsSection } from "./ProductsSection.js";
+import { SeatRequests } from "./SeatRequests.js";
 
 /**
  * Бар. Продажа — самая частая операция после посадки, поэтому товар продаётся
@@ -73,6 +74,9 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
 
   return (
     <main>
+      {/* Заказы с игровых ПК — первым делом: они уже оплачены и ждут, пока их отнесут. */}
+      <SeatRequests club={club} />
+
       {done && <div className="notice">Продано: {done}</div>}
       {error && <div className="error">{error}</div>}
 

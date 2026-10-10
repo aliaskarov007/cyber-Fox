@@ -58,6 +58,11 @@ export class HmacPaymentProvider implements PaymentProvider {
     return this.config.get<string>("PAYMENT_PROVIDER") ?? "manual";
   }
 
+  /** Банк подключён: QR приходит с суммой, а оплата подтверждается сама. */
+  get isConfigured(): boolean {
+    return Boolean(this.config.get<string>("PAYMENT_CHECKOUT_URL"));
+  }
+
   private get secret(): string {
     return this.config.get<string>("PAYMENT_WEBHOOK_SECRET") ?? "";
   }

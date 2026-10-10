@@ -54,6 +54,34 @@ export type PromoRedeem =
     }
   | { ok: false; reason: string };
 
+export interface BarMenu {
+  enabled: boolean;
+  products: Array<{
+    id: string;
+    name: string;
+    category: string | null;
+    price: number;
+    stock: number | null;
+  }>;
+}
+
+export type BarOrderResult =
+  | { ok: true; orderId: string; total: number; balance: number }
+  | { ok: false; reason: string };
+
+export type TopUpStart =
+  | {
+      ok: true;
+      intentId: string;
+      amount: number;
+      /** dynamic — QR банка уже с суммой; static — QR клуба, сумму гость вводит сам. */
+      mode: "dynamic" | "static";
+      qrPayload: string | null;
+      qrImageUrl: string | null;
+      expiresAt: string;
+    }
+  | { ok: false; reason: string };
+
 export interface Tick {
   sessionId: string;
   /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
@@ -92,6 +120,7 @@ declare global {
  */
 export class AgentClient {
   private socket: Socket | null = null;
+  private serverUrl = "";
 
   async connect(handlers: {
     onPaired: (info: PairedInfo) => void;
@@ -110,6 +139,7 @@ export class AgentClient {
     onLibraryChanged: () => void;
   }): Promise<void> {
     const config = await window.cyberfox.config();
+    this.serverUrl = config.serverUrl;
 
     this.socket = io(config.serverUrl, {
       auth: {
@@ -171,6 +201,52 @@ export class AgentClient {
 
   login(phone: string, pin: string): Promise<GuestLoginResult> {
     return this.request("guest.login", { phone, pin });
+  }
+
+  /** Адрес с сервера («/api/covers/…») — в полный: экран открыт не с сервера. */
+  resolveUrl(url: string): string {
+    try {
+      return new URL(url, this.serverUrl).toString();
+    } catch {
+      return url;
+    }
+  }
+
+  barMenu(): Promise<BarMenu> {
+    return this.request("bar.menu", {});
+  }
+
+  /** Заказ из бара с оплатой с баланса гостя этой сессии. */
+  barOrder(items: Array<{ productId: string; quantity: number }>): Promise<BarOrderResult> {
+    return this.request("bar.order", { items });
+  }
+
+  /** Пополнение по единому QR. Сумма в тиын. */
+  createTopUp(amount: number): Promise<TopUpStart> {
+    return this.request("topup.create", { amount });
+  }
+
+  /** Карточка вошедшего гостя заново — например, после пополнения. */
+  guestCard(): Promise<GuestLoginResult> {
+    return this.request("guest.card", {});
+  }
+
+  /** Деньги по QR зачислены. Возвращается функция отписки. */
+  onTopUpPaid(listener: (event: { intentId: string; amount: number }) => void): () => void {
+    this.socket?.on("topup.paid", listener);
+    return () => {
+      this.socket?.off("topup.paid", listener);
+    };
+  }
+
+  /** Заказ из бара отнесли или отменили. */
+  onBarOrderUpdated(
+    listener: (event: { orderId: string; status: "DONE" | "CANCELED" }) => void,
+  ): () => void {
+    this.socket?.on("bar.order.updated", listener);
+    return () => {
+      this.socket?.off("bar.order.updated", listener);
+    };
   }
 
   /** «Это не я»: машина забывает вошедшего гостя. */

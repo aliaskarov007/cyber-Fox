@@ -54,6 +54,7 @@ model Tenant {
   guestSignups GuestSignup[]
   promoCodes   PromoCode[]
   promoRedemptions PromoRedemption[]
+  barOrders    BarOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -151,6 +152,8 @@ model PaymentIntent {
   /// Ссылка на страницу оплаты. Хранится, чтобы повторный показ платежа
   /// возвращал тот же QR, а не пустоту.
   checkoutUrl String?
+  /// Игровой ПК, на экране которого показан QR: туда уходит весть об оплате.
+  computerId String?
 
   /// Ключ идемпотентности запроса на создание: повторный клик по кнопке
   /// не должен плодить платежи.
@@ -214,6 +217,13 @@ model Club {
   lowBalanceWarnMinutes Int @default(10)
   /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
   bonusPercent Int @default(0)
+  /// Гость может заказать из бара прямо с игрового ПК и оплатить с баланса.
+  /// Выключено по умолчанию: включает владелец, когда готов носить заказы к местам.
+  barOrdersFromPc Boolean @default(false)
+  /// Картинка статического QR клуба из банковского приложения (единый QR).
+  /// Показывается на игровом ПК, пока банк не подключён напрямую: гость платит
+  /// по нему, администратор подтверждает поступление.
+  paymentQrImageUrl String?
 
   /// Ключ клуба для бездисковых залов. Один на весь клуб, кладётся в общий
   /// образ рядом с агентом: машины называют себя MAC-адресом, а этот ключ
@@ -240,6 +250,7 @@ model Club {
   appSuggestions AppSuggestion[]
   events    Event[]
   promoCodes PromoCode[]
+  barOrders BarOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -506,6 +517,7 @@ model Guest {
   phoneCodes PhoneVerification[]
   invites    EventInvite[]
   promoRedemptions PromoRedemption[]
+  barOrders  BarOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -738,11 +750,16 @@ model ProductSale {
   total         Int
   method        PaymentMethod
 
+  /// Заказ с игрового ПК, к которому относится позиция.
+  orderId String?
+  order   BarOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([clubId, createdAt])
   @@index([shiftId])
   @@index([guestId])
+  @@index([orderId])
 }
 
 enum PaymentMethod {
@@ -1152,4 +1169,52 @@ model PromoRedemption {
   /// Один гость — один раз.
   @@unique([promoId, guestId])
   @@index([guestId])
+}
+
+enum BarOrderStatus {
+  /// Оплачен с баланса, ждёт администратора.
+  NEW
+  /// Отнесли гостю.
+  DONE
+  /// Отменён администратором: деньги вернулись на счёт, товар — на склад.
+  CANCELED
+}
+
+/**
+ * Заказ из бара с игрового ПК. Оплачивается с баланса сразу при заказе:
+ * администратор несёт уже оплаченное и не бегает за гостем с терминалом.
+ * Позиции — обычные продажи бара (ProductSale), поэтому выручка и маржа
+ * считаются тем же отчётом.
+ */
+model BarOrder {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String
+  club     Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  guestId  String
+  guest    Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  sessionId    String?
+  computerId   String
+  /// Имя машины на момент заказа — куда нести.
+  computerName String
+
+  status BarOrderStatus @default(NEW)
+  /// В тиын.
+  total  Int
+  /// Сколько бонусов начислено за заказ: при отмене они списываются обратно.
+  bonusAccrued Int @default(0)
+  /// Снимок позиций: [{ productId, name, quantity, price }].
+  items Json
+
+  handledById String?
+  handledAt   DateTime?
+
+  sales ProductSale[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId, status, createdAt])
 }

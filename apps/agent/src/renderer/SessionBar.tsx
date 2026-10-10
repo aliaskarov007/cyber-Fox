@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
+import { BarPanel } from "./BarPanel.js";
 import { PromoField } from "./PromoField.js";
+import { TopUpPanel } from "./TopUpPanel.js";
 
 /**
  * Полоса состояния над полками.
@@ -35,8 +37,12 @@ export function SessionBar({
    * выглядит как четыре вызова с одной машины.
    */
   const [called, setCalled] = useState(false);
-  const [promoOpen, setPromoOpen] = useState(false);
+  /* Открытая панель под полосой: одна за раз, чтобы не заслонять полки. */
+  const [panel, setPanel] = useState<"promo" | "topup" | "bar" | null>(null);
   const [promoNote, setPromoNote] = useState<string | null>(null);
+  /* Клуб разрешил заказ из бара с ПК — узнаём при старте сессии. */
+  const [barEnabled, setBarEnabled] = useState(false);
+  const hasAccount = Boolean(tick.guestName);
 
   // Сообщение о зачислении висит недолго: новый баланс уже виден в полосе.
   useEffect(() => {
@@ -44,6 +50,27 @@ export function SessionBar({
     const timer = setTimeout(() => setPromoNote(null), 15_000);
     return () => clearTimeout(timer);
   }, [promoNote]);
+
+  useEffect(() => {
+    if (!hasAccount) return;
+    void client
+      .barMenu()
+      .then((menu) => setBarEnabled(menu.enabled))
+      .catch(() => setBarEnabled(false));
+  }, [client, hasAccount, tick.sessionId]);
+
+  // Администратор отнёс или отменил заказ — гость узнаёт об этом у себя.
+  useEffect(
+    () =>
+      client.onBarOrderUpdated((event) =>
+        setPromoNote(
+          event.status === "DONE"
+            ? "Заказ из бара отмечен как выданный. Приятного аппетита!"
+            : "Заказ из бара отменён администратором — деньги вернулись на счёт.",
+        ),
+      ),
+    [client],
+  );
 
   /*
    * Кнопка возвращается в исходное через минуту. Таймер снимается при уходе с
@@ -92,9 +119,28 @@ export function SessionBar({
         </div>
 
         <div className="session-actions">
-          {/* Промокод зачисляется на аккаунт — у анонимной посадки его некуда положить. */}
-          {tick.guestName && !promoOpen && (
-            <button className="ghost" disabled={offline} onClick={() => setPromoOpen(true)}>
+          {/* Бар, пополнение и промокод работают со счётом аккаунта — у анонимной
+              посадки его нет. */}
+          {hasAccount && barEnabled && (
+            <button
+              className={panel === "bar" ? "primary" : "ghost"}
+              disabled={offline}
+              onClick={() => setPanel(panel === "bar" ? null : "bar")}
+            >
+              Бар
+            </button>
+          )}
+          {hasAccount && (
+            <button
+              className={panel === "topup" ? "primary" : "ghost"}
+              disabled={offline}
+              onClick={() => setPanel(panel === "topup" ? null : "topup")}
+            >
+              Пополнить
+            </button>
+          )}
+          {hasAccount && panel !== "promo" && (
+            <button className="ghost" disabled={offline} onClick={() => setPanel("promo")}>
               Промокод
             </button>
           )}
@@ -120,13 +166,36 @@ export function SessionBar({
         </div>
       </div>
 
-      {promoOpen && (
+      {panel === "bar" && (
+        <div className="promo-panel">
+          <BarPanel
+            client={client}
+            balance={tick.balance}
+            offline={offline}
+            onOrdered={setPromoNote}
+            onClose={() => setPanel(null)}
+          />
+        </div>
+      )}
+
+      {panel === "topup" && (
+        <div className="promo-panel">
+          <TopUpPanel
+            client={client}
+            disabled={offline}
+            onPaid={(amount) => setPromoNote(`Счёт пополнен на ${formatMoney(amount)}`)}
+            onClose={() => setPanel(null)}
+          />
+        </div>
+      )}
+
+      {panel === "promo" && (
         <div className="promo-panel">
           <PromoField
             client={client}
             disabled={offline}
             startOpen
-            onClose={() => setPromoOpen(false)}
+            onClose={() => setPanel(null)}
             onApplied={(result) =>
               setPromoNote(
                 result.kind === "BALANCE"

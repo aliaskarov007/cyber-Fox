@@ -4,6 +4,7 @@ import type { Tab } from "./App.js";
 import { type Club, type HallCell, type Tariff, api, formatMoney } from "./api.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
+import { SeatRequests } from "./SeatRequests.js";
 import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
@@ -113,6 +114,8 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
           <div className="label">Начислено по активным</div>
         </div>
       </div>
+
+      <SeatRequests club={club} />
 
       <StaffCalls
         calls={Object.entries(calls)

@@ -46,6 +46,20 @@ export class PaymentsController {
     return this.payments.list(staff, clubId);
   }
 
+  /** Пополнения по статическому QR с игровых ПК, ждущие подтверждения кассы. */
+  @Get("clubs/:clubId/payments/qr-pending")
+  pendingQr(@CurrentStaff() staff: AuthenticatedStaff, @Param("clubId") clubId: string) {
+    return this.payments.pendingQr(staff, clubId);
+  }
+
+  @Post("payments/:intentId/cancel")
+  cancelManually(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("intentId") intentId: string,
+  ) {
+    return this.payments.cancelManually(staff, intentId);
+  }
+
   @Post("payments/:intentId/confirm")
   confirmManually(
     @CurrentStaff() staff: AuthenticatedStaff,

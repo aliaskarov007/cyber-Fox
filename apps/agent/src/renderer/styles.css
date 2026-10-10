@@ -626,3 +626,107 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+
+/* --- Пополнение по QR --- */
+
+.topup {
+  display: grid;
+  gap: 12px;
+}
+
+.topup-title {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 650;
+}
+
+.topup-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.topup img.qr {
+  object-fit: contain;
+  background: #fff;
+}
+
+/* --- Бар с игрового ПК --- */
+
+.bar-panel {
+  display: grid;
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.bar-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bar-head .ghost {
+  margin-left: auto;
+}
+
+.bar-head .k,
+.bar-total .k {
+  color: var(--muted);
+}
+
+.bar-category {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 6px 0;
+}
+
+.bar-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.bar-name {
+  flex: 1;
+}
+
+.bar-price {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-qty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-qty button {
+  width: 44px;
+  padding: 8px 0;
+}
+
+.bar-qty span {
+  min-width: 2ch;
+  text-align: center;
+}
+
+.bar-total {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 10px;
+  background: var(--surface);
+}
+
+.bar-total button {
+  margin-left: auto;
+}

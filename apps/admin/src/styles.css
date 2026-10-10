@@ -787,6 +787,15 @@ tr.muted td {
   margin-left: auto;
 }
 
+/* Заказ и пополнение несут две кнопки: прижата вправо только первая. */
+.call button + button {
+  margin-left: 0;
+}
+
+.call {
+  flex-wrap: wrap;
+}
+
 /* Та же машина подсвечена и на карте зала. */
 .pc.calling {
   border-color: #5a4718;
@@ -836,4 +845,13 @@ tr.muted td {
 textarea {
   width: 100%;
   resize: vertical;
+}
+
+/* Пояснение под настройкой: короткое, приглушённое, не спорит с полем. */
+.hint {
+  margin: 6px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 70ch;
 }

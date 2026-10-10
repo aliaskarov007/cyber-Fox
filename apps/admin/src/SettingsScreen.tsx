@@ -60,6 +60,14 @@ export function SettingsScreen({
 
       <ClubSettings club={club} onSaved={(msg) => void run(async () => onClubsChanged(), msg)} />
 
+      {/* Деньги гостей: заказ с баланса и QR для оплаты клубу — решения владельца. */}
+      {isOwner && (
+        <SeatPaymentSettings
+          club={club}
+          onSaved={(msg) => void run(async () => onClubsChanged(), msg)}
+        />
+      )}
+
       {/*
        * Зоны и машины правит владелец или управляющий: сервер закрывает эти
        * запросы ролью. Администратору зала кнопки не показываем вовсе — нажатие,
@@ -153,6 +161,127 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
           Сохранить
         </button>
       </form>
+    </section>
+  );
+}
+
+/**
+ * Что гость может сделать со своими деньгами прямо за игровым ПК: заказать из
+ * бара с баланса и пополнить счёт по единому QR.
+ */
+function SeatPaymentSettings({
+  club,
+  onSaved,
+}: {
+  club: Club;
+  onSaved: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(
+    body: { barOrdersFromPc?: boolean; paymentQrImageUrl?: string | null },
+    message: string,
+  ): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateClub(club.id, body);
+      onSaved(message);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function upload(file: File): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const { url } = await api.uploadCover(club.id, file);
+      await api.updateClub(club.id, { paymentQrImageUrl: url });
+      onSaved("QR для пополнения сохранён — гости увидят его на игровых ПК");
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="zone-block">
+      <div className="zone-head">
+        <h2>Оплата за игровым ПК</h2>
+      </div>
+      {error && <div className="error">{error}</div>}
+
+      <div className="section">
+        <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={club.barOrdersFromPc}
+            disabled={busy}
+            onChange={(e) =>
+              void save(
+                { barOrdersFromPc: e.target.checked },
+                e.target.checked
+                  ? "Заказ из бара с игровых ПК включён"
+                  : "Заказ из бара с игровых ПК выключен",
+              )
+            }
+          />
+          Гости заказывают из бара с игрового ПК и платят с баланса
+        </label>
+        <p className="hint">
+          Деньги списываются сразу при заказе, заказ появляется на кассе сверху экрана «Зал» и
+          «Бар». Отмена возвращает деньги на счёт и товар на склад.
+        </p>
+      </div>
+
+      <div className="section">
+        <h3>Пополнение по единому QR</h3>
+        <p className="hint">
+          Пока банк не подключён напрямую, загрузите картинку статического QR клуба из
+          банковского приложения (Kaspi, Halyk, Freedom и др.). Гость сканирует его на экране
+          игрового ПК и вводит сумму сам, а касса подтверждает поступление кнопкой «Деньги
+          пришли». Когда банк подключат, QR будет приходить уже с суммой и зачисляться сам.
+        </p>
+        {club.paymentQrImageUrl && (
+          <img
+            src={club.paymentQrImageUrl}
+            alt="QR клуба для оплаты"
+            style={{ width: 160, height: 160, objectFit: "contain", background: "#fff", borderRadius: 8 }}
+          />
+        )}
+        <div className="actions">
+          <label className="button-link" style={{ cursor: busy ? "default" : "pointer" }}>
+            {club.paymentQrImageUrl ? "Заменить картинку QR" : "Загрузить картинку QR"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void upload(file);
+              }}
+            />
+          </label>
+          {club.paymentQrImageUrl && (
+            <button
+              disabled={busy}
+              onClick={() =>
+                void save({ paymentQrImageUrl: null }, "QR для пополнения убран с игровых ПК")
+              }
+            >
+              Убрать
+            </button>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

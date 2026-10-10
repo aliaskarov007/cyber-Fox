@@ -6,6 +6,7 @@ import {
   formatMoney,
 } from "./agent-client.js";
 import { PromoField } from "./PromoField.js";
+import { TopUpPanel } from "./TopUpPanel.js";
 import { SignupScreen } from "./SignupScreen.js";
 
 /**
@@ -46,6 +47,20 @@ export function LockScreen({
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<GuestLoginResult | null>(null);
   const [signingUp, setSigningUp] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+
+  /* Деньги пришли — карточка пересчитывается: от баланса зависит, можно ли начать. */
+  async function refreshCard(): Promise<void> {
+    try {
+      const next = await client.guestCard();
+      if (next.guest) {
+        setCard(next);
+        setError(next.ok ? null : (next.reason ?? null));
+      }
+    } catch {
+      // Карточку обновит следующий вход; деньги на счёте уже есть.
+    }
+  }
 
   async function login(withPhone: string, withPin: string): Promise<void> {
     setBusy(true);
@@ -151,6 +166,19 @@ export function LockScreen({
           </button>
         )}
 
+        {topUpOpen ? (
+          <TopUpPanel
+            client={client}
+            disabled={!online}
+            onPaid={() => void refreshCard()}
+            onClose={() => setTopUpOpen(false)}
+          />
+        ) : (
+          <button className="ghost" type="button" disabled={!online} onClick={() => setTopUpOpen(true)}>
+            Пополнить счёт по QR
+          </button>
+        )}
+
         <PromoField
           client={client}
           disabled={!online}
@@ -168,6 +196,7 @@ export function LockScreen({
           onClick={() => {
             setCard(null);
             setError(null);
+            setTopUpOpen(false);
             void client.logout().catch(() => null);
           }}
         >

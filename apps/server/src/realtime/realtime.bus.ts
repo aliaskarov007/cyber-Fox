@@ -46,6 +46,25 @@ export interface RealtimeEvents {
    * которой висит QR, переходит к вводу ника и PIN.
    */
   "signup.confirmed": { computerId: string; code: string; existingName: string | null };
+  /* Гость заказал из бара с игрового ПК — кассе нужно отнести. */
+  "bar.order.placed": { clubId: string; orderId: string; computerName: string };
+  /* Заказ отнесли или отменили — гость видит это у себя на экране. */
+  "bar.order.updated": {
+    clubId: string;
+    computerId: string;
+    orderId: string;
+    status: "DONE" | "CANCELED";
+  };
+  /* Гость открыл QR на игровом ПК: без подключённого банка кассе ждать перевода. */
+  "topup.pending": { clubId: string; intentId: string };
+  /* Пополнение зачислено — экран, где висел QR, закрывает его сам. */
+  "topup.paid": {
+    clubId: string;
+    computerId: string | null;
+    intentId: string;
+    guestId: string;
+    amount: number;
+  };
 }
 
 @Injectable()

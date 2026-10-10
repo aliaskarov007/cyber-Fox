@@ -19,6 +19,8 @@ import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
 import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
+import { PaymentsService } from "../payments/payments.service.js";
+import { BarOrdersService } from "../products/bar-orders.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
@@ -33,12 +35,12 @@ const agentRoom = (computerId: string): string => `agent:${computerId}`;
 const clubAgentsRoom = (clubId: string): string => `agents:${clubId}`;
 
 /*
- * Сколько гость, вошедший по PIN, считается опознанным на экране блокировки
+ * Сколько гость, вошедший по PIN (и с последнего действия), считается опознанным на экране блокировки
  * без сессии. Нужно, чтобы ввести промокод до старта: новичку с нулевым
  * балансом без кода начать нечем. Окно короткое — встал и ушёл, а следующий за
  * этой машиной не должен действовать от его имени.
  */
-const LOGIN_WINDOW_MS = 5 * 60_000;
+const LOGIN_WINDOW_MS = 10 * 60_000;
 
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
@@ -57,6 +59,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly library: LibraryService,
     private readonly signups: GuestSignupService,
     private readonly promos: PromosService,
+    private readonly barOrders: BarOrdersService,
+    private readonly payments: PaymentsService,
   ) {}
 
   onModuleInit(): void {
@@ -91,6 +95,36 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
      */
     this.bus.on("library.changed", (e) => {
       this.server.to(clubAgentsRoom(e.clubId)).emit("library.changed", {});
+    });
+    this.bus.on("bar.order.placed", (e) => {
+      this.server.to(adminRoom(e.clubId)).emit("bar.order.placed", e);
+    });
+    this.bus.on("bar.order.updated", (e) => {
+      this.server.to(adminRoom(e.clubId)).emit("bar.order.updated", e);
+      this.server.to(agentRoom(e.computerId)).emit("bar.order.updated", {
+        orderId: e.orderId,
+        status: e.status,
+      });
+    });
+    this.bus.on("topup.pending", (e) => {
+      this.server.to(adminRoom(e.clubId)).emit("topup.pending", e);
+    });
+    this.bus.on("topup.paid", (e) => {
+      this.server.to(adminRoom(e.clubId)).emit("topup.paid", e);
+      if (!e.computerId) return;
+      const computerId = e.computerId;
+      this.server.to(agentRoom(computerId)).emit("topup.paid", {
+        intentId: e.intentId,
+        amount: e.amount,
+      });
+      // Гость играет — новый баланс сразу в полосу сессии.
+      void this.sessions
+        .activeSessionFor(computerId)
+        .then((id) => (id ? this.sessions.sessionSnapshot(id) : null))
+        .then((snapshot) => {
+          if (snapshot) this.server.to(agentRoom(computerId)).emit("session.tick", snapshot);
+        })
+        .catch((error: Error) => this.logger.warn(`Баланс после пополнения: ${error.message}`));
     });
     this.bus.on("signup.confirmed", (e) => {
       this.server.to(agentRoom(e.computerId)).emit("signup.confirmed", {
@@ -252,8 +286,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
 
-    const playing = await this.currentGuest(client);
-    const guestId = playing ?? this.loggedInGuest(client);
+    const { guestId, playing } = await this.resolveGuest(client);
     if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
 
     const result = await this.promos.redeemAtComputer(computerId, guestId, body.code ?? "");
@@ -268,6 +301,67 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     // На экране блокировки баланс решает, можно ли начать, — отдаём карточку заново.
     const card = await this.agents.guestCard(computerId, guestId);
     return { ...result, card };
+  }
+
+  /**
+   * Пополнение по единому QR с экрана машины. Гость — тот же, что и для
+   * промокода: играющий или только что вошедший.
+   */
+  @SubscribeMessage("topup.create")
+  async createTopUp(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { amount?: number },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    const { guestId } = await this.resolveGuest(client);
+    if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
+    try {
+      return await this.payments.createTopUpForComputer(computerId, guestId, Number(body.amount));
+    } catch (error) {
+      this.logger.error("Пополнение по QR не создалось", error as Error);
+      return { ok: false, reason: "Не удалось создать платёж" };
+    }
+  }
+
+  /** Карточка вошедшего гостя заново — после пополнения на экране блокировки. */
+  @SubscribeMessage("guest.card")
+  async guestCard(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    const guestId = this.loggedInGuest(client);
+    if (!computerId || !guestId) return { ok: false, reason: "Войдите заново", guest: null };
+    return this.agents.guestCard(computerId, guestId);
+  }
+
+  /** Меню бара для этой машины; выключено в клубе — пустое. */
+  @SubscribeMessage("bar.menu")
+  async barMenu(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { enabled: false, products: [] };
+    return this.barOrders.menuFor(computerId);
+  }
+
+  /** Заказ из бара: платит гость сессии этой машины, со своего баланса. */
+  @SubscribeMessage("bar.order")
+  async barOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { items?: unknown },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    const guestId = await this.currentGuest(client);
+    if (!guestId) return { ok: false, reason: "Заказать с баланса можно во время игры по своему аккаунту" };
+    return this.barOrders.place(computerId, guestId, body.items);
+  }
+
+  private async resolveGuest(client: Socket): Promise<{ guestId: string | null; playing: boolean }> {
+    const playing = await this.currentGuest(client);
+    if (playing) return { guestId: playing, playing: true };
+    const guestId = this.loggedInGuest(client);
+    // Гость что-то делает на карточке — окно входа продлевается: пока он
+    // платит по QR с телефона, вход не должен истечь.
+    if (guestId) client.data.loginAt = Date.now();
+    return { guestId, playing: false };
   }
 
   private loggedInGuest(client: Socket): string | null {

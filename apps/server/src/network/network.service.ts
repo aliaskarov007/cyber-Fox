@@ -63,6 +63,18 @@ export class NetworkService {
       throw new ForbiddenException("Настройки клуба меняет управляющий или владелец");
     }
 
+    /*
+     * Деньги гостей: заказ с баланса с игровых ПК и QR, по которому платят
+     * клубу, — решения владельца. Управляющий сохраняет форму зала с прежними
+     * значениями, поэтому запрещена только смена, а не само поле в запросе.
+     */
+    const ownerOnly =
+      (dto.barOrdersFromPc !== undefined && dto.barOrdersFromPc !== club.barOrdersFromPc) ||
+      (dto.paymentQrImageUrl !== undefined && dto.paymentQrImageUrl !== club.paymentQrImageUrl);
+    if (ownerOnly && staff.role !== StaffRole.OWNER) {
+      throw new ForbiddenException("Бар с игровых ПК и QR для оплаты настраивает владелец");
+    }
+
     return this.prisma.club.update({ where: { id: clubId }, data: dto });
   }
 
