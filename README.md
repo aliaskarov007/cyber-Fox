@@ -15,6 +15,7 @@
 | [docs/billing.md](docs/billing.md) | Зоны, пакеты, долг, кошельки сети, техника списания |
 | [docs/guest-access.md](docs/guest-access.md) | Два пути входа гостя и разрешение конфликтов |
 | [docs/whatsapp.md](docs/whatsapp.md) | WhatsApp через Green-API, подтверждение номера, ивенты и приглашения |
+| [docs/tournaments.md](docs/tournaments.md) | Запись на турнир, взнос, сбор команды по коду, призовой фонд |
 | [docs/offline.md](docs/offline.md) | Работа без интернета, аварийный режим, синхронизация |
 | [docs/deploy.md](docs/deploy.md) | Пилот в зале: установка, проверки первой смены, чего ещё нет |
 | [docs/install-windows.md](docs/install-windows.md) | Установка на Windows и работа в локальной сети клуба |
