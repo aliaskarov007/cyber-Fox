@@ -11,6 +11,7 @@
 | Документ | О чём |
 |---|---|
 | [docs/setup.md](docs/setup.md) | Установка с нуля: что купить, что куда поставить, что проверить |
+| [docs/install-cloud.md](docs/install-cloud.md) | Облачный сервер и свой домен: ключ развёртывания, HTTPS, обновления |
 | [docs/product-structure.md](docs/product-structure.md) | Карта модулей, роли, архитектура, дорожная карта |
 | [docs/billing.md](docs/billing.md) | Зоны, пакеты, долг, кошельки сети, техника списания |
 | [docs/guest-access.md](docs/guest-access.md) | Два пути входа гостя и разрешение конфликтов |
