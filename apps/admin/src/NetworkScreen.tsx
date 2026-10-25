@@ -107,6 +107,7 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
                 <th>Время</th>
                 <th>Бар</th>
                 <th>Маржа бара</th>
+                <th>Турниры</th>
                 <th>Загрузка</th>
                 <th>Машин</th>
               </tr>
@@ -119,6 +120,9 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
                   <td className="num">{formatMoney(club.sessionsRevenue)}</td>
                   <td className="num">{formatMoney(club.productsRevenue)}</td>
                   <td className="num">{formatMoney(club.productsMargin)}</td>
+                  <td className="num">
+                    {club.tournamentNet === 0 ? "—" : formatMoney(club.tournamentNet)}
+                  </td>
                   <td className="num">{Math.round(club.occupancy * 100)}%</td>
                   <td className="num">{club.computers}</td>
                 </tr>

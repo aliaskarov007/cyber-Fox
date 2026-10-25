@@ -5,6 +5,7 @@ import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { toLocalMoment } from "../common/local-time.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { tournamentNet } from "../shifts/shift.rules.js";
 import {
   type ClubMoneyFlow,
   type ComputerPerformance,
@@ -29,6 +30,18 @@ const EARNING_TYPES: TransactionType[] = [
   TransactionType.PRODUCT_SALE,
   TransactionType.PACKAGE_PURCHASE,
   TransactionType.REFUND,
+  // Турнирные движения — втроём: взносы без призов завысили бы заработок, а
+  // клуб, доложивший в фонд своих, выглядел бы прибыльным там, где потратил.
+  TransactionType.TOURNAMENT_ENTRY,
+  TransactionType.TOURNAMENT_REFUND,
+  TransactionType.TOURNAMENT_PRIZE,
+];
+
+/** Те же три типа отдельно: показать владельцу, во что обошёлся турнир. */
+const TOURNAMENT_TYPES: TransactionType[] = [
+  TransactionType.TOURNAMENT_ENTRY,
+  TransactionType.TOURNAMENT_REFUND,
+  TransactionType.TOURNAMENT_PRIZE,
 ];
 
 export interface ClubSummary {
@@ -36,6 +49,8 @@ export interface ClubSummary {
   clubName: string;
   revenue: number;
   sessionsRevenue: number;
+  /** Взносы минус возвраты и призы. Отрицательный — турниры стоили клубу. */
+  tournamentNet: number;
   productsRevenue: number;
   productsMargin: number;
   sessionsCount: number;
@@ -59,7 +74,7 @@ export class ReportsService {
 
     return Promise.all(
       clubs.map(async (club) => {
-        const [charges, sales, segments, computers] = await Promise.all([
+        const [charges, sales, segments, computers, tournamentMoves] = await Promise.all([
           this.prisma.transaction.findMany({
             where: {
               clubId: club.id,
@@ -80,6 +95,14 @@ export class ReportsService {
             select: { minutesUsed: true, charged: true, sessionId: true },
           }),
           this.prisma.computer.count({ where: { clubId: club.id } }),
+          this.prisma.transaction.findMany({
+            where: {
+              clubId: club.id,
+              type: { in: TOURNAMENT_TYPES },
+              createdAt: { gte: period.from, lte: period.to },
+            },
+            select: { amount: true },
+          }),
         ]);
 
         // Выручка от времени берётся по списаниям, а минуты — по отрезкам:
@@ -88,12 +111,14 @@ export class ReportsService {
         const productsRevenue = sales.reduce((sum, s) => sum + s.total, 0);
         const productsCost = sales.reduce((sum, s) => sum + s.costAtSale * s.quantity, 0);
         const busyMinutes = segments.reduce((sum, s) => sum + s.minutesUsed, 0);
+        const tournaments = tournamentNet(tournamentMoves);
 
         return {
           clubId: club.id,
           clubName: club.name,
-          revenue: sessionsRevenue + productsRevenue,
+          revenue: sessionsRevenue + productsRevenue + tournaments,
           sessionsRevenue,
+          tournamentNet: tournaments,
           productsRevenue,
           productsMargin: productsRevenue - productsCost,
           sessionsCount: new Set(segments.map((s) => s.sessionId)).size,

@@ -201,6 +201,8 @@ export interface ShiftReport {
   cardTotal: number;
   balanceTotal: number;
   revenue: number;
+  /** Взносы за турниры минус возвраты и призы. Отрицательный — турнир стоил клубу. */
+  tournamentNet: number;
   sessionsRevenue: number;
   productsRevenue: number;
   productsCost: number;
@@ -1073,6 +1075,8 @@ export interface ClubSummary {
   clubName: string;
   revenue: number;
   sessionsRevenue: number;
+  /** Взносы за турниры минус возвраты и призы. */
+  tournamentNet: number;
   productsRevenue: number;
   productsMargin: number;
   sessionsCount: number;

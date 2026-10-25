@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { Discrepancy, bonusFor, computeShiftTotals, reconcile } from "./shift.rules.js";
+import {
+  Discrepancy,
+  bonusFor,
+  computeShiftTotals,
+  reconcile,
+  tournamentNet,
+} from "./shift.rules.js";
 
 /** ₸ → тиын. */
 const kzt = (v: number): number => v * 100;
@@ -74,5 +80,43 @@ describe("бонусы", () => {
 
   it("округляются вниз, чтобы клуб не дарил лишнего", () => {
     expect(bonusFor(999, 5)).toBe(49);
+  });
+});
+
+describe("турнирные деньги", () => {
+  it("взносы минус призы и возвраты", () => {
+    // Восемь взносов по 1000 ₸, два возврата, приз 5 900 ₸.
+    const net = tournamentNet([
+      ...Array.from({ length: 8 }, () => ({ amount: -100_000 })),
+      { amount: 100_000 },
+      { amount: 100_000 },
+      { amount: 590_000 },
+    ]);
+    expect(net).toBe(10_000);
+  });
+
+  it("уходит в минус, когда клуб добавил в фонд больше, чем собрал", () => {
+    // Два взноса по 1000 ₸, фонд 12 000 ₸ — клуб потратил свои.
+    expect(tournamentNet([{ amount: -100_000 }, { amount: -100_000 }, { amount: 1_200_000 }])).toBe(
+      -1_000_000,
+    );
+  });
+
+  it("без турниров не меняет выручку", () => {
+    expect(tournamentNet([])).toBe(0);
+  });
+
+  it("входит в выручку смены", () => {
+    const totals = computeShiftTotals({
+      cash: { openingFloat: 0, topUpsCash: 0, packagesCash: 0, productsCash: 0 },
+      cardTotal: 0,
+      balanceTotal: 0,
+      sessionsRevenue: 500_000,
+      productsRevenue: 100_000,
+      tournamentNet: -200_000,
+    });
+    // Турнир, стоивший клубу денег, уменьшает выручку смены — иначе отчёт
+    // показывал бы заработок там, где был расход.
+    expect(totals.revenue).toBe(400_000);
   });
 });

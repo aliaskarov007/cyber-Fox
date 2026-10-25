@@ -254,6 +254,15 @@ function ReportRows({ report }: { report: ShiftReport }) {
           <span className="k">Маржа бара</span>
           <span>{formatMoney(report.productsRevenue - report.productsCost)}</span>
         </div>
+        {report.tournamentNet !== 0 && (
+          <div className="row">
+            {/* Отрицательный итог — обычное дело: клуб доложил в фонд своих. */}
+            <span className="k">
+              Турниры{report.tournamentNet < 0 ? " (клуб доложил)" : ""}
+            </span>
+            <span>{formatMoney(report.tournamentNet)}</span>
+          </div>
+        )}
         <div className="row">
           <span className="k">Сессий за смену</span>
           <span>{report.sessionsCount}</span>

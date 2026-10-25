@@ -4,7 +4,14 @@ import { PaymentMethod, type Shift, TransactionType } from "@prisma/client";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { type Reconciliation, computeShiftTotals, reconcile } from "./shift.rules.js";
+import { type Reconciliation, computeShiftTotals, reconcile, tournamentNet } from "./shift.rules.js";
+
+/** Движения турниров: считаются только вместе — см. tournamentNet. */
+const TOURNAMENT_TYPES = [
+  TransactionType.TOURNAMENT_ENTRY,
+  TransactionType.TOURNAMENT_REFUND,
+  TransactionType.TOURNAMENT_PRIZE,
+];
 
 export interface ShiftReport {
   shift: Shift;
@@ -13,6 +20,8 @@ export interface ShiftReport {
   cardTotal: number;
   balanceTotal: number;
   revenue: number;
+  /** Взносы за турниры минус возвраты и призы. Отрицательный — турнир стоил клубу. */
+  tournamentNet: number;
   sessionsRevenue: number;
   productsRevenue: number;
   productsCost: number;
@@ -140,6 +149,13 @@ export class ShiftsService {
       select: { amount: true, sessionId: true },
     });
 
+    // Турнирные движения — тем же окном: взнос мог быть принят в эту смену,
+    // а возврат за несобравшуюся команду уйти уже в следующую.
+    const tournamentMoves = await this.prisma.transaction.findMany({
+      where: { clubId: shift.clubId, type: { in: TOURNAMENT_TYPES }, createdAt: window },
+      select: { amount: true },
+    });
+
     const sumBy = (method: PaymentMethod): number =>
       payments.filter((p) => p.method === method).reduce((sum, p) => sum + p.amount, 0);
 
@@ -148,6 +164,7 @@ export class ShiftsService {
 
     // Списания хранятся отрицательными: расход по кошельку.
     const sessionsRevenue = charges.reduce((sum, t) => sum - t.amount, 0);
+    const tournaments = tournamentNet(tournamentMoves);
     const productsRevenue = sales.reduce((sum, s) => sum + s.total, 0);
     const productsCost = sales.reduce((sum, s) => sum + s.costAtSale * s.quantity, 0);
 
@@ -163,6 +180,7 @@ export class ShiftsService {
       balanceTotal: salesBy(PaymentMethod.BALANCE) + sessionsRevenue,
       sessionsRevenue,
       productsRevenue,
+      tournamentNet: tournaments,
     });
 
     return {
@@ -172,6 +190,7 @@ export class ShiftsService {
       cardTotal: totals.cardTotal,
       balanceTotal: totals.balanceTotal,
       revenue: totals.revenue,
+      tournamentNet: tournaments,
       sessionsRevenue,
       productsRevenue,
       productsCost,

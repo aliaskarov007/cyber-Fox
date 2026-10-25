@@ -35,6 +35,22 @@ export interface ShiftTotals {
  * пополнить счёт вчера, а отыграть сегодня: деньги в кассе прошлой смены,
  * а время продано этой. Смешивать их — верный способ поссорить сотрудников.
  */
+/**
+ * Чистый итог турниров за период.
+ *
+ * Три типа движений считаются только вместе: взносы без призов завысили бы
+ * выручку вдвое, а клуб, добавивший в фонд больше, чем собрал взносами,
+ * выглядел бы прибыльным там, где он потратил.
+ *
+ * Знак как у остальных списаний: по кошельку гостя взнос отрицателен, а приз
+ * и возврат положительны, поэтому заработок зала — минус сумма движений.
+ */
+export function tournamentNet(
+  transactions: Array<{ amount: number }>,
+): number {
+  return transactions.reduce((sum, t) => sum - t.amount, 0);
+}
+
 export function computeShiftTotals(params: {
   cash: CashFlow;
   cardTotal: number;
@@ -43,6 +59,8 @@ export function computeShiftTotals(params: {
   sessionsRevenue: number;
   /** Продано товаров за смену, любым способом. */
   productsRevenue: number;
+  /** Взносы минус возвраты и призы. Может быть отрицательным. */
+  tournamentNet?: number;
 }): ShiftTotals {
   const { cash } = params;
   const cashExpected =
@@ -52,7 +70,7 @@ export function computeShiftTotals(params: {
     cashExpected,
     cardTotal: params.cardTotal,
     balanceTotal: params.balanceTotal,
-    revenue: params.sessionsRevenue + params.productsRevenue,
+    revenue: params.sessionsRevenue + params.productsRevenue + (params.tournamentNet ?? 0),
   };
 }
 
