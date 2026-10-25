@@ -527,6 +527,8 @@ model Guest {
   barOrders  BarOrder[]
   personalPromos PromoCode[] @relation("PersonalPromo")
   winbackMessages WinbackMessage[]
+  tournamentEntries TournamentEntry[]
+  captainOf         TournamentTeam[] @relation("TournamentCaptain")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -819,6 +821,12 @@ enum TransactionType {
   BONUS_SPEND
   /// Деньги по промокоду. Это не платёж: в кассу смены не попадает.
   PROMO
+  /// Взнос за участие в турнире.
+  TOURNAMENT_ENTRY
+  /// Возврат взноса: участие не состоялось.
+  TOURNAMENT_REFUND
+  /// Выплата призового фонда.
+  TOURNAMENT_PRIZE
 }
 
 /// Движение по кошельку гостя. Расход записывается в клуб, где шла сессия,
@@ -1028,13 +1036,137 @@ model Event {
   sentAt     DateTime?
   canceledAt DateTime?
 
-  invites EventInvite[]
+  invites    EventInvite[]
+  tournament Tournament?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, startsAt])
   @@index([clubId, startsAt])
+}
+
+enum TournamentStatus {
+  /// Регистрация открыта, места разбираются.
+  REGISTRATION
+  /// Запись закрыта: состав определён.
+  CLOSED
+  /// Турнир отменён, взносы возвращены.
+  CANCELED
+}
+
+/**
+ * Турнир — это ивент со взносом и составом.
+ *
+ * Отдельной сущностью от Event он не стал намеренно: приглашения, ответы
+ * «приду / не смогу», отписка и афиша на экране блокировки уже работают на
+ * ивентах. Турнир добавляет к ним деньги и команды, а не заводит второй
+ * параллельный механизм рассылки.
+ */
+model Tournament {
+  id      String @id @default(uuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Сколько человек в команде. 1 — турнир одиночек.
+  teamSize Int @default(1)
+  /// Сколько команд помещается. У одиночек — сколько участников.
+  slots Int
+
+  /// Взнос с человека, в тиын. Каждый платит за себя.
+  entryFee Int
+  /// Сколько процентов от собранных взносов остаётся клубу.
+  clubFeePercent Int @default(0)
+  /// Сколько клуб добавляет в фонд от себя, в тиын.
+  clubBonus Int @default(0)
+  /// Распределение фонда по местам в процентах: [50, 30, 20].
+  prizeSplit Int[] @default([50, 30, 20])
+
+  /// Сколько минут неполная команда держит место после оплаты капитана.
+  gatherWindowMinutes Int @default(360)
+
+  status TournamentStatus @default(REGISTRATION)
+
+  teams   TournamentTeam[]
+  entries TournamentEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TournamentTeamStatus {
+  /// Капитан оплатил, ждём напарников.
+  GATHERING
+  /// Состав полный и оплачен — место закреплено.
+  READY
+  /// Не собралась в срок либо турнир отменён: взносы возвращены.
+  DISBANDED
+}
+
+/**
+ * Команда турнира. У турнира одиночек это команда из одного человека —
+ * второй путь в коде развёл бы возвраты, фонд и подсчёт мест на две ветки,
+ * которые разошлись бы в поведении.
+ */
+model TournamentTeam {
+  id           String     @id @default(uuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  /// Код вида TM-4F3A: капитан рассылает его напарникам в свой чат.
+  code String @unique
+  name String?
+
+  captainGuestId String
+  captain        Guest  @relation("TournamentCaptain", fields: [captainGuestId], references: [id])
+
+  status TournamentTeamStatus @default(GATHERING)
+  /// До какого момента держится место. Прошло — команда расформирована.
+  gatherDeadline DateTime
+  /// Занятое место: присваивается, когда состав стал полным.
+  readyAt     DateTime?
+  disbandedAt DateTime?
+
+  entries TournamentEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tournamentId, status])
+  @@index([status, gatherDeadline])
+}
+
+/**
+ * Участник турнира. Без команды — свободный игрок: записался один на
+ * командный турнир и ждёт, пока администратор поставит его в неполный состав.
+ */
+model TournamentEntry {
+  id           String     @id @default(uuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  teamId String?
+  team   TournamentTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  /// Сколько внесено, в тиын. Ноль — ждём оплаты: денег не хватило.
+  paidAmount Int       @default(0)
+  paidAt     DateTime?
+  /// Взнос вернулся: участие не состоялось.
+  refundedAt DateTime?
+
+  /// Место, занятое при выплате приза. Пусто — без приза.
+  prizePlace Int?
+  prizeAmount Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Один гость — одна запись на турнир: вторым кодом в другую команду не войти.
+  @@unique([tournamentId, guestId])
+  @@index([tournamentId, teamId])
 }
 
 enum InviteStatus {

@@ -9,6 +9,14 @@ import type { SaveWhatsAppDto } from "./whatsapp.dto.js";
 import { findGuestByPhone } from "../guests/guest-phone.js";
 import { GuestSignupService } from "./guest-signup.service.js";
 import { findSignupCode, parseInviteReply, readIncoming, replyAck } from "./whatsapp.rules.js";
+import {
+  captainMessage,
+  findTeamCode,
+  teamNameFrom,
+  topUpPrompt,
+  wantsTeam,
+} from "../tournaments/tournament.rules.js";
+import { TournamentsService } from "../tournaments/tournaments.service.js";
 
 /** Канал глазами кассового экрана: без токена, с которым можно писать от имени клуба. */
 export interface PublicChannel {
@@ -45,7 +53,14 @@ export class WhatsAppService {
     private readonly prisma: PrismaService,
     private readonly greenApi: GreenApiClient,
     private readonly signups: GuestSignupService,
+    private readonly tournaments: TournamentsService,
   ) {}
+
+  /** Ответ гостю. Неудачу логируем: молчание бота человек читает как поломку. */
+  private async reply(channel: WhatsAppChannel, phone: string, text: string): Promise<void> {
+    const ack = await this.greenApi.sendText(credentialsOf(channel), phone, text);
+    if (!ack.ok) this.logger.warn(`Ответ гостю не ушёл: ${ack.error}`);
+  }
 
   private toPublic(channel: WhatsAppChannel | null): PublicChannel {
     return {
@@ -195,11 +210,54 @@ export class WhatsAppService {
       return;
     }
 
-    const reply = parseInviteReply(incoming.text);
-    if (!reply) return;
+    // Код команды турнира. Как и код регистрации, он однозначен — разбираем до
+    // ответов на приглашение, чтобы «TM-4F3A, я в деле» не ушло в обычный разбор.
+    const teamCode = findTeamCode(incoming.text);
+
+    const reply = teamCode ? null : parseInviteReply(incoming.text);
+    const seeksTeam = !teamCode && !reply && wantsTeam(incoming.text);
+    if (!teamCode && !reply && !seeksTeam) return;
 
     const guest = await findGuestByPhone(this.prisma, channel.tenantId, incoming.phone);
-    if (!guest) return;
+    if (!guest) {
+      // Незнакомый номер с верным кодом команды: молчать нельзя — человек ждёт,
+      // что его записали. Завести гостя одним сообщением мы пока не умеем.
+      if (teamCode) {
+        await this.reply(
+          channel,
+          incoming.phone,
+          "Этот номер нам ещё не знаком. Зарегистрируйтесь за игровым ПК в клубе — и пришлите код команды снова.",
+        );
+      }
+      return;
+    }
+
+    if (teamCode) {
+      const outcome = await this.tournaments.joinByCode(
+        teamCode,
+        guest.id,
+        teamNameFrom(incoming.text, teamCode),
+      );
+      await this.reply(
+        channel,
+        incoming.phone,
+        outcome.shortBy ? `${outcome.message}\n${topUpPrompt(outcome.shortBy)}` : outcome.message,
+      );
+      return;
+    }
+
+    if (seeksTeam) {
+      const tournament = await this.tournaments.pendingFor(guest.id, channel.tenantId);
+      if (!tournament) return;
+
+      const outcome = await this.tournaments.joinAsFreeAgent(tournament.id, guest.id);
+      await this.reply(
+        channel,
+        incoming.phone,
+        outcome.shortBy ? `${outcome.message}\n${topUpPrompt(outcome.shortBy)}` : outcome.message,
+      );
+      return;
+    }
 
     let eventTitle: string | null = null;
 
@@ -217,7 +275,7 @@ export class WhatsAppService {
           event: { canceledAt: null, startsAt: { gt: new Date() } },
         },
         orderBy: { sentAt: "desc" },
-        include: { event: { select: { title: true } } },
+        include: { event: { select: { title: true, tournament: true } } },
       });
       // Ответ «1» без приглашения — просто сообщение, не наше дело на него отвечать.
       if (!invite) return;
@@ -230,9 +288,33 @@ export class WhatsAppService {
         },
       });
       eventTitle = invite.event.title;
+
+      /*
+       * Согласие на турнир — это запись со взносом, а не отметка «придёт».
+       * Отвечаем результатом записи: человеку важно знать, списались ли
+       * деньги и что делать дальше, а не что мы его «ждём».
+       */
+      if (reply === "going" && invite.event.tournament) {
+        const outcome = await this.tournaments.joinAsCaptain(
+          invite.event.tournament.id,
+          guest.id,
+        );
+        const text = outcome.shortBy
+          ? `${outcome.message}\n${topUpPrompt(outcome.shortBy)}`
+          : outcome.teamCode
+            ? captainMessage({
+                code: outcome.teamCode,
+                teamSize: outcome.teamSize ?? 1,
+                filled: outcome.filled ?? 1,
+              })
+            : outcome.message;
+        await this.reply(channel, incoming.phone, text);
+        return;
+      }
     }
 
-    const ack = await this.greenApi.sendText(credentialsOf(channel), incoming.phone, replyAck(reply, eventTitle));
-    if (!ack.ok) this.logger.warn(`Подтверждение ответа гостю не ушло: ${ack.error}`);
+    // Сюда доходят только ответы на приглашение: пути турнира и кодов выше
+    // отвечают сами и возвращаются.
+    if (reply) await this.reply(channel, incoming.phone, replyAck(reply, eventTitle));
   }
 }

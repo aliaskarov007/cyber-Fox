@@ -6,6 +6,8 @@ import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { WhatsAppService } from "../whatsapp/whatsapp.service.js";
 import { inviteMessage } from "../whatsapp/whatsapp.rules.js";
+import { formatEventTime } from "../whatsapp/whatsapp.rules.js";
+import { prizePool, slotsLeft, tournamentInviteMessage } from "../tournaments/tournament.rules.js";
 import type { CreateEventDto } from "./events.dto.js";
 import { type InviteSummary, SEND_BATCH, SEND_PAUSE_MS, sendBlocker, summarizeInvites } from "./events.rules.js";
 
@@ -169,6 +171,72 @@ export class EventsService {
   }
 
   /**
+   * Текст приглашения.
+   *
+   * У турнира он другой: взнос, остаток мест и фонд решают, запишется человек
+   * или нет, и считать их надо на момент отправки — очередь идёт пачками, и за
+   * это время места разбирают.
+   */
+  private async inviteTextFor(
+    event: {
+      title: string;
+      description: string | null;
+      startsAt: Date;
+      club: { name: string; city: string | null; timezone: string };
+      tournament: {
+        id: string;
+        teamSize: number;
+        slots: number;
+        entryFee: number;
+        clubFeePercent: number;
+        clubBonus: number;
+      } | null;
+    },
+    guestName: string,
+  ): Promise<string> {
+    const place = event.club.city ? `${event.club.name}, ${event.club.city}` : event.club.name;
+
+    if (!event.tournament) {
+      return inviteMessage({
+        title: event.title,
+        description: event.description,
+        startsAt: event.startsAt,
+        clubName: event.club.name,
+        clubCity: event.club.city,
+        timezone: event.club.timezone,
+        guestName,
+      });
+    }
+
+    const { tournament } = event;
+    const [activeTeams, paidEntries] = await Promise.all([
+      this.prisma.tournamentTeam.count({
+        where: { tournamentId: tournament.id, status: { in: ["GATHERING", "READY"] } },
+      }),
+      this.prisma.tournamentEntry.count({
+        where: { tournamentId: tournament.id, refundedAt: null, paidAmount: { gt: 0 } },
+      }),
+    ]);
+
+    return tournamentInviteMessage({
+      title: event.title,
+      description: event.description,
+      when: formatEventTime(event.startsAt, event.club.timezone),
+      place,
+      guestName,
+      teamSize: tournament.teamSize,
+      entryFee: tournament.entryFee,
+      slotsLeft: slotsLeft({ slots: tournament.slots, activeTeams }),
+      prizePool: prizePool({
+        paidEntries,
+        entryFee: tournament.entryFee,
+        clubFeePercent: tournament.clubFeePercent,
+        clubBonus: tournament.clubBonus,
+      }),
+    });
+  }
+
+  /**
    * Один проход очереди рассылки. Вызывается воркером вне запроса — сети у
    * этого пути нет, поэтому каждое приглашение отправляется от имени своей.
    */
@@ -179,7 +247,12 @@ export class EventsService {
       take: SEND_BATCH,
       include: {
         guest: { select: { fullName: true, phone: true, invitesOptOutAt: true } },
-        event: { include: { club: { select: { name: true, city: true, timezone: true } } } },
+        event: {
+          include: {
+            club: { select: { name: true, city: true, timezone: true } },
+            tournament: true,
+          },
+        },
       },
     });
 
@@ -200,15 +273,7 @@ export class EventsService {
       const result = await this.whatsapp.send(
         event.tenantId,
         guest.phone,
-        inviteMessage({
-          title: event.title,
-          description: event.description,
-          startsAt: event.startsAt,
-          clubName: event.club.name,
-          clubCity: event.club.city,
-          timezone: event.club.timezone,
-          guestName: guest.fullName,
-        }),
+        await this.inviteTextFor(event, guest.fullName),
       );
 
       await this.prisma.eventInvite.update({
