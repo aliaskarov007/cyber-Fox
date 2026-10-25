@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { type Event, EventAudience, InviteStatus, type Prisma } from "@prisma/client";
+import { type Event, EventAudience, InviteStatus, type Prisma, type Tournament } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
@@ -13,6 +13,7 @@ import { type InviteSummary, SEND_BATCH, SEND_PAUSE_MS, sendBlocker, summarizeIn
 
 export interface EventWithStats extends Event {
   invites: InviteSummary;
+  tournament: Tournament | null;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,6 +60,9 @@ export class EventsService {
       where: { clubId, tenantId: staff.tenantId },
       orderBy: { startsAt: "desc" },
       take: 50,
+      // Турнир идёт вместе с ивентом: по списку видно, где просто афиша, а
+      // где запись со взносом и составом.
+      include: { tournament: true },
     });
     if (events.length === 0) return [];
 

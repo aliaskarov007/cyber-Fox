@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
+import { TournamentPanel } from "./TournamentPanel.js";
 import {
   type Club,
   type ClubEvent,
@@ -52,6 +53,7 @@ export function EventsScreen({ club, staff }: { club: Club; staff: Staff }) {
   const canManage = staff.role === "OWNER" || staff.role === "ADMIN";
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [openTournament, setOpenTournament] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [whatsappReady, setWhatsappReady] = useState<boolean | null>(null);
@@ -126,6 +128,15 @@ export function EventsScreen({ club, staff }: { club: Club; staff: Staff }) {
                     <td>{formatWhen(event.startsAt)}</td>
                     <td>
                       {event.title}
+                      {event.tournament && (
+                        <span className="chip credit">
+                          {" "}
+                          турнир{" "}
+                          {event.tournament.teamSize > 1
+                            ? `${event.tournament.teamSize}×${event.tournament.teamSize}`
+                            : "одиночки"}
+                        </span>
+                      )}
                       {event.canceledAt && <span className="chip offline"> отменён</span>}
                     </td>
                     <td>{AUDIENCE_LABEL[event.audience]}</td>
@@ -153,6 +164,17 @@ export function EventsScreen({ club, staff }: { club: Club; staff: Staff }) {
                               })
                             }
                           />
+                        )}
+                        {event.tournament && (
+                          <button
+                            onClick={() =>
+                              setOpenTournament(
+                                openTournament === event.tournament!.id ? null : event.tournament!.id,
+                              )
+                            }
+                          >
+                            Состав
+                          </button>
                         )}
                         <button onClick={() => setOpenId(openId === event.id ? null : event.id)}>
                           Список
@@ -187,6 +209,15 @@ export function EventsScreen({ club, staff }: { club: Club; staff: Staff }) {
           </table>
         </div>
       </section>
+
+      {openTournament && (
+        <TournamentPanel
+          club={club}
+          tournamentId={openTournament}
+          canManage={canManage}
+          onChanged={() => void load()}
+        />
+      )}
 
       {openId && <InviteList club={club} eventId={openId} />}
     </main>
@@ -227,19 +258,40 @@ function EventForm({ club, onCreated }: { club: Club; onCreated: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Турнирная часть: взнос и состав. Выключена — остаётся обычная афиша. */
+  const [isTournament, setIsTournament] = useState(false);
+  const [teamSize, setTeamSize] = useState("1");
+  const [slots, setSlots] = useState("8");
+  const [entryFee, setEntryFee] = useState("1000");
+  const [clubFeePercent, setClubFeePercent] = useState("0");
+  const [clubBonus, setClubBonus] = useState("0");
+
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
       if (!startsAt) throw new Error("Укажите дату и время начала");
-      await api.createEvent(club.id, {
+      const created = await api.createEvent(club.id, {
         title: title.trim(),
         // Поле datetime-local даёт время без пояса — браузер стойки стоит в поясе зала.
         startsAt: new Date(startsAt).toISOString(),
         audience,
         ...(description.trim() ? { description: description.trim() } : {}),
       });
+
+      if (isTournament) {
+        // Турнир заводится вторым шагом: взнос и места уйдут в тексте
+        // приглашения, поэтому их нельзя задать после рассылки.
+        await api.createTournament(club.id, created.id, {
+          teamSize: Number(teamSize),
+          slots: Number(slots),
+          entryFee: Math.round(Number(entryFee) * 100),
+          clubFeePercent: Number(clubFeePercent),
+          clubBonus: Math.round(Number(clubBonus) * 100),
+        });
+      }
+
       setTitle("");
       setStartsAt("");
       setDescription("");
@@ -288,6 +340,64 @@ function EventForm({ club, onCreated }: { club: Club; onCreated: () => void }) {
             onChange={(e) => setDescription(e.target.value)}
           />
         </label>
+        <label className="wide">
+          <span>
+            <input
+              type="checkbox"
+              checked={isTournament}
+              onChange={(e) => setIsTournament(e.target.checked)}
+              style={{ width: "auto", marginRight: 8 }}
+            />
+            Это турнир: со взносом, составом и призовым фондом
+          </span>
+        </label>
+
+        {isTournament && (
+          <>
+            <label>
+              Размер команды
+              <select value={teamSize} onChange={(e) => setTeamSize(e.target.value)}>
+                <option value="1">Одиночки</option>
+                <option value="2">2×2</option>
+                <option value="3">3×3</option>
+                <option value="5">5×5</option>
+              </select>
+            </label>
+            <label>
+              {teamSize === "1" ? "Мест" : "Команд"}
+              <input
+                inputMode="numeric"
+                value={slots}
+                onChange={(e) => setSlots(e.target.value)}
+              />
+            </label>
+            <label>
+              Взнос с человека, ₸
+              <input
+                inputMode="numeric"
+                value={entryFee}
+                onChange={(e) => setEntryFee(e.target.value)}
+              />
+            </label>
+            <label>
+              Доля клуба от взносов, %
+              <input
+                inputMode="numeric"
+                value={clubFeePercent}
+                onChange={(e) => setClubFeePercent(e.target.value)}
+              />
+            </label>
+            <label>
+              Клуб добавляет в фонд, ₸
+              <input
+                inputMode="numeric"
+                value={clubBonus}
+                onChange={(e) => setClubBonus(e.target.value)}
+              />
+            </label>
+          </>
+        )}
+
         <button className="primary" type="submit" disabled={busy || title.trim().length < 3}>
           Создать
         </button>

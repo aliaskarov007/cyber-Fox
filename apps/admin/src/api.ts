@@ -648,6 +648,40 @@ export const api = {
   eventInvites: (clubId: string, eventId: string) =>
     request<EventInvite[]>(`/clubs/${clubId}/events/${eventId}/invites`),
 
+  // --- Турниры ---
+
+  createTournament: (clubId: string, eventId: string, body: TournamentSetup) =>
+    request<{ id: string }>(`/clubs/${clubId}/events/${eventId}/tournament`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  tournament: (clubId: string, tournamentId: string) =>
+    request<TournamentSummary>(`/clubs/${clubId}/tournaments/${tournamentId}`),
+
+  assignFreeAgent: (clubId: string, tournamentId: string, entryId: string, teamId: string) =>
+    request<void>(`/clubs/${clubId}/tournaments/${tournamentId}/free-agents`, {
+      method: "POST",
+      body: JSON.stringify({ entryId, teamId }),
+    }),
+
+  closeTournament: (clubId: string, tournamentId: string) =>
+    request<{ disbanded: number; refunded: number }>(
+      `/clubs/${clubId}/tournaments/${tournamentId}/close`,
+      { method: "POST" },
+    ),
+
+  cancelTournament: (clubId: string, tournamentId: string) =>
+    request<{ refunded: number }>(`/clubs/${clubId}/tournaments/${tournamentId}/cancel`, {
+      method: "POST",
+    }),
+
+  payTournamentPrizes: (clubId: string, tournamentId: string, teamIds: string[]) =>
+    request<{ paid: number; total: number }>(
+      `/clubs/${clubId}/tournaments/${tournamentId}/prizes`,
+      { method: "POST", body: JSON.stringify({ teamIds }) },
+    ),
+
   // --- Заказы с игровых ПК и пополнения по QR ---
 
   barOrders: (clubId: string) => request<BarOrder[]>(`/clubs/${clubId}/bar-orders`),
@@ -809,6 +843,55 @@ export interface WhatsAppChannel {
 export type EventAudience = "NETWORK" | "CLUB";
 export type InviteStatus = "PENDING" | "SENT" | "FAILED" | "GOING" | "DECLINED";
 
+export interface TournamentSetup {
+  teamSize: number;
+  slots: number;
+  /** Взнос с человека, в тиын. */
+  entryFee: number;
+  clubFeePercent?: number;
+  clubBonus?: number;
+  gatherWindowMinutes?: number;
+}
+
+export interface Tournament {
+  id: string;
+  teamSize: number;
+  slots: number;
+  entryFee: number;
+  clubFeePercent: number;
+  clubBonus: number;
+  prizeSplit: number[];
+  gatherWindowMinutes: number;
+  status: "REGISTRATION" | "CLOSED" | "CANCELED";
+}
+
+export interface TournamentMember {
+  entryId: string;
+  guestId: string;
+  fullName: string;
+  phone: string;
+  isCaptain: boolean;
+}
+
+export interface TournamentTeam {
+  id: string;
+  code: string;
+  name: string | null;
+  status: "GATHERING" | "READY" | "DISBANDED";
+  gatherDeadline: string;
+  captainGuestId: string;
+  members: TournamentMember[];
+}
+
+export interface TournamentSummary {
+  tournament: Tournament & { eventId: string; title: string; startsAt: string };
+  slotsLeft: number;
+  prizePool: number;
+  prizeBreakdown: number[];
+  teams: TournamentTeam[];
+  freeAgents: Array<{ entryId: string; guestId: string; fullName: string; phone: string }>;
+}
+
 export interface ClubEvent {
   id: string;
   clubId: string;
@@ -818,6 +901,8 @@ export interface ClubEvent {
   audience: EventAudience;
   sentAt: string | null;
   canceledAt: string | null;
+  /** Заполнено — ивент идёт как турнир: со взносом и составом. */
+  tournament: Tournament | null;
   invites?: {
     total: number;
     pending: number;
