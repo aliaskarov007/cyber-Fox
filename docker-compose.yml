@@ -78,6 +78,9 @@ services:
       - server
     environment:
       CYBERFOX_DOMAIN: ${CYBERFOX_DOMAIN:?укажите домен клуба в .env}
+      # Короткий домен для редиректа на основной. Необязателен — по умолчанию
+      # несуществующее имя, блок редиректа тогда бездействует.
+      CYBERFOX_REDIRECT_DOMAIN: ${CYBERFOX_REDIRECT_DOMAIN:-http://cyberfox-redirect.invalid}
     ports:
       - "80:80"
       - "443:443"
