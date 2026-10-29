@@ -93,7 +93,7 @@ export function SettingsScreen({
             clubs={clubs}
             onSaved={(msg) => void run(async () => {}, msg)}
           />
-          <ClubsSection clubs={clubs} onCreated={() => void run(async () => onClubsChanged(), "Зал добавлен")} />
+          <ClubsSection clubs={clubs} onCreated={() => void run(async () => onClubsChanged(), "Филиал добавлен")} />
         </>
       )}
 
@@ -147,7 +147,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
   return (
     <section className="zone-block">
       <div className="zone-head">
-        <h2>Зал «{club.name}»</h2>
+        <h2>Клуб «{club.name}»</h2>
       </div>
       {error && <div className="error">{error}</div>}
       <form className="settings-grid" onSubmit={submit}>
@@ -395,7 +395,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
   return (
     <section className="zone-block">
       <div className="zone-head">
-        <h2>Залы сети</h2>
+        <h2>Филиалы сети</h2>
         <span className="count">{clubs.length}</span>
       </div>
 
@@ -405,7 +405,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
         <table>
           <thead>
             <tr>
-              <th>Зал</th>
+              <th>Филиал</th>
               <th>Город</th>
               <th>Лимит долга</th>
               <th>Срок пакета</th>
@@ -501,7 +501,7 @@ function StaffSection({
               <th>Сотрудник</th>
               <th>Почта</th>
               <th>Роль</th>
-              <th>Зал</th>
+              <th>Филиал</th>
               {isOwner && <th />}
             </tr>
           </thead>

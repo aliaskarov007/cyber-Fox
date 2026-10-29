@@ -34,7 +34,7 @@ export type Tab =
   | "settings";
 
 const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: boolean }> = [
-  { id: "hall", label: "Зал" },
+  { id: "hall", label: "Клуб" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
   { id: "events", label: "Ивенты" },

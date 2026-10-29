@@ -86,7 +86,7 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
         </div>
         <div className="stat">
           <div className="value">{summary.length}</div>
-          <div className="label">Залов в сети</div>
+          <div className="label">Филиалов в сети</div>
         </div>
         <div className="stat">
           <div className="value">{summary.reduce((sum, c) => sum + c.sessionsCount, 0)}</div>
@@ -96,13 +96,13 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
 
       <section className="zone-block">
         <div className="zone-head">
-          <h2>Залы</h2>
+          <h2>Филиалы</h2>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Зал</th>
+                <th>Филиал</th>
                 <th>Выручка</th>
                 <th>Время</th>
                 <th>Бар</th>
@@ -147,7 +147,7 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
             <table>
               <thead>
                 <tr>
-                  <th>Зал</th>
+                  <th>Филиал</th>
                   <th>Принято в кассу</th>
                   <th>Отыграно здесь</th>
                   <th>Баланс</th>
@@ -176,7 +176,7 @@ export function NetworkScreen({ clubs }: { clubs: Club[] }) {
 
       <section className="zone-block">
         <div className="zone-head">
-          <h2>Зал по машинам</h2>
+          <h2>Филиал по машинам</h2>
           <select
             style={{ width: 260 }}
             value={focusClubId}
