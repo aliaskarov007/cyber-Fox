@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   JoinRefusal,
+  askNameAgainMessage,
+  askNameMessage,
   canJoinTeam,
   captainMessage,
   findTeamCode,
   gatherDeadline,
   makeTeamCode,
+  newGuestTopUpMessage,
   prizeBreakdown,
   prizePool,
   slotsLeft,
@@ -233,6 +236,50 @@ describe("тексты гостю", () => {
     const text = captainMessage({ code: "TM-4F3A", teamSize: 5, filled: 1 });
     expect(text).toContain("TM-4F3A");
     expect(text).toContain("1 из 5");
+  });
+});
+
+describe("незнакомый номер", () => {
+  it("вопрос об имени называет турнир, команду и взнос", () => {
+    const text = askNameMessage({ title: "Турнир CS2", teamName: "Лисята", entryFee: 100_000 });
+    expect(text).toContain("«Лисята»");
+    expect(text).toContain("«Турнир CS2»");
+    expect(text).toMatch(/Взнос 1\s000 ₸/u);
+    expect(text).toContain("Как вас записать?");
+  });
+
+  it("без названия команды спрашивает так же, не показывая пустых кавычек", () => {
+    const text = askNameMessage({ title: "Кубок осени", teamName: null, entryFee: 100_000 });
+    expect(text).toContain("в команду на турнир «Кубок осени»");
+    expect(text).not.toContain("«»");
+  });
+
+  it("не заикается, когда ивент и так назван турниром", () => {
+    // Клубы называют ивенты «Турнир CS2» — «на турнир «Турнир CS2»» читается
+    // как опечатка и попадается на глаза каждому новому участнику.
+    const text = askNameMessage({ title: "Турнир CS2", teamName: null, entryFee: 100_000 });
+    expect(text).toContain("на «Турнир CS2»");
+    expect(text).not.toContain("турнир «Турнир");
+  });
+
+  it("цену называет до имени, а не после", () => {
+    // Узнать взнос после того, как оставил имя, — повод почувствовать себя
+    // обманутым; в одном сообщении порядок строк это и обеспечивает.
+    const text = askNameMessage({ title: "Турнир CS2", teamName: null, entryFee: 100_000 });
+    expect(text.indexOf("Взнос")).toBeLessThan(text.indexOf("Как вас записать?"));
+  });
+
+  it("при нехватке денег называет сумму и сам код команды", () => {
+    const text = newGuestTopUpMessage("Айдос", 100_000, "TM-4F3A");
+    expect(text).toContain("Айдос");
+    expect(text).toMatch(/не хватает 1\s000 ₸/u);
+    expect(text).toContain("TM-4F3A");
+    expect(text).toContain("номер подтверждён");
+  });
+
+  it("непонятный ответ переспрашивает, не отказывая", () => {
+    expect(askNameAgainMessage()).toContain("Пришлите");
+    expect(askNameAgainMessage()).not.toMatch(/отказ|нельзя|ошибка/i);
   });
 });
 

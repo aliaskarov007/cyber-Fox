@@ -52,6 +52,7 @@ model Tenant {
   whatsapp     WhatsAppChannel?
   events       Event[]
   guestSignups GuestSignup[]
+  tournamentSignups TournamentSignup[]
   promoCodes   PromoCode[]
   promoRedemptions PromoRedemption[]
   barOrders    BarOrder[]
@@ -1238,6 +1239,33 @@ model GuestSignup {
   createdAt   DateTime  @default(now())
 
   @@index([computerId, createdAt])
+}
+
+/**
+ * Незнакомый номер прислал код команды — ждём, как его записать.
+ *
+ * Регистрация за игровым ПК спрашивает ник и PIN на экране, а здесь экрана
+ * нет: человек узнал о турнире от приятеля и пишет с улицы. Имя приходится
+ * спрашивать сообщением, а между вопросом и ответом состояние надо где-то
+ * держать — больше в переписке его держать негде.
+ *
+ * Номер уникален в пределах сети: второй код от того же человека заменяет
+ * первый, иначе он навсегда остался бы записан в команду, про которую уже
+ * передумал.
+ */
+model TournamentSignup {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  phone    String
+  /// Код команды, в которую человек просился.
+  teamCode String
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, phone])
 }
 
 enum PromoKind {

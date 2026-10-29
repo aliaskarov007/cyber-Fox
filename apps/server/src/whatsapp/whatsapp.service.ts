@@ -214,6 +214,22 @@ export class WhatsAppService {
       return;
     }
 
+    /*
+     * Ждём ли мы от этого номера имя? Тогда его сообщение — ответ на наш
+     * вопрос, каким бы он ни был. Проверяем до всякого разбора: растерявшийся
+     * человек отвечает «да», и это ушло бы в разбор ответов на приглашение,
+     * где потерялось бы молча.
+     */
+    const named = await this.tournaments.finishSignup(
+      channel.tenantId,
+      incoming.phone,
+      incoming.text,
+    );
+    if (named) {
+      await this.reply(channel, incoming.phone, named);
+      return;
+    }
+
     // Код команды турнира. Как и код регистрации, он однозначен — разбираем до
     // ответов на приглашение, чтобы «TM-4F3A, я в деле» не ушло в обычный разбор.
     const teamCode = findTeamCode(incoming.text);
@@ -224,13 +240,18 @@ export class WhatsAppService {
 
     const guest = await findGuestByPhone(this.prisma, channel.tenantId, incoming.phone);
     if (!guest) {
-      // Незнакомый номер с верным кодом команды: молчать нельзя — человек ждёт,
-      // что его записали. Завести гостя одним сообщением мы пока не умеем.
+      /*
+       * Незнакомый номер с кодом команды — тот самый случай, ради которого
+       * клуб и проводит турнир: человек узнал о нём от приятеля и пишет с
+       * улицы. Заводим аккаунт прямо в переписке, начиная с имени, — отправить
+       * его регистрироваться за игровым ПК значило бы отправить его в клуб,
+       * куда он и так собирался прийти только к турниру.
+       */
       if (teamCode) {
         await this.reply(
           channel,
           incoming.phone,
-          "Этот номер нам ещё не знаком. Зарегистрируйтесь за игровым ПК в клубе — и пришлите код команды снова.",
+          await this.tournaments.startSignup(channel.tenantId, incoming.phone, teamCode),
         );
       }
       return;

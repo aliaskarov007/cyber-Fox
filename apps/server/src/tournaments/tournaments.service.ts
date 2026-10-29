@@ -10,12 +10,19 @@ import { randomInt } from "node:crypto";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
+import { findGuestByPhone, storedPhone } from "../guests/guest-phone.js";
 import { WalletService } from "../guests/wallet.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { cleanNickname, normalizePhone } from "../whatsapp/whatsapp.rules.js";
 import {
+  TOURNAMENT_SIGNUP_TTL_MS,
+  askNameAgainMessage,
+  askNameMessage,
   canJoinTeam,
+  findTeamCode,
   gatherDeadline,
   makeTeamCode,
+  newGuestTopUpMessage,
   prizeBreakdown,
   prizePool,
   slotsLeft,
@@ -359,6 +366,112 @@ export class TournamentsService {
           : `Вы в команде. Собрано ${filled} из ${tournament.teamSize}.`,
       };
     });
+  }
+
+  /**
+   * Незнакомый номер прислал код команды.
+   *
+   * Аккаунта ещё нет — записывать некого, поэтому спрашиваем имя и запоминаем
+   * код: следующее сообщение с этого номера будет ответом.
+   *
+   * Код проверяем до вопроса. Спросить имя под несуществующий код — значит
+   * взять у человека данные и в конце сказать «такой команды нет»; он пришёл
+   * по ссылке от приятеля и решит, что его разыграли.
+   */
+  async startSignup(tenantId: string, phone: string, code: string): Promise<string> {
+    const team = await this.prisma.tournamentTeam.findUnique({
+      where: { code },
+      include: { tournament: { include: { event: true } } },
+    });
+    if (!team || team.tournament.event.tenantId !== tenantId) return "Такой команды нет.";
+
+    const members = await this.prisma.tournamentEntry.count({ where: { teamId: team.id } });
+    const verdict = canJoinTeam({
+      tournamentStatus: team.tournament.status,
+      teamStatus: team.status,
+      teamSize: team.tournament.teamSize,
+      membersInTeam: members,
+      alreadyEntered: false,
+    });
+    if (!verdict.ok) return `${verdict.reason}.`;
+
+    await this.prisma.tournamentSignup.upsert({
+      where: { tenantId_phone: { tenantId, phone } },
+      update: { teamCode: code, expiresAt: new Date(Date.now() + TOURNAMENT_SIGNUP_TTL_MS) },
+      create: {
+        tenantId,
+        phone,
+        teamCode: code,
+        expiresAt: new Date(Date.now() + TOURNAMENT_SIGNUP_TTL_MS),
+      },
+    });
+
+    return askNameMessage({
+      title: team.tournament.event.title,
+      teamName: team.name,
+      entryFee: team.tournament.entryFee,
+    });
+  }
+
+  /**
+   * Ответ незнакомого номера на вопрос об имени.
+   *
+   * Возвращает null, если от этого номера имени не ждали: обычную переписку
+   * бот не комментирует.
+   *
+   * Аккаунт заводим до оплаты и независимо от неё. Турнир тем и ценен, что
+   * приводит в клуб новых людей с подтверждённым номером; потерять контакт
+   * из-за того, что человек не нашёл денег к вечеру пятницы, — потерять
+   * ровно то, ради чего всё затевалось.
+   */
+  async finishSignup(tenantId: string, phone: string, text: string): Promise<string | null> {
+    const pending = await this.prisma.tournamentSignup.findUnique({
+      where: { tenantId_phone: { tenantId, phone } },
+    });
+    if (!pending) return null;
+
+    if (pending.expiresAt <= new Date()) {
+      await this.prisma.tournamentSignup.delete({ where: { id: pending.id } });
+      return null;
+    }
+
+    // Прислал другой код вместо имени — передумал. Переспрашиваем уже про него.
+    const another = findTeamCode(text);
+    if (another) return this.startSignup(tenantId, phone, another);
+
+    // Успел зарегистрироваться за игровым ПК, пока мы ждали имя. Второй
+    // аккаунт на тот же номер развёл бы ему кошелёк надвое, а клубу показал
+    // двух гостей вместо одного: убираем ожидание и отдаём обычному разбору.
+    const already = await findGuestByPhone(this.prisma, tenantId, phone);
+    if (already) {
+      await this.prisma.tournamentSignup.delete({ where: { id: pending.id } });
+      return null;
+    }
+
+    const name = cleanNickname(text);
+    if (!name) return askNameAgainMessage();
+
+    const normalized = normalizePhone(phone);
+    if (!normalized) return null;
+
+    const guest = await this.prisma.guest.create({
+      data: {
+        tenantId,
+        fullName: name,
+        phone: storedPhone(normalized),
+        // Номер отправителя подставляет сам WhatsApp — подделать его нельзя,
+        // значит он подтверждён и приглашения этому гостю уходить могут.
+        phoneVerifiedAt: new Date(),
+      },
+    });
+    await this.prisma.tournamentSignup.delete({ where: { id: pending.id } });
+    this.logger.log(`Новый гость с турнира: ${guest.id}`);
+
+    const outcome = await this.joinByCode(pending.teamCode, guest.id, null);
+    if (outcome.shortBy) {
+      return newGuestTopUpMessage(name, outcome.shortBy, pending.teamCode);
+    }
+    return `${name}, ${outcome.message[0].toLowerCase()}${outcome.message.slice(1)}`;
   }
 
   /**
