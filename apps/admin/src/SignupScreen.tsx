@@ -1,13 +1,14 @@
 import { type FormEvent, useState } from "react";
 
-import { api, setToken, toTiyn } from "./api.js";
+import { api, setToken } from "./api.js";
 
 /**
  * Регистрация чужого клуба.
  *
- * Полей ровно столько, сколько нужно, чтобы зал заработал: остальное владелец
- * донастроит внутри. Число машин и цена минуты спрашиваются здесь потому, что
- * без них система создаст пустую оболочку, в которой нельзя открыть сессию.
+ * Полей ровно столько, сколько нужно, чтобы клуб заработал: остальное владелец
+ * донастроит внутри. Число машин спрашиваем здесь, иначе система создаст пустую
+ * оболочку, в которой нельзя открыть сессию. Цену минуты не спрашиваем — клуб
+ * заводится со стартовым тарифом, а владелец меняет его в настройках.
  */
 export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [form, setForm] = useState({
@@ -17,7 +18,6 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
     email: "",
     password: "",
     computers: "20",
-    pricePerMinute: "10",
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,6 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
         email: form.email.trim(),
         password: form.password,
         computers: Number(form.computers) || 0,
-        pricePerMinute: toTiyn(form.pricePerMinute),
       });
       setToken(result.accessToken);
       onDone();
@@ -74,24 +73,14 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
           <input value={form.city} onChange={(e) => set("city")(e.target.value)} />
         </label>
 
-        <div className="settings-grid" style={{ padding: 0, background: "none", border: "none" }}>
-          <label>
-            Машин в зале
-            <input
-              inputMode="numeric"
-              value={form.computers}
-              onChange={(e) => set("computers")(e.target.value)}
-            />
-          </label>
-          <label>
-            Цена минуты, ₸
-            <input
-              inputMode="decimal"
-              value={form.pricePerMinute}
-              onChange={(e) => set("pricePerMinute")(e.target.value)}
-            />
-          </label>
-        </div>
+        <label>
+          Машин в клубе
+          <input
+            inputMode="numeric"
+            value={form.computers}
+            onChange={(e) => set("computers")(e.target.value)}
+          />
+        </label>
 
         <label>
           Ваше имя

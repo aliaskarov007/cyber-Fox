@@ -51,7 +51,7 @@ export function ZonesSection({ club, onChanged }: { club: Club; onChanged: () =>
   return (
     <section className="zone-block">
       <div className="zone-head">
-        <h2>Зоны зала</h2>
+        <h2>Зоны клуба</h2>
         <span className="count">{zones.length}</span>
       </div>
 

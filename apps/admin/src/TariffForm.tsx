@@ -159,7 +159,7 @@ export function TariffForm({
             />
           </label>
           <label>
-            Живёт дней (пусто — {club.packageValidityDays} из настроек зала)
+            Живёт дней (пусто — {club.packageValidityDays} из настроек клуба)
             <input
               inputMode="numeric"
               value={validityDays}
@@ -182,7 +182,7 @@ export function TariffForm({
       {overCredit && (
         <div className="error">
           Цена минуты больше лимита игры в долг ({formatMoney(club.creditLimit)}): гость не сможет
-          доиграть ни минуты в долг. Поднимите лимит зала или снизьте цену.
+          доиграть ни минуты в долг. Поднимите лимит клуба или снизьте цену.
         </div>
       )}
 

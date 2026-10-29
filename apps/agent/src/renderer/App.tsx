@@ -220,7 +220,7 @@ export function App() {
         <div className="failure-title">Cyber-Fox · сбой запуска</div>
         <pre className="failure-reason">{configError}</pre>
         <div className="failure-hint">
-          Покажите этот текст тому, кто ставил систему. Машина в зал в таком виде не выдаётся.
+          Покажите этот текст тому, кто ставил систему. Машина в клуб в таком виде не выдаётся.
         </div>
       </div>
     );

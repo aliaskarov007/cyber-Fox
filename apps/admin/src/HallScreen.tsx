@@ -123,7 +123,7 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
             computerId,
             at,
             computerName:
-              hall.find((c) => c.computer.id === computerId)?.computer.name ?? "Машина зала",
+              hall.find((c) => c.computer.id === computerId)?.computer.name ?? "Машина клуба",
           }))
           .sort((a, b) => b.at - a.at)}
         onAnswer={(computerId) =>
@@ -233,7 +233,7 @@ function FirstSteps({ onGoTo }: { onGoTo: (tab: Tab) => void }) {
    */
   const steps: Array<{ title: string; hint: string; tab: Tab; action: string }> = [
     {
-      title: "Заведите машины зала",
+      title: "Заведите машины клуба",
       hint: "Зона «Основной зал» уже создана — переименуйте её или добавьте вторую, например VIP, и заведите машины.",
       tab: "settings",
       action: "В настройки",

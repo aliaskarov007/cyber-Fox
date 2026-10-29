@@ -290,11 +290,11 @@ function DisklessKey({ club }: { club: Club }) {
 
   return (
     <div className="notice">
-      <b>Зал на бездисковой загрузке (CCBoot и подобные)</b>
+      <b>Клуб на бездисковой загрузке (CCBoot и подобные)</b>
       <div className="note" style={{ marginTop: 6 }}>
         Коды привязки здесь не нужны: положите файл <code>cyberfox.json</code> рядом с агентом в
         общий образ, и машины подключатся сами, различаясь по MAC сетевой карты. Новая машина
-        появится в зале при первой загрузке.
+        появится в клубе при первой загрузке.
       </div>
 
       <div className="actions" style={{ marginTop: 8 }}>

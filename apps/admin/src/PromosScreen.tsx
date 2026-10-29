@@ -107,7 +107,7 @@ export function PromosScreen({ club, staff }: { club: Club; staff: Staff }) {
                     <td>
                       {formatMoney(promo.amount)} · {KIND_LABEL[promo.kind].toLowerCase()}
                     </td>
-                    <td>{promo.clubId === null ? "вся сеть" : (promo.clubName ?? "этот зал")}</td>
+                    <td>{promo.clubId === null ? "вся сеть" : (promo.clubName ?? "этот клуб")}</td>
                     <td className="num">
                       {promo.usedCount}
                       {promo.maxUses !== null ? ` из ${promo.maxUses}` : ""}
@@ -259,7 +259,7 @@ function PromoForm({
               onChange={(e) => setNetworkWide(e.target.value === "network")}
             >
               <option value="club">Только в «{club.name}»</option>
-              <option value="network">Во всех залах сети</option>
+              <option value="network">Во всех филиалах сети</option>
             </select>
           </label>
         )}

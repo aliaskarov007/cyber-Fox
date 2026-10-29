@@ -29,7 +29,7 @@ const STATUS_ORDER: Record<InviteStatus, number> = {
 
 const AUDIENCE_LABEL: Record<EventAudience, string> = {
   NETWORK: "Все гости сети",
-  CLUB: "Гости этого зала",
+  CLUB: "Гости этого клуба",
 };
 
 function formatWhen(iso: string): string {

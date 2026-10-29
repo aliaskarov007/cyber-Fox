@@ -10,7 +10,7 @@ import { WhatsAppSettings } from "./WhatsAppSettings.js";
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Владелец сети",
   ADMIN: "Управляющий",
-  STAFF: "Администратор зала",
+  STAFF: "Администратор клуба",
 };
 
 /** Настройки клуба и сети: доступны управляющему по своему залу, владельцу — по всем. */
@@ -93,7 +93,7 @@ export function SettingsScreen({
             clubs={clubs}
             onSaved={(msg) => void run(async () => {}, msg)}
           />
-          <ClubsSection clubs={clubs} onCreated={() => void run(async () => onClubsChanged(), "Зал добавлен")} />
+          <ClubsSection clubs={clubs} onCreated={() => void run(async () => onClubsChanged(), "Филиал добавлен")} />
         </>
       )}
 
@@ -136,7 +136,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         lowBalanceWarnMinutes: Number(warn),
         bonusPercent: Number(bonus),
       });
-      onSaved("Настройки зала сохранены");
+      onSaved("Настройки клуба сохранены");
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -147,7 +147,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
   return (
     <section className="zone-block">
       <div className="zone-head">
-        <h2>Зал «{club.name}»</h2>
+        <h2>Клуб «{club.name}»</h2>
       </div>
       {error && <div className="error">{error}</div>}
       <form className="settings-grid" onSubmit={submit}>
@@ -330,7 +330,7 @@ function WalletSettings({
         sharedBalance: next,
         ...(next ? {} : { moveBalancesToClubId: target }),
       });
-      onSaved(next ? "Кошельки объединены" : "Остатки перенесены в выбранный зал");
+      onSaved(next ? "Кошельки объединены" : "Остатки перенесены в выбранный филиал");
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -352,15 +352,15 @@ function WalletSettings({
       {/* Переключение меняет структуру денег, поэтому объясняем последствия до нажатия. */}
       <div className="notice">
         {tenant.sharedBalance
-          ? "Баланс гостя действует во всех залах сети. Пополнение и расход могут оказаться в разных залах — разницу показывает взаимозачёт."
-          : "У гостя свой кошелёк в каждом зале. Аккаунт и история общие по сети в любом случае."}
+          ? "Баланс гостя действует во всех филиалах сети. Пополнение и расход могут оказаться в разных филиалах — разницу показывает взаимозачёт."
+          : "У гостя свой кошелёк в каждом филиале. Аккаунт и история общие по сети в любом случае."}
       </div>
 
       {tenant.sharedBalance ? (
         <>
           <div className="notice warn">
-            Разделить общий остаток по залам корректно нельзя — система не знает, чьи это деньги.
-            Укажите зал, куда перенести остатки.
+            Разделить общий остаток по филиалам корректно нельзя — система не знает, чьи это деньги.
+            Укажите филиал, куда перенести остатки.
           </div>
           <div className="actions">
             <select style={{ width: 260 }} value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -395,7 +395,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
   return (
     <section className="zone-block">
       <div className="zone-head">
-        <h2>Залы сети</h2>
+        <h2>Филиалы сети</h2>
         <span className="count">{clubs.length}</span>
       </div>
 
@@ -405,7 +405,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
         <table>
           <thead>
             <tr>
-              <th>Зал</th>
+              <th>Филиал</th>
               <th>Город</th>
               <th>Лимит долга</th>
               <th>Срок пакета</th>
@@ -427,7 +427,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
       <div className="actions" style={{ marginTop: 10 }}>
         <input
           style={{ width: 220 }}
-          placeholder="Название нового зала"
+          placeholder="Название нового филиала"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -454,7 +454,7 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
             }
           }}
         >
-          Добавить зал
+          Добавить филиал
         </button>
       </div>
     </section>
@@ -501,7 +501,7 @@ function StaffSection({
               <th>Сотрудник</th>
               <th>Почта</th>
               <th>Роль</th>
-              <th>Зал</th>
+              <th>Филиал</th>
               {isOwner && <th />}
             </tr>
           </thead>
@@ -561,7 +561,7 @@ function StaffSection({
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
-            <option value="STAFF">Администратор зала</option>
+            <option value="STAFF">Администратор клуба</option>
             <option value="ADMIN">Управляющий</option>
             <option value="OWNER">Владелец сети</option>
           </select>
