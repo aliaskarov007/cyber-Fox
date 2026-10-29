@@ -69,6 +69,9 @@ export function PlatformScreen({ name, onLogout }: { name: string; onLogout: () 
     computers: tenants.reduce((sum, t) => sum + t.computers, 0),
     online: tenants.reduce((sum, t) => sum + t.online, 0),
     paying: tenants.filter((t) => t.status === "ACTIVE").length,
+    // Отдельно от «Сетей минус Платят»: туда попали бы ещё просроченные и
+    // отключённые, а это противоположный конец воронки.
+    trialing: tenants.filter((t) => t.status === "TRIALING").length,
   };
 
   return (
@@ -106,6 +109,10 @@ export function PlatformScreen({ name, onLogout }: { name: string; onLogout: () 
               {totals.online}/{totals.computers}
             </div>
             <div className="label">Машин на связи</div>
+          </div>
+          <div className="stat">
+            <div className="value">{totals.trialing}</div>
+            <div className="label">На пробном</div>
           </div>
           <div className="stat">
             <div className="value">{totals.paying}</div>
