@@ -96,7 +96,7 @@ export function LibraryScreen({ club }: { club: Club }) {
         {apps.length === 0 ? (
           <div className="notice">
             Пока каталог пуст, гость после оплаты увидит пустую оболочку. Добавьте хотя бы то, во что
-            в зале играют каждый день.
+            в клубе играют каждый день.
           </div>
         ) : (
           <div className="cover-grid">

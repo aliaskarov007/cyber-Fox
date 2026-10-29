@@ -76,7 +76,7 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
 
         <div className="settings-grid" style={{ padding: 0, background: "none", border: "none" }}>
           <label>
-            Машин в зале
+            Машин в клубе
             <input
               inputMode="numeric"
               value={form.computers}

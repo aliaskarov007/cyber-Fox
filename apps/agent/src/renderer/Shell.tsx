@@ -77,7 +77,7 @@ export function Shell({
       <div className="shell-empty">
         <div className="shell-empty-title">Игры ещё не добавлены</div>
         <div className="shell-empty-hint">
-          Каталог зала пуст. Подойдите к администратору — он добавит игры из кассы, и они появятся
+          Каталог клуба пуст. Подойдите к администратору — он добавит игры из кассы, и они появятся
           здесь без перезагрузки.
         </div>
       </div>

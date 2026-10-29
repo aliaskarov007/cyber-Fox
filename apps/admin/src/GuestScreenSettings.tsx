@@ -54,7 +54,7 @@ export function GuestScreenSettings({ club, isOwner }: { club: Club; isOwner: bo
         <h2>Экран гостя: карусель</h2>
       </div>
       <p className="hint">
-        На экране блокировки игровых ПК — название клуба, слоган (меняются выше, в настройках зала) и
+        На экране блокировки игровых ПК — название клуба, слоган (меняются выше, в настройках клуба) и
         карусель. Ближайшие турниры из «Ивентов» попадают в неё сами, между ними крутятся слайды
         отсюда. Слайд партнёра помечается на экране словом «Реклама».
       </p>
@@ -84,7 +84,7 @@ export function GuestScreenSettings({ club, isOwner }: { club: Club; isOwner: bo
                       <div style={{ color: "var(--muted)", fontSize: 12 }}>Реклама · {slide.partner}</div>
                     )}
                   </td>
-                  <td>{slide.networkWide ? "вся сеть" : "этот зал"}</td>
+                  <td>{slide.networkWide ? "вся сеть" : "этот клуб"}</td>
                   <td>{period(slide)}</td>
                   <td className="num">{slide.impressions.toLocaleString("ru-KZ")}</td>
                   <td>
@@ -240,7 +240,7 @@ function SlideForm({ club, isOwner, onCreated }: { club: Club; isOwner: boolean;
               onChange={(e) => setNetworkWide(e.target.value === "network")}
             >
               <option value="club">Только в «{club.name}»</option>
-              <option value="network">Во всех залах сети</option>
+              <option value="network">Во всех филиалах сети</option>
             </select>
           </label>
         )}

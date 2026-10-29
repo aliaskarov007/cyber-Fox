@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { type PlatformTenant, platformApi, setPlatformToken } from "./platform-api.js";
 import { PlatformTenantForm } from "./PlatformTenantForm.js";
 
-const PLAN_LABEL: Record<string, string> = { TRIAL: "Пробный", BASIC: "Один зал", PRO: "Сеть залов" };
+const PLAN_LABEL: Record<string, string> = { TRIAL: "Пробный", BASIC: "Один клуб", PRO: "Сеть клубов" };
 const STATUS_LABEL: Record<string, string> = {
   TRIALING: "пробный период",
   ACTIVE: "платит",
