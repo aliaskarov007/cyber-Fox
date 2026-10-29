@@ -71,7 +71,12 @@ function ClubApp() {
   const [clubId, setClubId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("hall");
   const [loading, setLoading] = useState(true);
-  const [signingUp, setSigningUp] = useState(false);
+  /*
+   * Регистрацию можно открыть прямой ссылкой /signup — её шлют будущим
+   * владельцам клубов. Caddy на неизвестный путь отдаёт index.html, а дальше
+   * путь разбирает браузер, как и для /platform.
+   */
+  const [signingUp, setSigningUp] = useState(() => window.location.pathname === "/signup");
 
   async function load(): Promise<void> {
     if (!getToken()) {
@@ -96,12 +101,35 @@ function ClubApp() {
     void load();
   }, []);
 
+  // Кнопки «назад»/«вперёд» браузера держат экран в согласии с адресом.
+  useEffect(() => {
+    const sync = (): void => setSigningUp(window.location.pathname === "/signup");
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+
   if (loading) return <div className="login-wrap">Загружаем…</div>;
   if (!staff) {
+    // Открытие и закрытие регистрации держат адрес в строке браузера: ссылку
+    // /signup можно скопировать и переслать, а «назад» возвращает ко входу.
+    const openSignup = (): void => {
+      setSigningUp(true);
+      window.history.pushState(null, "", "/signup");
+    };
+    const closeSignup = (): void => {
+      setSigningUp(false);
+      window.history.pushState(null, "", "/");
+    };
     return signingUp ? (
-      <SignupScreen onDone={() => void load()} onBack={() => setSigningUp(false)} />
+      <SignupScreen
+        onDone={() => {
+          window.history.replaceState(null, "", "/");
+          void load();
+        }}
+        onBack={closeSignup}
+      />
     ) : (
-      <LoginScreen onDone={() => void load()} onSignup={() => setSigningUp(true)} />
+      <LoginScreen onDone={() => void load()} onSignup={openSignup} />
     );
   }
 
