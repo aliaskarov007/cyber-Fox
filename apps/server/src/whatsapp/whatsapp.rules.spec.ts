@@ -7,6 +7,7 @@ import {
   findSignupCode,
   inviteMessage,
   makeSignupCode,
+  maskPhone,
   normalizePhone,
   parseInviteReply,
   phoneFromChatId,
@@ -34,6 +35,13 @@ describe("номер телефона", () => {
   it("обрывок номера не превращает в чей-то чужой", () => {
     expect(normalizePhone("123-45-67")).toBeNull();
     expect(normalizePhone("")).toBeNull();
+  });
+
+  it("в журнал отдаёт только хвост номера", () => {
+    expect(maskPhone("77011234567")).toBe("…4567");
+    expect(maskPhone("+7 701 123-45-67")).toBe("…4567");
+    // Короткий обрывок нечего и маскировать — но и показывать его незачем.
+    expect(maskPhone("456")).toBe("…");
   });
 
   it("строит идентификатор чата и разбирает его обратно", () => {

@@ -38,6 +38,18 @@ export function phoneFromChatId(chatId: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Номер для журнала: видно последние четыре цифры, остальное скрыто.
+ *
+ * Журнал сервера читают при разборе неполадок и пересылают в переписке, а
+ * телефон гостя — персональные данные. Четырёх цифр хватает, чтобы отличить
+ * «пришло не от того» от «не пришло вовсе».
+ */
+export function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 4 ? `…${digits.slice(-4)}` : "…";
+}
+
 /** Два номера — один человек, даже если записаны по-разному. */
 export function samePhone(a: string, b: string): boolean {
   const left = normalizePhone(a);

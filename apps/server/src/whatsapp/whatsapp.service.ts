@@ -8,7 +8,7 @@ import { type GreenApiCredentials, GreenApiClient, type SendResult } from "./gre
 import type { SaveWhatsAppDto } from "./whatsapp.dto.js";
 import { findGuestByPhone } from "../guests/guest-phone.js";
 import { GuestSignupService } from "./guest-signup.service.js";
-import { findSignupCode, parseInviteReply, readIncoming, replyAck } from "./whatsapp.rules.js";
+import { findSignupCode, maskPhone, parseInviteReply, readIncoming, replyAck } from "./whatsapp.rules.js";
 import {
   captainMessage,
   findTeamCode,
@@ -197,6 +197,10 @@ export class WhatsAppService {
       this.logger.warn(`Уведомление для инстанса ${incoming.instanceId} без верного секрета — пропущено`);
       return;
     }
+
+    // Принятое сообщение раньше не оставляло следа, и «дошёл ли ответ гостя»
+    // проверяли по косвенным признакам. При настройке это первый вопрос.
+    this.logger.log(`Входящее от ${maskPhone(incoming.phone)}`);
 
     // Код регистрации с игрового ПК — его ищем первым: в сообщении он один,
     // и спутать его с ответом на приглашение нельзя.
