@@ -10,10 +10,16 @@
 
 set -eu
 
+# BACKUP_ONCE=1 — один проход вместо вечного цикла, с честным кодом возврата.
+# Без него проверить настройку можно было бы только дождавшись ночи, то есть
+# узнать о неработающей отправке через сутки после того, как её настроили.
+FAILED=0
+
 # Ключ переносится к себе и закрывается от чужих: ssh отказывается работать с
 # ключом, который читает кто угодно, а права примонтированного файла задаёт
 # хозяйская машина — на Windows они всегда «читают все».
 KEY=/tmp/offsite-key
+rm -f "$KEY"
 if [ -s /keys/offsite ]; then
   cp /keys/offsite "$KEY"
   chmod 600 "$KEY"
@@ -47,23 +53,31 @@ while true; do
     if [ -n "${OFFSITE_HOST:-}" ]; then
       if [ ! -s "$KEY" ]; then
         echo "ОТПРАВКА ОТМЕНЕНА: нет ключа доступа к хранилищу"
+        FAILED=1
       elif [ -z "${BACKUP_AGE_RECIPIENT:-}" ]; then
         # Отправить незашифрованный дамп наружу хуже, чем не отправить вовсе.
         echo "ОТПРАВКА ОТМЕНЕНА: не задан BACKUP_AGE_RECIPIENT"
+        FAILED=1
       elif rsync -e "ssh -p ${OFFSITE_PORT:-23} -i "$KEY" -o StrictHostKeyChecking=accept-new -o BatchMode=yes" \
             "$OUT" "${OFFSITE_USER}@${OFFSITE_HOST}:${OFFSITE_PATH:-./cyberfox/}"; then
         echo "копия уехала: ${OFFSITE_HOST}"
       else
         # Молчать нельзя: клуб думал бы, что копия есть, до дня аварии.
         echo "КОПИЯ НЕ УЕХАЛА: ${OFFSITE_HOST}"
+        FAILED=1
       fi
     fi
   else
     # Обрезанный файл хуже отсутствия бэкапа: он выглядит рабочим.
     echo "БЭКАП НЕ СДЕЛАН: $STAMP"
+    FAILED=1
   fi
 
   rm -f "$DUMP"
   find /backups -name "cyberfox-*.sql.gz*" -mtime "+$KEEP_DAYS" -delete
+
+  if [ -n "${BACKUP_ONCE:-}" ]; then
+    exit "$FAILED"
+  fi
   sleep 86400
 done
