@@ -3,6 +3,7 @@ import { SegmentEndReason, SessionStatus } from "@prisma/client";
 
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
+import { isAcceptableMinutes } from "./offline.rules.js";
 
 /** Отчёт агента о времени, отыгранном без связи с облаком. */
 export interface OfflineOperationInput {
@@ -66,6 +67,14 @@ export class OfflineService {
     const ordered = [...operations].sort((a, b) => a.sequence - b.sequence);
 
     for (const operation of ordered) {
+      // Недопустимые минуты (дробь, минус, больше суток) — сломанный или
+      // подставной отчёт: отклоняем, не доходя до базы. Правило — в offline.rules.
+      if (!isAcceptableMinutes(operation.minutes)) {
+        result.rejected += 1;
+        result.notes.push(`Отчёт с недопустимым числом минут (${operation.minutes}) отклонён`);
+        continue;
+      }
+
       // Ключ идемпотентности: обрыв во время отправки заставит агента прислать
       // ту же пачку снова, и списывать минуты второй раз нельзя.
       const existing = await this.prisma.offlineOperation.findUnique({
@@ -91,7 +100,7 @@ export class OfflineService {
         },
       });
 
-      const outcome = await this.apply(operation);
+      const outcome = await this.apply(computerId, operation);
       if (outcome.rejected) {
         result.rejected += 1;
         result.notes.push(outcome.rejected);
@@ -122,6 +131,7 @@ export class OfflineService {
   }
 
   private async apply(
+    computerId: string,
     operation: OfflineOperationInput,
   ): Promise<{ rejected?: string; note?: string }> {
     const session = await this.prisma.session.findUnique({
@@ -130,6 +140,16 @@ export class OfflineService {
     });
     if (!session) {
       return { rejected: "Сессия не найдена: возможно, удалена на сервере" };
+    }
+
+    /*
+     * Сессия обязана принадлежать той машине, что прислала отчёт. Без этой
+     * проверки агент с ключом клуба мог прислать replay с чужим sessionId и
+     * списать минуты гостю за другой машиной — сервер списывал бы вслепую,
+     * доверяя номеру сессии из тела сообщения.
+     */
+    if (session.computerId !== computerId) {
+      return { rejected: `${session.computer.name}: сессия не с этой машины, отчёт отклонён` };
     }
 
     if (session.status !== SessionStatus.ACTIVE) {
