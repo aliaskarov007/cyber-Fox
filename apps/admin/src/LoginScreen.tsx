@@ -35,89 +35,122 @@ export function LoginScreen({
 
   return (
     <AuthShell>
-      <form className="fx-login-card" onSubmit={submit}>
-        <AuthLogo />
-        <h1 className="fx-login-title">Вход</h1>
+      <div className="fx-login-layout">
+        <section className="fx-intro" aria-label="О программе">
+          <h2 className="fx-intro-title">
+            Управление компьютерным клубом — <span>стабильно</span>
+          </h2>
+          <p className="fx-intro-lead">
+            Касса, компьютеры, гости и бар в одной программе. Для одного клуба и
+            для целой сети.
+          </p>
+          <ul className="fx-intro-list">
+            <li>
+              <b>Привлекайте гостей и растите выручку</b>
+              Регистрация через WhatsApp, бонусы, промокоды и турниры возвращают
+              гостей снова.
+            </li>
+            <li>
+              <b>Контролируйте все процессы</b>
+              Каждый ПК на карте клуба: кто играет, сколько осталось, где
+              закончилось время.
+            </li>
+            <li>
+              <b>Принимайте оплату без администратора</b>
+              Kaspi QR пополняет баланс гостя за секунды, деньги сразу видны в
+              кассе.
+            </li>
+            <li>
+              <b>Разгрузите администратора</b>
+              Смены, пакеты, заказы из бара с игрового места, отчёт по каждой
+              смене.
+            </li>
+          </ul>
+        </section>
+        <form className="fx-login-card" onSubmit={submit}>
+          <AuthLogo />
+          <h1 className="fx-login-title">Вход</h1>
 
-        {error && <div className="error">{error}</div>}
+          {error && <div className="error">{error}</div>}
 
-        <label className="fx-field">
-          Логин
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@club.kz"
-            autoComplete="username"
-            required
-          />
-        </label>
+          <label className="fx-field">
+            Логин
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@club.kz"
+              autoComplete="username"
+              required
+            />
+          </label>
 
-        <label className="fx-field" htmlFor="fx-password">
-          Пароль
-        </label>
-        <div className="fx-password">
-          <input
-            id="fx-password"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-          <button
-            type="button"
-            className="fx-eye"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={eyeLabel}
-            title={eyeLabel}
-          >
-            {showPassword ? (
-              <svg
-                aria-hidden="true"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 3l18 18" />
-                <path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7a9.6 9.6 0 0 0 5.4-1.6" />
-                <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-              </svg>
-            ) : (
-              <svg
-                aria-hidden="true"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-            )}
+          <label className="fx-field" htmlFor="fx-password">
+            Пароль
+          </label>
+          <div className="fx-password">
+            <input
+              id="fx-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              className="fx-eye"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={eyeLabel}
+              title={eyeLabel}
+            >
+              {showPassword ? (
+                <svg
+                  aria-hidden="true"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7a9.6 9.6 0 0 0 5.4-1.6" />
+                  <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                </svg>
+              ) : (
+                <svg
+                  aria-hidden="true"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          <button className="fx-login-go" type="submit" disabled={busy}>
+            {busy ? "Проверяем…" : "Войти"}
           </button>
-        </div>
 
-        <button className="fx-login-go" type="submit" disabled={busy}>
-          {busy ? "Проверяем…" : "Войти"}
-        </button>
-
-        <div className="fx-login-join">
-          <button type="button" onClick={onSignup}>
-            Подключить клуб
-          </button>
-          <small>Первые 2 недели — БЕСПЛАТНО</small>
-        </div>
-      </form>
+          <div className="fx-login-join">
+            <button type="button" onClick={onSignup}>
+              Подключить клуб
+            </button>
+            <small>Первые 2 недели — БЕСПЛАТНО</small>
+          </div>
+        </form>
+      </div>
     </AuthShell>
   );
 }
