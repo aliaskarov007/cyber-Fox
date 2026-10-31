@@ -9,7 +9,6 @@ import {
   GreenApiClient,
   type SendResult,
 } from "./green-api.client.js";
-import { WhatsAppService } from "./whatsapp.service.js";
 import {
   CODE_MAX_ATTEMPTS,
   CODE_RESEND_MS,
@@ -51,7 +50,6 @@ export class PasswordResetService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly greenApi: GreenApiClient,
-    private readonly whatsapp: WhatsAppService,
   ) {}
 
   private systemChannel(): GreenApiCredentials | null {
@@ -68,15 +66,40 @@ export class PasswordResetService {
     return { apiUrl, instanceId, apiToken };
   }
 
-  private send(
+  /**
+   * Куда слать код: системный номер CyberFox, иначе WhatsApp самой сети,
+   * иначе первый подключённый WhatsApp на сервере — это номер CyberFox, с
+   * которого сервис запускали. Так сброс работает и у клуба, который свой
+   * WhatsApp ещё не подключал.
+   */
+  private async send(
     tenantId: string,
     phone: string,
     message: string,
   ): Promise<SendResult> {
     const system = this.systemChannel();
-    return system
-      ? this.greenApi.sendText(system, phone, message)
-      : this.whatsapp.send(tenantId, phone, message);
+    if (system) return this.greenApi.sendText(system, phone, message);
+
+    const own = await this.prisma.whatsAppChannel.findUnique({
+      where: { tenantId },
+    });
+    const channel =
+      own ??
+      (await this.prisma.whatsAppChannel.findFirst({
+        orderBy: { createdAt: "asc" },
+      }));
+    if (!channel)
+      return { ok: false, error: "На сервере не подключён ни один WhatsApp" };
+
+    return this.greenApi.sendText(
+      {
+        apiUrl: channel.apiUrl,
+        instanceId: channel.instanceId,
+        apiToken: channel.apiToken,
+      },
+      phone,
+      message,
+    );
   }
 
   /**

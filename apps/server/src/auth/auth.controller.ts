@@ -1,12 +1,26 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import { IsEmail, IsString, MinLength } from "class-validator";
 
 import { PrismaService } from "../prisma/prisma.service.js";
+import { normalizePhone } from "../whatsapp/whatsapp.rules.js";
 import { AuthService, type LoginResult } from "./auth.service.js";
 import type { AuthenticatedStaff } from "./auth.types.js";
 import { CurrentStaff } from "./current-staff.decorator.js";
 import { Public } from "./guards.js";
+
+class MyPhoneDto {
+  @IsString()
+  @MinLength(10, { message: "Введите номер WhatsApp" })
+  phone!: string;
+}
 
 class LoginDto {
   @IsEmail()
@@ -49,10 +63,32 @@ export class AuthController {
         clubId: true,
         email: true,
         fullName: true,
+        phone: true,
         role: true,
         tenant: { select: { name: true, sharedBalance: true } },
       },
     });
     return record;
+  }
+
+  /**
+   * Свой номер WhatsApp — на него придёт код, если сотрудник забудет пароль.
+   * Каждый указывает его сам: касса просит об этом сразу после входа.
+   */
+  @Patch("me/phone")
+  async setMyPhone(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Body() dto: MyPhoneDto,
+  ) {
+    const phone = normalizePhone(dto.phone);
+    if (!phone)
+      throw new BadRequestException(
+        "Номер WhatsApp не разобран — пример: +7 701 123 45 67",
+      );
+    await this.prisma.staff.update({
+      where: { id: staff.id },
+      data: { phone },
+    });
+    return { phone };
   }
 }

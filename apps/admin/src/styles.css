@@ -1332,3 +1332,18 @@ button.link {
   padding-top: 6px;
   border-top: 1px solid var(--line);
 }
+
+/* Просьба указать свой WhatsApp: висит под шапкой, пока номера нет. */
+.phone-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 16px;
+  background: rgba(225, 82, 28, 0.12);
+  border-bottom: 1px solid rgba(225, 82, 28, 0.45);
+  font-size: 14px;
+}
+
+.phone-banner input { width: 200px; }
+.phone-banner-error { color: var(--stopped); font-size: 13px; }

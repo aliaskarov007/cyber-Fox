@@ -8,6 +8,7 @@ export interface Staff {
   clubId: string | null;
   email: string;
   fullName: string;
+  phone: string | null;
   role: "OWNER" | "ADMIN" | "STAFF";
   tenant: { name: string; sharedBalance: boolean };
 }
@@ -329,6 +330,9 @@ export const api = {
     }),
 
   me: () => request<Staff>("/auth/me"),
+
+  setMyPhone: (phone: string) =>
+    request<{ phone: string }>("/auth/me/phone", { method: "PATCH", body: JSON.stringify({ phone }) }),
 
   requestPasswordReset: (phone: string) =>
     request<{ sent: true }>("/auth/password-reset/request", {
