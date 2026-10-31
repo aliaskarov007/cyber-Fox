@@ -49,7 +49,7 @@ export function LoginScreen({
       <main className="fx-login-main">
         <form className="fx-login-card" onSubmit={submit}>
           <div className="fx-login-logo">
-            Cyber<span>Fox</span>
+            CYBER<span>FOX</span>
           </div>
           <h1 className="fx-login-title">Вход</h1>
 
@@ -109,7 +109,7 @@ export function LoginScreen({
             <button type="button" onClick={onSignup}>
               Подключить клуб
             </button>
-            <small>Первые 2 недели — бесплатно</small>
+            <small>ПЕРВЫЕ 2 НЕДЕЛИ — БЕСПЛАТНО</small>
           </div>
         </form>
       </main>
