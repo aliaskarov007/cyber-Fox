@@ -78,6 +78,7 @@ services:
       - server
     environment:
       CYBERFOX_DOMAIN: ${CYBERFOX_DOMAIN:?укажите домен клуба в .env}
+      CYBERFOX_OLD_DOMAINS: ${CYBERFOX_OLD_DOMAINS:-}
     ports:
       - "80:80"
       - "443:443"

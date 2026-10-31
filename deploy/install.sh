@@ -145,7 +145,20 @@ if [ ! -f .env ]; then
   ok "Пароли записаны в $DIR/.env — сохраните этот файл, без него база не откроется"
 else
   ok "Настройки уже есть — пароли не трогаю"
-  sed -i "s#^CYBERFOX_DOMAIN=.*#CYBERFOX_DOMAIN=$DOMAIN#; s#^ALLOWED_ORIGINS=.*#ALLOWED_ORIGINS=https://$DOMAIN#" .env
+  # Переезд на новый домен: прежний не выключаем, а запоминаем. Агенты в
+  # залах и вебхуки платежей и WhatsApp продолжают ходить на старый адрес.
+  PREV_DOMAIN="$(grep -E '^CYBERFOX_DOMAIN=' .env | cut -d= -f2- || true)"
+  OLD_DOMAINS="$(grep -E '^CYBERFOX_OLD_DOMAINS=' .env | cut -d= -f2- || true)"
+  if [ -n "$PREV_DOMAIN" ] && [ "$PREV_DOMAIN" != "$DOMAIN" ] && [ "${PREV_DOMAIN#:}" = "$PREV_DOMAIN" ]; then
+    OLD_DOMAINS="$OLD_DOMAINS $PREV_DOMAIN"
+    ok "Прежний адрес $PREV_DOMAIN остаётся рабочим, касса с него переводит на $DOMAIN"
+  fi
+  # Новый домен среди старых не держим, повторы убираем.
+  OLD_DOMAINS="$(echo $OLD_DOMAINS | tr ' ' '\n' | grep -vxF "$DOMAIN" | awk 'NF && !seen[$0]++' | tr '\n' ' ' | sed 's/ $//')"
+  ORIGINS="https://$DOMAIN"
+  for d in $OLD_DOMAINS; do ORIGINS="$ORIGINS,https://$d"; done
+  grep -q '^CYBERFOX_OLD_DOMAINS=' .env || echo "CYBERFOX_OLD_DOMAINS=" >> .env
+  sed -i "s#^CYBERFOX_DOMAIN=.*#CYBERFOX_DOMAIN=$DOMAIN#; s#^CYBERFOX_OLD_DOMAINS=.*#CYBERFOX_OLD_DOMAINS=$OLD_DOMAINS#; s#^ALLOWED_ORIGINS=.*#ALLOWED_ORIGINS=$ORIGINS#" .env
 fi
 
 # --- 4. Домен -------------------------------------------------------------
