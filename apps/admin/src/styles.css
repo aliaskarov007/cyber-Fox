@@ -159,23 +159,23 @@ label {
 .fx-login-bg {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  padding-top: 0.2em;
+  font-size: clamp(44px, 7vw, 110px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #1b1d24;
+  white-space: nowrap;
   pointer-events: none;
   user-select: none;
 }
 
-.fx-login-bg span {
-  position: absolute;
-  font-weight: 900;
-  line-height: 0.85;
-  letter-spacing: -0.04em;
-  color: #23252e;
-  white-space: nowrap;
-}
-
-.fx-login-bg .w1 { left: -12%; top: -8%; font-size: clamp(110px, 24vw, 380px); transform: rotate(-7deg); }
-.fx-login-bg .w2 { right: -52%; top: 30%; font-size: clamp(100px, 22vw, 340px); transform: rotate(6deg); }
-.fx-login-bg .w3 { left: -30%; top: 52%; font-size: clamp(90px, 19vw, 300px); transform: rotate(-4deg); }
-.fx-login-bg .w4 { left: 6%; bottom: -16%; font-size: clamp(120px, 27vw, 420px); transform: rotate(4deg); }
+/* Чётные ряды сдвинуты, чтобы слова не стояли столбиком. */
+.fx-login-bg div:nth-child(even) { margin-left: -2.2em; }
 
 .fx-login-main {
   position: relative;
@@ -334,10 +334,6 @@ label {
 @media (max-width: 600px) {
   .fx-login-card { padding: 28px 20px; }
   .fx-login-footer { padding: 0 16px 20px; }
-  .fx-login-bg .w1 { font-size: 150px; top: -2%; }
-  .fx-login-bg .w2 { font-size: 140px; top: 40%; right: -120%; }
-  .fx-login-bg .w3 { font-size: 130px; top: 62%; left: -90%; }
-  .fx-login-bg .w4 { font-size: 160px; bottom: -6%; left: -20%; }
 }
 
 /* --- Каркас --- */
