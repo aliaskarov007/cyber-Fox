@@ -5,8 +5,6 @@ import { api, setToken } from "./api.js";
 const SUPPORT_PHONE = "+7 708 777 77 69";
 const SUPPORT_PHONE_RAW = "77087777769";
 const SUPPORT_EMAIL = "aliaskarovnye@gmail.com";
-// Рядов с запасом: на высоком экране фон не должен заканчиваться.
-const BG_ROWS = Array.from({ length: 14 }, (_, i) => i);
 
 export function LoginScreen({
   onDone,
@@ -42,9 +40,9 @@ export function LoginScreen({
     <div className="fx-login">
       {/* Крупные надписи на фоне — только украшение, читалкам экрана не нужны. */}
       <div className="fx-login-bg" aria-hidden="true">
-        {BG_ROWS.map((row) => (
-          <div key={row}>CYBERFOX CYBERFOX CYBERFOX CYBERFOX CYBERFOX CYBERFOX</div>
-        ))}
+        <span className="w1">CYBERFOX</span>
+        <span className="w2">CYBERFOX</span>
+        <span className="w3">CYBERFOX</span>
       </div>
 
       <main className="fx-login-main">
