@@ -177,6 +177,22 @@ if [ -n "$SERVER_IP" ] && [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
 fi
 ok "Домен указывает на $SERVER_IP"
 
+# www. для основного домена (cyberfoxclub.com → www.cyberfoxclub.com). Берём
+# его, только когда A-запись www уже смотрит сюда: иначе Caddy будет без
+# конца пытаться выпустить на него сертификат. С www касса переводит на домен
+# без www.
+if [ "$(echo "$DOMAIN" | tr -cd . | wc -c)" -eq 1 ]; then
+  WWW="www.$DOMAIN"
+  if [ -n "$SERVER_IP" ] && [ "$(dig +short A "$WWW" | tail -n1)" = "$SERVER_IP" ]; then
+    if ! grep -E '^CYBERFOX_OLD_DOMAINS=' .env | cut -d= -f2- | tr ' ' '\n' | grep -qxF "$WWW"; then
+      sed -i "s#^CYBERFOX_OLD_DOMAINS=\(.*\)#CYBERFOX_OLD_DOMAINS=\1 $WWW#; s#^CYBERFOX_OLD_DOMAINS= #CYBERFOX_OLD_DOMAINS=#; s#^ALLOWED_ORIGINS=\(.*\)#ALLOWED_ORIGINS=\1,https://$WWW#" .env
+    fi
+    ok "$WWW тоже открывает кассу"
+  else
+    echo "  Чтобы работал и $WWW: A-запись www → ${SERVER_IP:-адрес сервера}, потом эта же команда."
+  fi
+fi
+
 # --- 5. Запуск ------------------------------------------------------------
 
 say "Собираю и запускаю — первый раз это 5–10 минут"
