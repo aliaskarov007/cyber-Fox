@@ -243,3 +243,8 @@ export function signupConfirmedMessage(computerName: string, existingName: strin
     ? `Номер подтверждён ✅ Вернитесь к ${computerName} и задайте новый PIN для аккаунта «${existingName}».`
     : `Номер подтверждён ✅ Вернитесь к ${computerName}: осталось ввести ник и придумать PIN.`;
 }
+
+/** Сообщение с кодом сброса пароля сотрудника. */
+export function passwordResetMessage(code: string): string {
+  return `${code} — код для сброса пароля CyberFox. Действует 10 минут. Никому его не сообщайте: сотрудники CyberFox его не спрашивают.`;
+}

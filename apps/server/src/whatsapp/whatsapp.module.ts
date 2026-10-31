@@ -5,6 +5,8 @@ import { SessionsModule } from "../sessions/sessions.module.js";
 import { TournamentsModule } from "../tournaments/tournaments.module.js";
 import { GuestSignupService } from "./guest-signup.service.js";
 import { GreenApiClient } from "./green-api.client.js";
+import { PasswordResetController } from "./password-reset.controller.js";
+import { PasswordResetService } from "./password-reset.service.js";
 import { PhoneVerificationService } from "./phone-verification.service.js";
 import {
   PhoneVerificationController,
@@ -17,11 +19,17 @@ import { WhatsAppService } from "./whatsapp.service.js";
   // Шина событий живёт в модуле сессий: свой экземпляр здесь значил бы, что
   // подтверждение регистрации не дойдёт до экрана машины.
   imports: [SessionsModule, TournamentsModule],
-  controllers: [WhatsAppController, WhatsAppWebhookController, PhoneVerificationController],
+  controllers: [
+    WhatsAppController,
+    WhatsAppWebhookController,
+    PhoneVerificationController,
+    PasswordResetController,
+  ],
   providers: [
     WhatsAppService,
     GreenApiClient,
     PhoneVerificationService,
+    PasswordResetService,
     GuestSignupService,
     ClubAccessService,
   ],

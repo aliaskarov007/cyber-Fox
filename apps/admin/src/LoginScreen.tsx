@@ -4,11 +4,15 @@ import { api, setToken } from "./api.js";
 import { AuthLogo, AuthShell } from "./AuthShell.js";
 
 export function LoginScreen({
+  notice,
   onDone,
   onSignup,
+  onForgot,
 }: {
+  notice?: string | null;
   onDone: () => void;
   onSignup: () => void;
+  onForgot: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +43,7 @@ export function LoginScreen({
         <AuthLogo />
         <h1 className="fx-login-title">Вход</h1>
 
+        {notice && !error && <div className="fx-notice">{notice}</div>}
         {error && <div className="error">{error}</div>}
 
         <label className="fx-field">
@@ -106,6 +111,9 @@ export function LoginScreen({
             )}
           </button>
         </div>
+        <button type="button" className="fx-forgot" onClick={onForgot}>
+          Забыли пароль?
+        </button>
 
         <button className="fx-login-go" type="submit" disabled={busy}>
           {busy ? "Проверяем…" : "Войти"}

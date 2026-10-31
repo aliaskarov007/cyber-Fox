@@ -105,6 +105,11 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   clubId?: string;
+
+  /** WhatsApp для сброса пароля. */
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }
 
 export class UpdateStaffDto {
@@ -129,6 +134,11 @@ export class UpdateStaffDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** WhatsApp для сброса пароля; пустая строка убирает номер. */
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }
 
 export class UpdateTenantDto {

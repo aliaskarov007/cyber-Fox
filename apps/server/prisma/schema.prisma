@@ -913,6 +913,8 @@ model Staff {
 
   email        String
   fullName     String
+  /// WhatsApp сотрудника: сюда приходит код, когда он забыл пароль.
+  phone        String?
   passwordHash String
   /// PIN для входа в кассовый экран в аварийном режиме.
   pinHash  String?
@@ -927,6 +929,7 @@ model Staff {
   shifts   Shift[]
   payments Payment[]
   sales    ProductSale[]
+  passwordResets StaffPasswordReset[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -997,6 +1000,22 @@ model WhatsAppChannel {
 }
 
 /** Код подтверждения номера гостя. Хранится хешем, живёт несколько минут. */
+/// Код сброса пароля сотрудника, отправленный в WhatsApp.
+model StaffPasswordReset {
+  id      String @id @default(uuid())
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([staffId, createdAt])
+}
+
 model PhoneVerification {
   id      String @id @default(uuid())
   guestId String

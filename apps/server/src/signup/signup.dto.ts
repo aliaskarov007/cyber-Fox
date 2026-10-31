@@ -33,6 +33,11 @@ export class SignupDto {
   @IsEmail()
   email!: string;
 
+  /** WhatsApp владельца: сюда придёт код, если он забудет пароль. */
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
   @IsString()
   @MinLength(8, { message: "Пароль от восьми символов" })
   password!: string;

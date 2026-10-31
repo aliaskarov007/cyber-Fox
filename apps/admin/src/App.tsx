@@ -8,6 +8,7 @@ import { getPlatformToken } from "./platform-api.js";
 import { LibraryScreen } from "./LibraryScreen.js";
 import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
+import { ForgotPasswordScreen } from "./ForgotPasswordScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
 import { NetworkScreen } from "./NetworkScreen.js";
 import { OnboardingScreen } from "./OnboardingScreen.js";
@@ -72,6 +73,8 @@ function ClubApp() {
   const [tab, setTab] = useState<Tab>("hall");
   const [loading, setLoading] = useState(true);
   const [signingUp, setSigningUp] = useState(false);
+  const [forgot, setForgot] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function load(): Promise<void> {
     if (!getToken()) {
@@ -98,10 +101,30 @@ function ClubApp() {
 
   if (loading) return <div className="login-wrap">Загружаем…</div>;
   if (!staff) {
-    return signingUp ? (
-      <SignupScreen onDone={() => void load()} onBack={() => setSigningUp(false)} />
-    ) : (
-      <LoginScreen onDone={() => void load()} onSignup={() => setSigningUp(true)} />
+    if (signingUp) {
+      return <SignupScreen onDone={() => void load()} onBack={() => setSigningUp(false)} />;
+    }
+    if (forgot) {
+      return (
+        <ForgotPasswordScreen
+          onBack={() => setForgot(false)}
+          onDone={() => {
+            setForgot(false);
+            setNotice("Пароль изменён — войдите с новым паролем");
+          }}
+        />
+      );
+    }
+    return (
+      <LoginScreen
+        notice={notice}
+        onDone={() => void load()}
+        onSignup={() => setSigningUp(true)}
+        onForgot={() => {
+          setNotice(null);
+          setForgot(true);
+        }}
+      />
     );
   }
 

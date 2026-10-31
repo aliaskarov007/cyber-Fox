@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { api, setToken } from "./api.js";
-import { AuthLogo, AuthShell } from "./AuthShell.js";
+import { AuthLogo, AuthShell, PasswordInput } from "./AuthShell.js";
 
 /**
  * Регистрация чужого клуба.
@@ -23,6 +23,7 @@ export function SignupScreen({
     city: "",
     ownerName: "",
     email: "",
+    phone: "",
     password: "",
     computers: "20",
   });
@@ -42,6 +43,7 @@ export function SignupScreen({
         city: form.city.trim() || undefined,
         ownerName: form.ownerName.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
         password: form.password,
         computers: Number(form.computers) || 0,
       });
@@ -104,6 +106,21 @@ export function SignupScreen({
             />
           </label>
           <label className="fx-field">
+            WhatsApp
+            <input
+              type="tel"
+              inputMode="tel"
+              value={form.phone}
+              onChange={(e) => set("phone")(e.target.value)}
+              placeholder="+7 701 123 45 67"
+              autoComplete="tel"
+              required
+            />
+          </label>
+        </div>
+
+        <div className="fx-row">
+          <label className="fx-field">
             Рабочая почта
             <input
               type="email"
@@ -113,19 +130,20 @@ export function SignupScreen({
               required
             />
           </label>
+          <label className="fx-field" htmlFor="fx-signup-password">
+            Пароль
+            <PasswordInput
+              id="fx-signup-password"
+              value={form.password}
+              onChange={set("password")}
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </label>
         </div>
-
-        <label className="fx-field">
-          Пароль
-          <input
-            type="password"
-            value={form.password}
-            onChange={(e) => set("password")(e.target.value)}
-            autoComplete="new-password"
-            required
-            minLength={8}
-          />
-        </label>
+        <p className="fx-field-hint">
+          На WhatsApp придёт код, если забудете пароль.
+        </p>
 
         <button className="fx-login-go" type="submit" disabled={busy}>
           {busy ? "Создаём клуб…" : "Начать бесплатно"}

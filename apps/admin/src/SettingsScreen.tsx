@@ -475,6 +475,7 @@ function StaffSection({
   const [form, setForm] = useState({
     email: "",
     fullName: "",
+    phone: "",
     password: "",
     role: "STAFF",
     clubId: clubs[0]?.id ?? "",
@@ -500,6 +501,7 @@ function StaffSection({
             <tr>
               <th>Сотрудник</th>
               <th>Почта</th>
+              <th>WhatsApp</th>
               <th>Роль</th>
               <th>Зал</th>
               {isOwner && <th />}
@@ -510,6 +512,14 @@ function StaffSection({
               <tr key={person.id} style={{ opacity: person.isActive ? 1 : 0.5 }}>
                 <td>{person.fullName}</td>
                 <td className="num">{person.email}</td>
+                <td>
+                  <StaffPhone
+                    person={person}
+                    canEdit={isOwner}
+                    onSaved={onChanged}
+                    onError={setError}
+                  />
+                </td>
                 <td>{ROLE_LABEL[person.role]}</td>
                 <td>{clubName(person.clubId)}</td>
                 {isOwner && (
@@ -548,6 +558,13 @@ function StaffSection({
             placeholder="Почта"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          <input
+            style={{ width: 170 }}
+            type="tel"
+            placeholder="WhatsApp"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
           <input
             style={{ width: 150 }}
@@ -591,9 +608,10 @@ function StaffSection({
                   fullName: form.fullName.trim(),
                   password: form.password,
                   role: form.role,
+                  ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
                   ...(form.role === "OWNER" ? {} : { clubId: form.clubId }),
                 });
-                setForm({ ...form, email: "", fullName: "", password: "" });
+                setForm({ ...form, email: "", fullName: "", phone: "", password: "" });
                 onChanged();
               } catch (cause) {
                 setError((cause as Error).message);
@@ -607,5 +625,80 @@ function StaffSection({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Номер WhatsApp сотрудника: на него приходит код, когда он забыл пароль.
+ * Без номера сбросить пароль с экрана входа нельзя — только через поддержку.
+ */
+function StaffPhone({
+  person,
+  canEdit,
+  onSaved,
+  onError,
+}: {
+  person: StaffMember;
+  canEdit: boolean;
+  onSaved: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(person.phone ?? "");
+  const [busy, setBusy] = useState(false);
+
+  if (!editing) {
+    return (
+      <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+        <span className="num" style={{ color: person.phone ? undefined : "var(--muted)" }}>
+          {person.phone ? `+${person.phone}` : "не указан"}
+        </span>
+        {canEdit && (
+          <button
+            onClick={() => {
+              setValue(person.phone ? `+${person.phone}` : "");
+              setEditing(true);
+            }}
+          >
+            {person.phone ? "Изменить" : "Указать"}
+          </button>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+      <input
+        style={{ width: 160 }}
+        type="tel"
+        placeholder="+7 701 123 45 67"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        autoFocus
+      />
+      <button
+        className="primary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          onError(null);
+          try {
+            await api.updateStaff(person.id, { phone: value.trim() });
+            setEditing(false);
+            onSaved();
+          } catch (cause) {
+            onError((cause as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Сохранить
+      </button>
+      <button disabled={busy} onClick={() => setEditing(false)}>
+        Отмена
+      </button>
+    </span>
   );
 }

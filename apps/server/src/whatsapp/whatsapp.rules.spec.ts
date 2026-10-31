@@ -15,6 +15,7 @@ import {
   samePhone,
   signupLink,
   toChatId,
+  passwordResetMessage,
 } from "./whatsapp.rules.js";
 
 describe("номер телефона", () => {
@@ -192,5 +193,13 @@ describe("регистрация за ПК", () => {
     expect(cleanNickname("  Shadow   Fox ")).toBe("Shadow Fox");
     expect(cleanNickname("A")).toBeNull();
     expect(cleanNickname("x".repeat(25))).toBeNull();
+  });
+});
+
+describe("passwordResetMessage", () => {
+  it("несёт код и предупреждает никому его не сообщать", () => {
+    const text = passwordResetMessage("042517");
+    expect(text.startsWith("042517")).toBe(true);
+    expect(text).toContain("Никому его не сообщайте");
   });
 });

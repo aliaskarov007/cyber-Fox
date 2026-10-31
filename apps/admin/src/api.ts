@@ -330,6 +330,18 @@ export const api = {
 
   me: () => request<Staff>("/auth/me"),
 
+  requestPasswordReset: (email: string) =>
+    request<{ sent: true }>("/auth/password-reset/request", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  confirmPasswordReset: (body: { email: string; code: string; password: string }) =>
+    request<{ ok: true } | { ok: false; error: string }>("/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   clubs: () => request<Club[]>("/clubs"),
 
   zones: (clubId: string) => request<Zone[]>(`/clubs/${clubId}/zones`),
@@ -543,11 +555,19 @@ export const api = {
     password: string;
     role: string;
     clubId?: string;
+    phone?: string;
   }) => request<StaffMember>("/network/staff", { method: "POST", body: JSON.stringify(body) }),
 
   updateStaff: (
     staffId: string,
-    body: Partial<{ fullName: string; password: string; role: string; clubId: string; isActive: boolean }>,
+    body: Partial<{
+      fullName: string;
+      password: string;
+      role: string;
+      clubId: string;
+      isActive: boolean;
+      phone: string;
+    }>,
   ) => request<StaffMember>(`/network/staff/${staffId}`, { method: "PATCH", body: JSON.stringify(body) }),
 
   // --- Отчёты ---
@@ -816,6 +836,7 @@ export interface SignupBody {
   city?: string;
   ownerName: string;
   email: string;
+  phone?: string;
   password: string;
   computers?: number;
   pricePerMinute?: number;
@@ -1066,6 +1087,7 @@ export interface StaffMember {
   clubId: string | null;
   email: string;
   fullName: string;
+  phone: string | null;
   role: "OWNER" | "ADMIN" | "STAFF";
   isActive: boolean;
 }

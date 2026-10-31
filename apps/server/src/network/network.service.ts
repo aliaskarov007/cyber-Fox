@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { ScreenService } from "../screen/screen.service.js";
+import { normalizePhone } from "../whatsapp/whatsapp.rules.js";
 import type {
   CreateClubDto,
   CreateStaffDto,
@@ -18,6 +19,7 @@ export interface PublicStaff {
   clubId: string | null;
   email: string;
   fullName: string;
+  phone: string | null;
   role: StaffRole;
   isActive: boolean;
 }
@@ -130,6 +132,7 @@ export class NetworkService {
         clubId: dto.role === StaffRole.OWNER ? null : dto.clubId!,
         email,
         fullName: dto.fullName.trim(),
+        phone: staffPhone(dto.phone),
         passwordHash: await bcrypt.hash(dto.password, 10),
         role: dto.role,
       },
@@ -172,6 +175,7 @@ export class NetworkService {
         where: { id: staffId },
         data: {
           fullName: dto.fullName,
+          ...(dto.phone !== undefined ? { phone: staffPhone(dto.phone) } : {}),
           role: dto.role,
           isActive: dto.isActive,
           clubId: dto.role === StaffRole.OWNER ? null : dto.clubId,
@@ -321,11 +325,23 @@ export class NetworkService {
 }
 
 /** Хеш пароля наружу не выходит. */
+/**
+ * Номер WhatsApp сотрудника в едином виде. Пусто — номера нет; неразборчивый
+ * номер не сохраняем: код сброса пароля ушёл бы постороннему.
+ */
+function staffPhone(raw: string | undefined): string | null {
+  if (!raw || raw.trim() === "") return null;
+  const phone = normalizePhone(raw);
+  if (!phone) throw new BadRequestException("Номер WhatsApp не разобран — пример: +7 701 123 45 67");
+  return phone;
+}
+
 export function toPublicStaff(staff: {
   id: string;
   clubId: string | null;
   email: string;
   fullName: string;
+  phone: string | null;
   role: StaffRole;
   isActive: boolean;
 }): PublicStaff {
@@ -334,6 +350,7 @@ export function toPublicStaff(staff: {
     clubId: staff.clubId,
     email: staff.email,
     fullName: staff.fullName,
+    phone: staff.phone,
     role: staff.role,
     isActive: staff.isActive,
   };

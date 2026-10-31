@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { AuthService, type LoginResult } from "../auth/auth.service.js";
 import { PLANS, TRIAL_DAYS } from "../billing-platform/subscription.rules.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { normalizePhone } from "../whatsapp/whatsapp.rules.js";
 import type { SignupDto } from "./signup.dto.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +30,11 @@ export class SignupService {
 
   async signup(dto: SignupDto): Promise<LoginResult & { clubId: string }> {
     const email = dto.email.toLowerCase().trim();
+    // Неразборчивый номер не сохраняем: код сброса пароля ушёл бы постороннему.
+    const phone = dto.phone?.trim() ? normalizePhone(dto.phone) : null;
+    if (dto.phone?.trim() && !phone) {
+      throw new BadRequestException("Номер WhatsApp не разобран — пример: +7 701 123 45 67");
+    }
 
     // Адрес уникален в пределах сети, но для входа он должен быть уникален
     // и глобально: иначе форма входа не поймёт, в какую сеть пускать.
@@ -102,6 +108,7 @@ export class SignupService {
           clubId: null,
           email,
           fullName: dto.ownerName.trim(),
+          phone,
           passwordHash: await bcrypt.hash(dto.password, 10),
           role: StaffRole.OWNER,
         },
