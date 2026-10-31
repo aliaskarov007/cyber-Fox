@@ -302,38 +302,79 @@ label {
 .fx-login-card .fx-login-join button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); background: transparent; }
 .fx-login-join small { font-size: 13px; color: var(--muted); }
 
-/* Описание программы слева от входа — только на широком экране. */
-.fx-login-layout {
+/* Кнопка «О нас» и окно с рассказом о программе. */
+.fx-login .fx-about-open {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 2;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #3a3d48;
+  border-radius: 8px;
+  background: rgba(15, 16, 20, 0.7);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fx-login .fx-about-open:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); background: rgba(15, 16, 20, 0.7); }
+
+.fx-about-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 6, 8, 0.72);
+  overflow-y: auto;
+}
+
+.fx-about {
+  position: relative;
   width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 36px 36px 32px;
+  background: #17181e;
+  border: 1px solid #2a2d38;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.fx-about .fx-about-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.fx-intro { display: none; }
+.fx-about .fx-about-close:hover:not(:disabled) { background: transparent; color: var(--ink); }
 
-@media (min-width: 1200px) {
-  /* Справа оставляем место под техподдержку, чтобы форма с ней не пересекалась. */
-  .fx-login-main { width: 100%; box-sizing: border-box; }
-  .fx-login-layout {
-    justify-content: center;
-    gap: clamp(40px, 4vw, 96px);
-    padding: 0 380px 0 32px;
-    box-sizing: border-box;
-  }
-
-  .fx-login-layout .fx-login-card { flex: none; width: 380px; }
-
-  .fx-intro {
-    display: block;
-    flex: 0 1 460px;
-    min-width: 0;
-  }
+.fx-about-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .fx-intro-title {
   margin: 0 0 14px;
-  font-size: clamp(30px, 2.6vw, 42px);
+  font-size: clamp(26px, 3vw, 34px);
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: -0.02em;
@@ -356,11 +397,6 @@ label {
 
 .fx-intro-list b { display: block; margin-bottom: 2px; font-size: 15px; font-weight: 600; color: var(--ink); }
 
-@media (min-width: 1200px) and (max-height: 820px) {
-  .fx-intro-title { font-size: 30px; margin-bottom: 10px; }
-  .fx-intro-lead { margin-bottom: 18px; font-size: 15px; }
-  .fx-intro-list { gap: 12px; }
-}
 
 .fx-signup-card { max-width: 520px; }
 
@@ -451,6 +487,8 @@ label {
 
 @media (max-width: 600px) {
   .fx-login-card { padding: 28px 20px; }
+  .fx-about { padding: 28px 22px 24px; }
+  .fx-login-main { padding-top: 76px; }
   .fx-login-footer { padding: 0 16px 20px; justify-content: center; }
   .fx-support { width: 100%; max-width: 340px; }
   .fx-login-bg .w1 { font-size: 150px; top: -2%; }

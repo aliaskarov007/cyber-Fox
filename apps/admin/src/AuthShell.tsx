@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 const SUPPORT_PHONE = "+7 708 777 77 69";
 const SUPPORT_PHONE_RAW = "77087777769";
@@ -9,8 +9,27 @@ const SUPPORT_EMAIL = "aliaskarovnye@gmail.com";
  * форма по центру, техподдержка в правом нижнем углу.
  */
 export function AuthShell({ children }: { children: ReactNode }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  useEffect(() => {
+    if (!aboutOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAboutOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [aboutOpen]);
+
   return (
     <div className="fx-login">
+      <button
+        type="button"
+        className="fx-about-open"
+        onClick={() => setAboutOpen(true)}
+      >
+        О нас
+      </button>
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
       {/* Крупные надписи на фоне — только украшение, читалкам экрана не нужны. */}
       <div className="fx-login-bg" aria-hidden="true">
         <span className="w1">CYBERFOX</span>
@@ -82,6 +101,73 @@ export function AuthLogo() {
   return (
     <div className="fx-login-logo">
       CYBER<span>FOX</span>
+    </div>
+  );
+}
+
+/** Рассказ о CyberFox: открывается кнопкой «О нас» поверх экрана входа. */
+function AboutDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fx-about-backdrop" onClick={onClose}>
+      <section
+        className="fx-about"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fx-about-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="fx-about-close"
+          onClick={onClose}
+          aria-label="Закрыть"
+        >
+          <svg
+            aria-hidden="true"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+        <p className="fx-about-kicker">О нас</p>
+        <h2 id="fx-about-title" className="fx-intro-title">
+          Управление компьютерным клубом — <span>стабильно</span>
+        </h2>
+        <p className="fx-intro-lead">
+          CyberFox — программа для компьютерных клубов: касса, компьютеры, гости
+          и бар в одном окне. Мы сами владеем компьютерным клубом и сделали
+          программу, которой нам не хватало. Подходит и для одного клуба, и для
+          целой сети.
+        </p>
+        <ul className="fx-intro-list">
+          <li>
+            <b>Привлекайте гостей и растите выручку</b>
+            Регистрация через WhatsApp, бонусы, промокоды и турниры возвращают
+            гостей снова.
+          </li>
+          <li>
+            <b>Контролируйте все процессы</b>
+            Каждый ПК на карте клуба: кто играет, сколько осталось, где
+            закончилось время.
+          </li>
+          <li>
+            <b>Принимайте оплату без администратора</b>
+            Kaspi QR пополняет баланс гостя за секунды, деньги сразу видны в
+            кассе.
+          </li>
+          <li>
+            <b>Разгрузите администратора</b>
+            Смены, пакеты, заказы из бара с игрового места, отчёт по каждой
+            смене.
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
