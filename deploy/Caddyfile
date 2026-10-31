@@ -15,8 +15,10 @@
 
 	# Только страницы кассы: API и сокеты на старом адресе отвечают как
 	# раньше, иначе агенты и вебхуки отвалятся на переадресации.
+	# Сравнение, а не список хостов: при пустом списке старых доменов
+	# правило просто не срабатывает, а не роняет запуск кассы.
 	@old_address {
-		host {$CYBERFOX_OLD_DOMAINS:none.invalid}
+		expression `"{$CYBERFOX_OLD_DOMAINS}" != "" && {http.request.host} != "{$CYBERFOX_DOMAIN}"`
 		not path /api/* /socket.io/*
 	}
 	redir @old_address https://{$CYBERFOX_DOMAIN}{uri} 308
