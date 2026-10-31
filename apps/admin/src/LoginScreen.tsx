@@ -109,7 +109,7 @@ export function LoginScreen({
             <button type="button" onClick={onSignup}>
               Подключить клуб
             </button>
-            <small>ПЕРВЫЕ 2 НЕДЕЛИ — БЕСПЛАТНО</small>
+            <small>Первые 2 недели — БЕСПЛАТНО</small>
           </div>
         </form>
       </main>
