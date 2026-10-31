@@ -144,6 +144,202 @@ label {
   color: var(--accent);
 }
 
+/* --- Экран входа: CYBERFOX крупно вразброс на фоне --- */
+
+.fx-login {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #0f1014;
+  font-family: Inter, var(--font);
+}
+
+.fx-login-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fx-login-bg span {
+  position: absolute;
+  font-weight: 900;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  color: #23252e;
+  white-space: nowrap;
+}
+
+.fx-login-bg .w1 { left: -12%; top: -8%; font-size: clamp(110px, 24vw, 380px); transform: rotate(-7deg); }
+.fx-login-bg .w2 { right: -52%; top: 30%; font-size: clamp(100px, 22vw, 340px); transform: rotate(6deg); }
+.fx-login-bg .w3 { left: -30%; top: 52%; font-size: clamp(90px, 19vw, 300px); transform: rotate(-4deg); }
+.fx-login-bg .w4 { left: 6%; bottom: -16%; font-size: clamp(120px, 27vw, 420px); transform: rotate(4deg); }
+
+.fx-login-main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px 24px;
+}
+
+.fx-login-card {
+  width: 100%;
+  max-width: 380px;
+  box-sizing: border-box;
+  padding: 36px;
+  background: #17181e;
+  border: 1px solid #262832;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fx-login-logo {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.fx-login-logo span { color: var(--accent); }
+
+.fx-login-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.fx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #a3aab8;
+}
+
+.fx-login-card input {
+  height: 46px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid #2c2f3a;
+  border-radius: 8px;
+  background: #0f1014;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.fx-password { position: relative; margin-top: -10px; }
+.fx-password input { padding-right: 50px; }
+
+.fx-login-card .fx-eye {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fx-login-card .fx-eye:hover:not(:disabled) { background: transparent; color: var(--ink); }
+
+.fx-login-card .fx-login-go {
+  margin-top: 6px;
+  height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.fx-login-card .fx-login-go:hover:not(:disabled) { background: var(--accent-hover); }
+
+.fx-login-join {
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid #262832;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.fx-login-card .fx-login-join button {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #3a3d48;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.fx-login-card .fx-login-join button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); background: transparent; }
+.fx-login-join small { font-size: 13px; color: var(--muted); }
+
+.fx-login-footer {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 32px 28px;
+}
+
+.fx-support {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.fx-support p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.fx-support-head { color: var(--muted); }
+.fx-support a { color: var(--ink); font-weight: 500; text-decoration: none; padding: 4px 0; }
+.fx-support a:hover { color: var(--accent-ink); }
+.fx-sep { color: #4a4e5a; }
+
+@media (max-width: 600px) {
+  .fx-login-card { padding: 28px 20px; }
+  .fx-login-footer { padding: 0 16px 20px; }
+  .fx-login-bg .w1 { font-size: 150px; top: -2%; }
+  .fx-login-bg .w2 { font-size: 140px; top: 40%; right: -120%; }
+  .fx-login-bg .w3 { font-size: 130px; top: 62%; left: -90%; }
+  .fx-login-bg .w4 { font-size: 160px; bottom: -6%; left: -20%; }
+}
+
 /* --- Каркас --- */
 
 .topbar {
