@@ -330,13 +330,13 @@ export const api = {
 
   me: () => request<Staff>("/auth/me"),
 
-  requestPasswordReset: (email: string) =>
+  requestPasswordReset: (phone: string) =>
     request<{ sent: true }>("/auth/password-reset/request", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ phone }),
     }),
 
-  confirmPasswordReset: (body: { email: string; code: string; password: string }) =>
+  confirmPasswordReset: (body: { phone: string; code: string; password: string }) =>
     request<{ ok: true } | { ok: false; error: string }>("/auth/password-reset/confirm", {
       method: "POST",
       body: JSON.stringify(body),

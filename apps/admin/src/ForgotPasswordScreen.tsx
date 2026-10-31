@@ -4,9 +4,9 @@ import { api } from "./api.js";
 import { AuthLogo, AuthShell, PasswordInput } from "./AuthShell.js";
 
 /**
- * «Забыли пароль?»: код приходит в WhatsApp, указанный в карточке сотрудника.
+ * «Забыли пароль?»: сотрудник вводит свой номер, код приходит в WhatsApp.
  *
- * Шаг 1 — почта, шаг 2 — код и новый пароль. Ответ на шаге 1 одинаковый,
+ * Шаг 1 — номер WhatsApp, шаг 2 — код и новый пароль. Ответ на шаге 1 одинаковый,
  * есть такой сотрудник или нет: экран не должен подсказывать, кто работает в клубе.
  */
 export function ForgotPasswordScreen({
@@ -16,8 +16,8 @@ export function ForgotPasswordScreen({
   onBack: () => void;
   onDone: () => void;
 }) {
-  const [step, setStep] = useState<"email" | "code">("email");
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function ForgotPasswordScreen({
     setBusy(true);
     setError(null);
     try {
-      await api.requestPasswordReset(email.trim());
+      await api.requestPasswordReset(phone.trim());
       setStep("code");
     } catch (cause) {
       setError((cause as Error).message);
@@ -43,7 +43,7 @@ export function ForgotPasswordScreen({
     setError(null);
     try {
       const result = await api.confirmPasswordReset({
-        email: email.trim(),
+        phone: phone.trim(),
         code: code.trim(),
         password,
       });
@@ -58,25 +58,26 @@ export function ForgotPasswordScreen({
 
   return (
     <AuthShell>
-      {step === "email" ? (
+      {step === "phone" ? (
         <form className="fx-login-card" onSubmit={sendCode}>
           <AuthLogo />
           <h1 className="fx-login-title">Сброс пароля</h1>
           <p className="fx-signup-note">
-            Введите рабочую почту. Код для сброса придёт в WhatsApp на номер из
-            вашей карточки сотрудника.
+            Введите свой номер WhatsApp. Код для сброса придёт на него, если
+            номер указан в вашей карточке сотрудника.
           </p>
 
           {error && <div className="error">{error}</div>}
 
           <label className="fx-field">
-            Рабочая почта
+            Номер WhatsApp
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@club.kz"
-              autoComplete="username"
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+7 701 123 45 67"
+              autoComplete="tel"
               required
             />
           </label>
@@ -96,8 +97,9 @@ export function ForgotPasswordScreen({
           <AuthLogo />
           <h1 className="fx-login-title">Новый пароль</h1>
           <p className="fx-signup-note">
-            Если к аккаунту {email.trim()} привязан номер WhatsApp, код уже
-            пришёл. Код действует 10 минут. Не пришёл — напишите в техподдержку.
+            Если номер {phone.trim()} указан в карточке сотрудника, код уже
+            пришёл в WhatsApp. Код действует 10 минут. Не пришёл — напишите в
+            техподдержку.
           </p>
 
           {error && <div className="error">{error}</div>}

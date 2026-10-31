@@ -36,12 +36,12 @@ export type ResetConfirmResult = { ok: true } | { ok: false; error: string };
 /**
  * Сброс забытого пароля сотрудника кодом в WhatsApp.
  *
- * Почтового канала у системы нет, а WhatsApp уже подключён: код уходит на
- * номер, указанный в карточке сотрудника. Пишет системный номер CyberFox
+ * Сотрудник вводит свой номер WhatsApp; код приходит на него, если этот номер
+ * указан в карточке сотрудника. Пишет системный номер CyberFox
  * (SYSTEM_WHATSAPP_*), а если он не настроен — WhatsApp самой сети.
  *
- * На запрос кода ответ всегда одинаковый, есть такой сотрудник или нет:
- * иначе форма превращается в способ узнать, кто работает в клубе.
+ * На запрос кода ответ всегда одинаковый, есть такой номер у сотрудников или
+ * нет: иначе форма превращается в способ узнать, кто работает в клубе.
  */
 @Injectable()
 export class PasswordResetService {
@@ -79,19 +79,27 @@ export class PasswordResetService {
       : this.whatsapp.send(tenantId, phone, message);
   }
 
-  private findStaff(email: string) {
-    return this.prisma.staff.findFirst({
-      where: { email: email.toLowerCase().trim(), isActive: true },
+  /**
+   * Сотрудники с этим номером. Обычно один; если человек работает в двух
+   * сетях под одним номером, код сбрасывает пароль во всех его аккаунтах.
+   */
+  private async findStaff(rawPhone: string) {
+    const phone = normalizePhone(rawPhone);
+    if (!phone) return { phone: null, people: [] };
+    const people = await this.prisma.staff.findMany({
+      where: { phone, isActive: true },
+      orderBy: { id: "asc" },
     });
+    return { phone, people };
   }
 
-  async request(email: string): Promise<{ sent: true }> {
-    const staff = await this.findStaff(email);
-    const phone = staff?.phone ? normalizePhone(staff.phone) : null;
-    if (!staff || !phone) return { sent: true };
+  async request(rawPhone: string): Promise<{ sent: true }> {
+    const { phone, people } = await this.findStaff(rawPhone);
+    if (!phone || people.length === 0) return { sent: true };
 
+    const ids = people.map((p) => p.id);
     const last = await this.prisma.staffPasswordReset.findFirst({
-      where: { staffId: staff.id },
+      where: { staffId: { in: ids } },
       orderBy: { createdAt: "desc" },
     });
     // Не чаще раза в минуту: WhatsApp блокирует номера, которые шлют пачками.
@@ -102,12 +110,12 @@ export class PasswordResetService {
 
     // Действует только последний отправленный код.
     await this.prisma.staffPasswordReset.updateMany({
-      where: { staffId: staff.id, consumedAt: null },
+      where: { staffId: { in: ids }, consumedAt: null },
       data: { consumedAt: new Date() },
     });
 
     const result = await this.send(
-      staff.tenantId,
+      people[0].tenantId,
       phone,
       passwordResetMessage(code),
     );
@@ -118,22 +126,26 @@ export class PasswordResetService {
       return { sent: true };
     }
 
-    await this.prisma.staffPasswordReset.create({
-      data: {
-        staffId: staff.id,
-        codeHash: hashCode(staff.id, code),
-        expiresAt: new Date(Date.now() + CODE_TTL_MS),
-      },
-    });
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+    for (const person of people) {
+      await this.prisma.staffPasswordReset.create({
+        data: {
+          staffId: person.id,
+          codeHash: hashCode(person.id, code),
+          expiresAt,
+        },
+      });
+    }
     return { sent: true };
   }
 
   async confirm(
-    email: string,
+    rawPhone: string,
     code: string,
     password: string,
   ): Promise<ResetConfirmResult> {
-    const staff = await this.findStaff(email);
+    const { people } = await this.findStaff(rawPhone);
+    const staff = people.at(0);
     const record = staff
       ? await this.prisma.staffPasswordReset.findFirst({
           where: { staffId: staff.id },
@@ -181,18 +193,16 @@ export class PasswordResetService {
         break;
     }
 
-    const now = new Date();
-    await this.prisma.staffPasswordReset.update({
-      where: { id: record.id },
-      data: { consumedAt: now },
+    const ids = people.map((p) => p.id);
+    await this.prisma.staffPasswordReset.updateMany({
+      where: { staffId: { in: ids }, consumedAt: null },
+      data: { consumedAt: new Date() },
     });
     // Новый пароль выгоняет все открытые вкладки со старым входом.
-    await this.prisma.staff.update({
-      where: { id: staff.id },
-      data: {
-        passwordHash: await bcrypt.hash(password, 10),
-        tokenVersion: { increment: 1 },
-      },
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.staff.updateMany({
+      where: { id: { in: ids } },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
     });
     return { ok: true };
   }
