@@ -333,6 +333,32 @@ label {
 .fx-support a:hover { color: var(--accent-ink); }
 .fx-sep { color: #4a4e5a; }
 
+/* На компьютере поддержка прибита к правому нижнему углу окна и не
+   занимает места под формой: всё видно сразу, без прокрутки. */
+@media (min-width: 900px) {
+  .fx-login-main { padding: 24px 16px; }
+  .fx-login-footer {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    padding: 0 32px 24px;
+    z-index: 1;
+  }
+}
+
+/* Невысокий экран ноутбука: форма плотнее, чтобы влезла целиком. */
+@media (max-height: 760px) {
+  .fx-login-main { padding: 16px; }
+  .fx-login-card { padding: 24px 32px; gap: 12px; }
+  .fx-login-logo { font-size: 26px; margin-bottom: 0; }
+  .fx-login-title { font-size: 18px; margin: 0; }
+  .fx-login-card input { height: 42px; }
+  .fx-login-card .fx-eye { width: 40px; height: 40px; }
+  .fx-login-card .fx-login-go { height: 44px; margin-top: 2px; }
+  .fx-login-join { padding-top: 12px; margin-top: 0; }
+  .fx-login-card .fx-login-join button { height: 42px; }
+}
+
 @media (max-width: 600px) {
   .fx-login-card { padding: 28px 20px; }
   .fx-login-footer { padding: 0 16px 20px; }
