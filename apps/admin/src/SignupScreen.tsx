@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { api, setToken } from "./api.js";
+import { AuthLogo, AuthShell } from "./AuthShell.js";
 
 /**
  * Регистрация чужого клуба.
@@ -10,7 +11,13 @@ import { api, setToken } from "./api.js";
  * появился на карте. Цену минуты владелец ставит потом в тарифах — до этого
  * действует заготовка сервера.
  */
-export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+export function SignupScreen({
+  onDone,
+  onBack,
+}: {
+  onDone: () => void;
+  onBack: () => void;
+}) {
   const [form, setForm] = useState({
     clubName: "",
     city: "",
@@ -22,7 +29,8 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (key: keyof typeof form) => (value: string) => setForm({ ...form, [key]: value });
+  const set = (key: keyof typeof form) => (value: string) =>
+    setForm({ ...form, [key]: value });
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -47,18 +55,17 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
   }
 
   return (
-    <div className="login-wrap">
-      <form className="login-card" style={{ maxWidth: 460 }} onSubmit={submit}>
-        <h1 className="brand">
-          Cyber-<span>Fox</span>
-        </h1>
-        <div className="note">
-          Две недели бесплатно. Карта не нужна — тариф выбирается позже.
-        </div>
+    <AuthShell>
+      <form className="fx-login-card fx-signup-card" onSubmit={submit}>
+        <AuthLogo />
+        <h1 className="fx-login-title">Подключение клуба</h1>
+        <p className="fx-signup-note">
+          Первые 2 недели — БЕСПЛАТНО. Карта не нужна, тариф выбирается позже.
+        </p>
 
         {error && <div className="error">{error}</div>}
 
-        <label>
+        <label className="fx-field">
           Название клуба
           <input
             value={form.clubName}
@@ -68,42 +75,47 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
           />
         </label>
 
-        <label>
-          Город
-          <input value={form.city} onChange={(e) => set("city")(e.target.value)} />
-        </label>
+        <div className="fx-row">
+          <label className="fx-field">
+            Город
+            <input
+              value={form.city}
+              onChange={(e) => set("city")(e.target.value)}
+            />
+          </label>
+          <label className="fx-field">
+            Количество компьютеров
+            <input
+              inputMode="numeric"
+              value={form.computers}
+              onChange={(e) => set("computers")(e.target.value)}
+            />
+          </label>
+        </div>
 
-        <label>
-          Количество компьютеров
-          <input
-            inputMode="numeric"
-            value={form.computers}
-            onChange={(e) => set("computers")(e.target.value)}
-          />
-        </label>
+        <div className="fx-row">
+          <label className="fx-field">
+            Ваше имя
+            <input
+              value={form.ownerName}
+              onChange={(e) => set("ownerName")(e.target.value)}
+              required
+              minLength={2}
+            />
+          </label>
+          <label className="fx-field">
+            Рабочая почта
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => set("email")(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+        </div>
 
-        <label>
-          Ваше имя
-          <input
-            value={form.ownerName}
-            onChange={(e) => set("ownerName")(e.target.value)}
-            required
-            minLength={2}
-          />
-        </label>
-
-        <label>
-          Рабочая почта
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => set("email")(e.target.value)}
-            autoComplete="username"
-            required
-          />
-        </label>
-
-        <label>
+        <label className="fx-field">
           Пароль
           <input
             type="password"
@@ -115,14 +127,16 @@ export function SignupScreen({ onDone, onBack }: { onDone: () => void; onBack: (
           />
         </label>
 
-        <button className="primary" type="submit" disabled={busy}>
+        <button className="fx-login-go" type="submit" disabled={busy}>
           {busy ? "Создаём клуб…" : "Начать бесплатно"}
         </button>
 
-        <button type="button" className="link-back" onClick={onBack}>
-          У меня уже есть аккаунт
-        </button>
+        <div className="fx-login-join">
+          <button type="button" onClick={onBack}>
+            У меня уже есть аккаунт
+          </button>
+        </div>
       </form>
-    </div>
+    </AuthShell>
   );
 }
