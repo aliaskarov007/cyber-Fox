@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import bcrypt from "bcryptjs";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 
+import { MailClient } from "../mail/mail.client.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import {
   type GreenApiCredentials,
@@ -16,6 +17,7 @@ import {
   checkCode,
   maskPhone,
   normalizePhone,
+  passwordResetEmail,
   passwordResetMessage,
 } from "./whatsapp.rules.js";
 
@@ -33,14 +35,14 @@ function sameHash(a: string, b: string): boolean {
 export type ResetConfirmResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Сброс забытого пароля сотрудника кодом в WhatsApp.
+ * Сброс забытого пароля сотрудника.
  *
- * Сотрудник вводит свой номер WhatsApp; код приходит на него, если этот номер
- * указан в карточке сотрудника. Пишет системный номер CyberFox
- * (SYSTEM_WHATSAPP_*), а если он не настроен — WhatsApp самой сети.
+ * Сотрудник вводит рабочую почту — ту, с которой входит. Код приходит на эту
+ * почту, а если в карточке указан WhatsApp — ещё и туда. Почта есть у каждого
+ * аккаунта с регистрации, поэтому сброс работает у всех без настроек.
  *
- * На запрос кода ответ всегда одинаковый, есть такой номер у сотрудников или
- * нет: иначе форма превращается в способ узнать, кто работает в клубе.
+ * На запрос кода ответ всегда одинаковый, есть такой сотрудник или нет:
+ * иначе форма превращается в способ узнать, кто работает в клубе.
  */
 @Injectable()
 export class PasswordResetService {
@@ -50,6 +52,7 @@ export class PasswordResetService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly greenApi: GreenApiClient,
+    private readonly mail: MailClient,
   ) {}
 
   private systemChannel(): GreenApiCredentials | null {
@@ -103,29 +106,27 @@ export class PasswordResetService {
   }
 
   /**
-   * Сотрудники с этим номером. Обычно один; если человек работает в двух
-   * сетях под одним номером, код сбрасывает пароль во всех его аккаунтах.
+   * Сотрудники с этой почтой. Обычно один; если человек работает в двух
+   * сетях под одной почтой, код сбрасывает пароль во всех его аккаунтах.
    */
-  private async findStaff(rawPhone: string) {
-    const phone = normalizePhone(rawPhone);
-    if (!phone) return { phone: null, people: [] };
-    const people = await this.prisma.staff.findMany({
-      where: { phone, isActive: true },
+  private findStaff(email: string) {
+    return this.prisma.staff.findMany({
+      where: { email: email.toLowerCase().trim(), isActive: true },
       orderBy: { id: "asc" },
     });
-    return { phone, people };
   }
 
-  async request(rawPhone: string): Promise<{ sent: true }> {
-    const { phone, people } = await this.findStaff(rawPhone);
-    if (!phone || people.length === 0) return { sent: true };
+  async request(email: string): Promise<{ sent: true }> {
+    const people = await this.findStaff(email);
+    const first = people.at(0);
+    if (!first) return { sent: true };
 
     const ids = people.map((p) => p.id);
     const last = await this.prisma.staffPasswordReset.findFirst({
       where: { staffId: { in: ids } },
       orderBy: { createdAt: "desc" },
     });
-    // Не чаще раза в минуту: WhatsApp блокирует номера, которые шлют пачками.
+    // Не чаще раза в минуту: и почта, и WhatsApp режут тех, кто шлёт пачками.
     if (last && Date.now() - last.createdAt.getTime() < CODE_RESEND_MS)
       return { sent: true };
 
@@ -137,17 +138,35 @@ export class PasswordResetService {
       data: { consumedAt: new Date() },
     });
 
-    const result = await this.send(
-      people[0].tenantId,
-      phone,
-      passwordResetMessage(code),
+    const letter = passwordResetEmail(code, first.fullName);
+    const byMail = await this.mail.send(
+      first.email,
+      letter.subject,
+      letter.text,
     );
-    if (!result.ok) {
-      this.logger.warn(
-        `Код сброса пароля на ${maskPhone(phone)} не ушёл: ${result.error}`,
+    if (!byMail.ok)
+      this.logger.warn(`Код сброса пароля на почту не ушёл: ${byMail.error}`);
+
+    const phone =
+      people
+        .map((p) => (p.phone ? normalizePhone(p.phone) : null))
+        .find(Boolean) ?? null;
+    let byWhatsApp = false;
+    if (phone) {
+      const result = await this.send(
+        first.tenantId,
+        phone,
+        passwordResetMessage(code),
       );
-      return { sent: true };
+      byWhatsApp = result.ok;
+      if (!result.ok)
+        this.logger.warn(
+          `Код сброса пароля на ${maskPhone(phone)} не ушёл: ${result.error}`,
+        );
     }
+
+    // Ни одним путём не ушёл — код не сохраняем: ввести его всё равно некому.
+    if (!byMail.ok && !byWhatsApp) return { sent: true };
 
     const expiresAt = new Date(Date.now() + CODE_TTL_MS);
     for (const person of people) {
@@ -159,15 +178,18 @@ export class PasswordResetService {
         },
       });
     }
+    this.logger.log(
+      `Код сброса пароля отправлен: почта ${byMail.ok ? "да" : "нет"}, WhatsApp ${byWhatsApp ? "да" : "нет"}`,
+    );
     return { sent: true };
   }
 
   async confirm(
-    rawPhone: string,
+    email: string,
     code: string,
     password: string,
   ): Promise<ResetConfirmResult> {
-    const { people } = await this.findStaff(rawPhone);
+    const people = await this.findStaff(email);
     const staff = people.at(0);
     const record = staff
       ? await this.prisma.staffPasswordReset.findFirst({

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { ClubAccessService } from "../common/club-access.service.js";
+import { MailClient } from "../mail/mail.client.js";
 import { SessionsModule } from "../sessions/sessions.module.js";
 import { TournamentsModule } from "../tournaments/tournaments.module.js";
 import { GuestSignupService } from "./guest-signup.service.js";
@@ -30,6 +31,7 @@ import { WhatsAppService } from "./whatsapp.service.js";
     GreenApiClient,
     PhoneVerificationService,
     PasswordResetService,
+    MailClient,
     GuestSignupService,
     ClubAccessService,
   ],

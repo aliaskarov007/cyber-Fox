@@ -248,3 +248,20 @@ export function signupConfirmedMessage(computerName: string, existingName: strin
 export function passwordResetMessage(code: string): string {
   return `${code} — код для сброса пароля CyberFox. Действует 10 минут. Никому его не сообщайте: сотрудники CyberFox его не спрашивают.`;
 }
+
+/** Письмо с кодом сброса пароля. */
+export function passwordResetEmail(code: string, name: string): { subject: string; text: string } {
+  return {
+    subject: `${code} — код для сброса пароля CyberFox`,
+    text: [
+      `Здравствуйте, ${name}!`,
+      "",
+      `Ваш код для сброса пароля: ${code}`,
+      "",
+      "Введите его на странице входа cyberfoxclub.com. Код действует 10 минут.",
+      "Если вы не запрашивали сброс, просто проигнорируйте это письмо — пароль не изменится.",
+      "",
+      "Техподдержка CyberFox 24/7: WhatsApp +7 708 777 77 69",
+    ].join("\n"),
+  };
+}

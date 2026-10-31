@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, Post } from "@nestjs/common";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
-import { IsString, Matches, MinLength } from "class-validator";
+import { IsEmail, IsString, Matches, MinLength } from "class-validator";
 
 import { Public } from "../auth/guards.js";
 import {
@@ -9,15 +9,13 @@ import {
 } from "./password-reset.service.js";
 
 class ResetRequestDto {
-  @IsString()
-  @MinLength(10, { message: "Введите номер WhatsApp" })
-  phone!: string;
+  @IsEmail({}, { message: "Введите рабочую почту" })
+  email!: string;
 }
 
 class ResetConfirmDto {
-  @IsString()
-  @MinLength(10, { message: "Введите номер WhatsApp" })
-  phone!: string;
+  @IsEmail({}, { message: "Введите рабочую почту" })
+  email!: string;
 
   @IsString()
   @Matches(/^\s*\d{6}\s*$/, { message: "Код — шесть цифр" })
@@ -28,7 +26,7 @@ class ResetConfirmDto {
   password!: string;
 }
 
-/** «Забыли пароль?» на экране входа: сотрудник вводит свой номер, код приходит в WhatsApp. */
+/** «Забыли пароль?» на экране входа: код приходит на рабочую почту (и в WhatsApp, если он указан). */
 @Controller("auth/password-reset")
 export class PasswordResetController {
   constructor(private readonly reset: PasswordResetService) {}
@@ -39,7 +37,7 @@ export class PasswordResetController {
   @HttpCode(200)
   @Post("request")
   request(@Body() dto: ResetRequestDto): Promise<{ sent: true }> {
-    return this.reset.request(dto.phone);
+    return this.reset.request(dto.email);
   }
 
   @SkipThrottle({ general: true })
@@ -48,6 +46,6 @@ export class PasswordResetController {
   @HttpCode(200)
   @Post("confirm")
   confirm(@Body() dto: ResetConfirmDto): Promise<ResetConfirmResult> {
-    return this.reset.confirm(dto.phone, dto.code, dto.password);
+    return this.reset.confirm(dto.email, dto.code, dto.password);
   }
 }

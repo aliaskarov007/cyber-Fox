@@ -53,6 +53,8 @@ services:
       SYSTEM_WHATSAPP_INSTANCE_ID: ${SYSTEM_WHATSAPP_INSTANCE_ID:-}
       SYSTEM_WHATSAPP_API_TOKEN: ${SYSTEM_WHATSAPP_API_TOKEN:-}
       SYSTEM_WHATSAPP_API_URL: ${SYSTEM_WHATSAPP_API_URL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       TZ: ${TZ:-Asia/Almaty}
     volumes:
       # Загруженные обложки живут отдельно от образа: пересборка сервера не

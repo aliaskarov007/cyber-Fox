@@ -334,13 +334,13 @@ export const api = {
   setMyPhone: (phone: string) =>
     request<{ phone: string }>("/auth/me/phone", { method: "PATCH", body: JSON.stringify({ phone }) }),
 
-  requestPasswordReset: (phone: string) =>
+  requestPasswordReset: (email: string) =>
     request<{ sent: true }>("/auth/password-reset/request", {
       method: "POST",
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ email }),
     }),
 
-  confirmPasswordReset: (body: { phone: string; code: string; password: string }) =>
+  confirmPasswordReset: (body: { email: string; code: string; password: string }) =>
     request<{ ok: true } | { ok: false; error: string }>("/auth/password-reset/confirm", {
       method: "POST",
       body: JSON.stringify(body),
