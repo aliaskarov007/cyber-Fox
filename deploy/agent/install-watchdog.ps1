@@ -1,20 +1,24 @@
-# Сторож агента: поднимает Cyber-Fox Agent, если процесс исчез.
+﻿# Сторож агента: поднимает Cyber-Fox Agent, если процесс исчез.
 #
 # Зачем. Электронное окно киоска перехватывает обычные способы выйти — Alt+F4,
 # Alt+Tab, клавишу Windows, — но не диспетчер задач: тот снимает процесс мимо
 # приложения. Сторож не мешает этому произойти, он делает это бессмысленным:
 # через минуту блокировка возвращается.
 #
-# Запускать один раз при установке, от имени администратора:
+# Ставится сам установщиком агента. Руками — один раз, от имени администратора:
 #   powershell -ExecutionPolicy Bypass -File install-watchdog.ps1
 #
 # Снять:
 #   Unregister-ScheduledTask -TaskName "Cyber-Fox Watchdog" -Confirm:$false
 
+param(
+    # Установщик передаёт путь, куда поставил агента; руками — по умолчанию.
+    [string]$AgentPath = (Join-Path ${env:ProgramFiles} "Cyber-Fox Agent\Cyber-Fox Agent.exe")
+)
+
 $ErrorActionPreference = "Stop"
 
 $TaskName = "Cyber-Fox Watchdog"
-$AgentPath = Join-Path ${env:ProgramFiles} "Cyber-Fox Agent\Cyber-Fox Agent.exe"
 
 if (-not (Test-Path $AgentPath)) {
     throw "Агент не найден: $AgentPath. Сначала установите Cyber-Fox Agent."

@@ -110,9 +110,9 @@ pnpm --filter @cyberfox/agent pack:win
    - код — из админки, экран «Подключение», рядом с названием ПК. Каждый код
      подходит только к одной машине.
 3. Убедиться, что машина появилась в карте зала как «на связи».
-4. Один раз, от имени администратора, поставить сторожа:
+4. Сторож ставится сам вместе с агентом (с версии 0.5.0). Проверить:
    ```powershell
-   powershell -ExecutionPolicy Bypass -File deploy\agent\install-watchdog.ps1
+   Get-ScheduledTask -TaskName "Cyber-Fox Watchdog"
    ```
 
 ## 5. Каждый день

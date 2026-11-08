@@ -10,8 +10,8 @@ const run = promisify(execFile);
  *
  * Оболочка показывает полки, но Windows под ней никуда не делся: из любого
  * окна открывался проводник, а из него — диски, чужие сохранения и папка с
- * самим агентом. Здесь ставятся политики, которые это закрывают, и снимаются,
- * когда сессия закончилась.
+ * самим агентом. Здесь два набора политик: против побега из-под агента — они
+ * держатся всё время, — и на время игры — они снимаются, когда сессия кончилась.
  *
  * Это не защита от подготовленного гостя: политики живут в его же ветке
  * реестра, и тот, кто дошёл до regedit, снимет их сам. Настоящая изоляция —
@@ -56,7 +56,42 @@ function spread(keys: string[], name: string, value: number, why: string): Polic
   return keys.map((key) => ({ key, name, value, why }));
 }
 
-function policies(): Policy[] {
+/**
+ * Запреты против побега из-под агента. Держатся всё время, пока агент
+ * работает, — и пока экран заблокирован, и во время игры.
+ *
+ * Раньше они ставились только на оплаченную сессию, а на заблокированном
+ * экране снимались. Ctrl+Alt+Del перехватить не может ни одна программа —
+ * его обрабатывает сама Windows, — и гость у запертой машины открывал
+ * диспетчер задач, снимал агента и играл бесплатно. Значит закрывать нужно не
+ * окном, а политикой, и не на время сессии, а всегда.
+ */
+function guardPolicies(): Policy[] {
+  return [
+    ...spread(SYSTEM_KEYS, "DisableTaskMgr", 1, "убирает диспетчер задач, в том числе из Ctrl+Alt+Del"),
+    /*
+     * Выход из системы и смена пользователя уводят гостя мимо агента: другой
+     * сеанс запускается без него, и машина оказывается открытой.
+     */
+    ...spread(EXPLORER_KEYS, "NoLogoff", 1, "убирает «Выход» из Ctrl+Alt+Del и меню «Пуск»"),
+    ...spread(SYSTEM_KEYS, "HideFastUserSwitching", 1, "убирает «Сменить пользователя»"),
+    /*
+     * Блокировка экрана оставляет сессию идти, а машину — недоступной: время
+     * тратится, играть нельзя, администратор ничего не видит.
+     */
+    ...spread(SYSTEM_KEYS, "DisableLockWorkstation", 1, "убирает «Заблокировать»"),
+    ...spread(SYSTEM_KEYS, "DisableChangePassword", 1, "убирает «Изменить пароль»"),
+    ...spread(
+      SYSTEM_KEYS,
+      "DisableRegistryTools",
+      1,
+      "закрывает regedit, которым снимаются эти же политики",
+    ),
+  ];
+}
+
+/** Запреты на время оплаченной игры: проводник, чужие диски, настройки. */
+function sessionPolicies(): Policy[] {
   const hidden = allDrivesExcept(VISIBLE_DRIVES);
   return [
     ...spread(EXPLORER_KEYS, "NoDrives", hidden, "прячет чужие диски в проводнике"),
@@ -64,29 +99,6 @@ function policies(): Policy[] {
     ...spread(EXPLORER_KEYS, "NoRun", 1, "убирает «Выполнить»"),
     ...spread(EXPLORER_KEYS, "NoFolderOptions", 1, "прячет настройки папок"),
     ...spread(EXPLORER_KEYS, "NoControlPanel", 1, "закрывает панель управления"),
-    ...spread(
-      SYSTEM_KEYS,
-      "DisableRegistryTools",
-      1,
-      "закрывает regedit, которым снимаются эти же политики",
-    ),
-    /*
-     * Диспетчер задач — главный способ убрать блокировку: Ctrl+Alt+Del
-     * перехватить нельзя ни одной программой, это делает сама система. Значит
-     * закрывать его нужно политикой, а не окном.
-     */
-    ...spread(SYSTEM_KEYS, "DisableTaskMgr", 1, "закрывает диспетчер задач"),
-    /*
-     * Выход из системы и смена пользователя уводят гостя мимо агента: другой
-     * сеанс запускается без него, и машина оказывается открытой.
-     */
-    ...spread(EXPLORER_KEYS, "NoLogoff", 1, "убирает «Выход» и «Сменить пользователя»"),
-    ...spread(SYSTEM_KEYS, "HideFastUserSwitching", 1, "прячет переключение пользователей"),
-    /*
-     * Блокировка экрана оставляет сессию идти, а машину — недоступной: время
-     * тратится, играть нельзя, администратор ничего не видит.
-     */
-    ...spread(SYSTEM_KEYS, "DisableLockWorkstation", 1, "убирает блокировку экрана"),
     ...SYSTEM_KEYS.map((key) => ({
       /*
        * Единица, а не двойка. Двойка закрывает вместе с командной строкой и
@@ -110,14 +122,16 @@ async function reg(args: string[]): Promise<void> {
 }
 
 /**
- * Что стояло в ключе до нас.
+ * Что стояло в ключе до нас — отдельно для каждого набора запретов.
  *
  * Нужно, чтобы снятие запретов не выглядело как «удалить всё, что там лежит».
  * Те же самые имена значений использует настоящая групповая политика, и на
  * машине в домене агент стёр бы корпоративные ограничения до следующего входа
  * в систему.
  */
-const previous = new Map<string, number | null>();
+type Remembered = Map<string, number | null>;
+const beforeGuard: Remembered = new Map();
+const beforeSession: Remembered = new Map();
 
 async function readValue(key: string, name: string): Promise<number | null> {
   try {
@@ -131,18 +145,15 @@ async function readValue(key: string, name: string): Promise<number | null> {
 }
 
 /**
- * Поставить запреты. Ошибка любой политики не должна ронять сессию: гость уже
- * заплатил, и лучше пустить его играть с открытым проводником, чем не пустить
- * вовсе. Каждая неудача уходит в журнал.
+ * Поставить набор запретов. Ошибка любой политики не должна ронять агента:
+ * каждая неудача уходит в журнал, остальные ставятся.
  */
-export async function applyLockdown(): Promise<void> {
-  if (!isWindows) return;
-
-  for (const policy of policies()) {
+async function apply(list: Policy[], previous: Remembered): Promise<void> {
+  for (const policy of list) {
     const slot = `${policy.key}\\${policy.name}`;
     try {
-      // Запоминаем прежнее значение один раз за сессию: повторный вызов не
-      // должен запомнить наше же собственное.
+      // Запоминаем прежнее значение один раз: повторный вызов не должен
+      // запомнить наше же собственное.
       if (!previous.has(slot)) previous.set(slot, await readValue(policy.key, policy.name));
 
       await reg(["add", policy.key, "/v", policy.name, "/t", "REG_DWORD", "/d", String(policy.value), "/f"]);
@@ -150,18 +161,10 @@ export async function applyLockdown(): Promise<void> {
       console.error(`Политика ${policy.name} (${policy.why}) не применилась: ${text(error)}`);
     }
   }
-
-  await refreshExplorer();
 }
 
-/**
- * Снять запреты. Вызывается и при блокировке, и при запуске агента: если
- * прошлая сессия оборвалась падением, машина не должна остаться запертой.
- */
-export async function releaseLockdown(): Promise<void> {
-  if (!isWindows) return;
-
-  for (const policy of policies()) {
+async function release(list: Policy[], previous: Remembered): Promise<void> {
+  for (const policy of list) {
     const slot = `${policy.key}\\${policy.name}`;
     const before = previous.get(slot);
 
@@ -177,9 +180,49 @@ export async function releaseLockdown(): Promise<void> {
       // Отсутствие значения — обычное дело: снимать нечего.
     }
   }
-
   previous.clear();
+}
 
+/**
+ * Закрыть пути побега: диспетчер задач, выход, смену пользователя. Ставится
+ * при запуске агента и держится до его осознанного закрытия.
+ */
+export async function applyGuard(): Promise<void> {
+  if (!isWindows) return;
+  await apply(guardPolicies(), beforeGuard);
+  // Ctrl+Alt+Del читает политики сам при каждом нажатии; проводник
+  // перезапускаем ради «Выхода» в меню «Пуск».
+  await refreshExplorer();
+}
+
+/**
+ * Вернуть как было. Агент сам этого не делает — запреты против побега держатся
+ * и после его закрытия; функция для обслуживания машины руками.
+ */
+export async function releaseGuard(): Promise<void> {
+  if (!isWindows) return;
+  await release(guardPolicies(), beforeGuard);
+}
+
+/**
+ * Поставить запреты на время игры. Ошибка любой политики не должна ронять
+ * сессию: гость уже заплатил, и лучше пустить его играть с открытым
+ * проводником, чем не пустить вовсе.
+ */
+export async function applyLockdown(): Promise<void> {
+  if (!isWindows) return;
+  await apply(sessionPolicies(), beforeSession);
+  await refreshExplorer();
+}
+
+/**
+ * Снять запреты на время игры. Вызывается и при блокировке, и при запуске
+ * агента: если прошлая сессия оборвалась падением, проводник не должен
+ * остаться закрытым до следующей оплаты. Запреты против побега это не трогает.
+ */
+export async function releaseLockdown(): Promise<void> {
+  if (!isWindows) return;
+  await release(sessionPolicies(), beforeSession);
   await refreshExplorer();
 }
 

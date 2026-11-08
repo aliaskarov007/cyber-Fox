@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
-import { applyLockdown, releaseLockdown } from "./lockdown.js";
+import { applyGuard, applyLockdown, releaseLockdown } from "./lockdown.js";
 import { scanInstalled } from "./scan.js";
 import { setPlaying, startUpdater } from "./updater.js";
 
@@ -308,7 +308,12 @@ app.whenReady().then(() => {
    * агента или машины, и тогда проводник остался бы закрытым до следующей
    * оплаты — на машине с диском это состояние переживает и перезагрузку.
    */
-  void releaseLockdown();
+  /*
+   * Запреты сессии снимаем, а запреты против побега ставим сразу и держим всё
+   * время: пока экран заблокирован, Ctrl+Alt+Del не должен давать диспетчер
+   * задач, выход и смену пользователя — иначе агента снимают за секунду.
+   */
+  void releaseLockdown().then(() => applyGuard());
 
   try {
     // Агент должен подниматься сам: машину в зале включают кнопкой на корпусе,
@@ -387,9 +392,9 @@ function asText(error: unknown): string {
 
 /*
  * Пока экран заблокирован, выйти из агента нельзя: Alt+F4 по окну и «Закрыть»
- * из панели задач не должны отдавать машину бесплатно. Это не защита от
- * диспетчера задач — тот закрывает процесс мимо Electron, и разбирается с ним
- * служба-сторож (см. docs/deploy.md).
+ * из панели задач не должны отдавать машину бесплатно. Диспетчер задач закрыт
+ * политикой (applyGuard), а если агента всё же снимут, его поднимет сторож —
+ * задача Windows, которую ставит установщик.
  */
 app.on("before-quit", (event) => {
   /*
@@ -405,7 +410,13 @@ app.on("before-quit", (event) => {
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
-  // Осознанный выход не должен оставлять машину с закрытым проводником.
+  /*
+   * Осознанный выход не должен оставлять машину с закрытым проводником.
+   * Запреты против побега не снимаем никогда: ни падение, ни выключение, ни
+   * обновление не должны открывать окно, в которое гость успеет снять агента.
+   * Администратор обслуживает машину из своей учётной записи Windows —
+   * запреты стоят только у игровой.
+   */
   void releaseLockdown();
 });
 

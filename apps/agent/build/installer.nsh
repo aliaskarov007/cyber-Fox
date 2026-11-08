@@ -19,8 +19,11 @@
 !macroend
 
 !macro customInstall
-  ; Сторож возвращается на место: без него снятый диспетчером задач агент уже
-  ; не поднимется, и машина останется без блокировки.
+  ; Сторож ставится сам: задача Windows раз в минуту поднимает агента, если его
+  ; сняли. Раньше её ставили отдельным скриптом руками — и в залах её не было.
+  ; Установка идёт от администратора (perMachine), поэтому прав хватает.
+  ; Повторная установка задачу просто перезаписывает.
+  nsExec::Exec 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\install-watchdog.ps1" -AgentPath "$INSTDIR\Cyber-Fox Agent.exe"'
   nsExec::Exec 'schtasks /change /tn "Cyber-Fox Watchdog" /enable'
 !macroend
 
