@@ -39,9 +39,12 @@ $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
 # Запуск при входе и повтор раз в минуту: если сам сторож снят, через минуту
 # задача поднимет его снова. Второй экземпляр поверх живого не запускается.
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
+# Срок повтора — 9999 дней, а не [TimeSpan]::MaxValue: «бесконечность» Windows
+# отвергает («value incorrectly formatted or out of range»), и задача не
+# ставилась вовсе — сторожа не было ни на одной машине.
 $Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)).Repetition
+    -RepetitionDuration (New-TimeSpan -Days 9999)).Repetition
 
 $Settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
