@@ -41,6 +41,17 @@ export interface GuestLoginResult {
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
 
+  /**
+   * Антиперебор пароля выхода из оболочки, по клубу. Пароль вводят на людной
+   * кассе, поэтому после пяти промахов — минута паузы, чтобы не подобрали
+   * коротким перебором. Хранится в памяти: перезапуск сервера сбрасывает —
+   * это не защита аккаунта, а защита от подбора на месте.
+   */
+  private readonly shellExitAttempts = new Map<
+    string,
+    { fails: number; blockedUntil: number }
+  >();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
@@ -164,6 +175,46 @@ export class AgentService {
       where: { id: computerId },
       data: { lastSeenAt: new Date() },
     });
+  }
+
+  /**
+   * Проверка пароля выхода из оболочки для клуба этой машины.
+   *
+   * У каждого клуба свой пароль (его задаёт владелец в настройках). По верному
+   * паролю агент снимает блокировку для обслуживания. Пароль не задан — выход
+   * выключен. На сервере проверяем намеренно: хэш не уезжает на игровые ПК, а
+   * перебор режется паузой.
+   */
+  async verifyShellExit(
+    clubId: string,
+    password: string,
+  ): Promise<{ ok: boolean; reason?: string }> {
+    const now = Date.now();
+    const gate = this.shellExitAttempts.get(clubId);
+    if (gate && gate.blockedUntil > now) {
+      return { ok: false, reason: "Слишком много попыток — подождите минуту" };
+    }
+
+    const club = await this.prisma.club.findUnique({
+      where: { id: clubId },
+      select: { shellExitPasswordHash: true },
+    });
+    if (!club?.shellExitPasswordHash) {
+      return { ok: false, reason: "Пароль выхода не задан в настройках клуба" };
+    }
+
+    const ok = await bcrypt.compare(password ?? "", club.shellExitPasswordHash);
+    if (!ok) {
+      const fails = (gate?.fails ?? 0) + 1;
+      this.shellExitAttempts.set(clubId, {
+        fails,
+        blockedUntil: fails >= 5 ? now + 60_000 : 0,
+      });
+      return { ok: false, reason: "Неверный пароль" };
+    }
+
+    this.shellExitAttempts.delete(clubId);
+    return { ok: true };
   }
 
   /**

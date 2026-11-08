@@ -81,7 +81,22 @@ export class NetworkService {
       throw new ForbiddenException("Бар с игровых ПК и QR для оплаты настраивает владелец");
     }
 
-    const { slogan, ...rest } = dto;
+    const { slogan, shellExitPassword, ...rest } = dto;
+
+    // Пароль выхода из оболочки хэшируем здесь. Пустая строка или null — снять
+    // выход по паролю; иначе не короче 4 знаков, чтобы не подобрали у кассы.
+    let exitPasswordChange: { shellExitPasswordHash: string | null } | undefined;
+    if (shellExitPassword !== undefined) {
+      const trimmed = shellExitPassword?.trim() ?? "";
+      if (trimmed === "") {
+        exitPasswordChange = { shellExitPasswordHash: null };
+      } else if (trimmed.length < 4) {
+        throw new BadRequestException("Пароль выхода — не меньше 4 знаков");
+      } else {
+        exitPasswordChange = { shellExitPasswordHash: await bcrypt.hash(trimmed, 10) };
+      }
+    }
+
     const updated = await this.prisma.club.update({
       where: { id: clubId },
       data: {
@@ -89,13 +104,17 @@ export class NetworkService {
         ...(rest.name !== undefined ? { name: rest.name.trim() } : {}),
         // Пустой слоган — убрать строку с экрана, а не показывать пустоту.
         ...(slogan !== undefined ? { slogan: slogan?.trim() || null } : {}),
+        ...(exitPasswordChange ?? {}),
       },
+      // Хэш пароля выхода наружу не отдаём.
+      omit: { shellExitPasswordHash: true },
     });
     // Название и слоган видны на экране блокировки — машины зала обновляют его сразу.
     if (updated.name !== club.name || updated.slogan !== club.slogan) {
       await this.screen.announce(club.tenantId, club.id);
     }
-    return updated;
+    // omit убрал поле в рантайме; тип возвращаем прежний.
+    return updated as Club;
   }
 
   async listStaff(staff: AuthenticatedStaff): Promise<PublicStaff[]> {

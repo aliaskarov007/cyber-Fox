@@ -259,6 +259,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (computerId) await this.agents.heartbeat(computerId);
   }
 
+  /**
+   * Проверка пароля выхода из оболочки. Клуб берём из сокета — у каждого свой
+   * пароль, и агент не может проверить чужой.
+   */
+  @SubscribeMessage("shell.exit")
+  async shellExit(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { password: string },
+  ) {
+    const clubId = client.data.clubId as string | undefined;
+    if (!clubId) return { ok: false, reason: "ПК не опознан" };
+    return this.agents.verifyShellExit(clubId, body?.password ?? "");
+  }
+
   @SubscribeMessage("guest.login")
   async guestLogin(
     @ConnectedSocket() client: Socket,

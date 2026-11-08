@@ -84,6 +84,17 @@ export class UpdateClubDto {
   @IsString()
   @MaxLength(80)
   slogan?: string | null;
+
+  /**
+   * Новый пароль выхода из оболочки для этого клуба. Приходит открытым, на
+   * сервере хэшируется. Пустая строка или null — убрать пароль (выход по паролю
+   * выключен). Короткий пароль легко подобрать на людной кассе, поэтому не
+   * меньше 4 знаков.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  shellExitPassword?: string | null;
 }
 
 export class CreateStaffDto {

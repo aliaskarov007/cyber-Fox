@@ -34,12 +34,15 @@ export class ClubAccessService {
 
   /** Клубы, доступные сотруднику: все залы сети для владельца, иначе один. */
   async listAccessibleClubs(staff: AuthenticatedStaff): Promise<Club[]> {
-    return this.prisma.club.findMany({
+    const clubs = await this.prisma.club.findMany({
       where: {
         tenantId: staff.tenantId,
         ...(staff.clubId === null ? {} : { id: staff.clubId }),
       },
       orderBy: { name: "asc" },
+      // Хэш пароля выхода из оболочки наружу не отдаём.
+      omit: { shellExitPasswordHash: true },
     });
+    return clubs as Club[];
   }
 }
