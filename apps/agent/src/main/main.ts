@@ -113,7 +113,9 @@ function showFailure(message: string): void {
       <div style="color:#949cad">Покажите этот текст тому, кто ставил систему. Машина в зал в таком виде не выдаётся.</div>
     </div>
   </body>`;
-  void lockWindow?.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
+  void lockWindow?.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(page)}`,
+  );
 }
 
 /*
@@ -207,68 +209,41 @@ ipcMain.handle("agent:scan", () => {
  * Программа отвязывается от агента: перезапуск оболочки не должен убивать
  * запущенную игру, а закрытая игра — оставлять висеть процесс агента.
  */
-ipcMain.handle("agent:launch", async (_event, app: { kind: string; target: string; args: string[] }) => {
-  if (!unlocked) return { ok: false, reason: "Сессия не оплачена" };
+ipcMain.handle(
+  "agent:launch",
+  async (_event, app: { kind: string; target: string; args: string[] }) => {
+    if (!unlocked) return { ok: false, reason: "Сессия не оплачена" };
 
-  try {
-    if (app.kind === "URI") {
-      await shell.openExternal(app.target);
-    } else {
-      await spawnGame(app.target, app.args ?? []);
+    try {
+      if (app.kind === "URI") {
+        await shell.openExternal(app.target);
+      } else {
+        await spawnGame(app.target, app.args ?? []);
+      }
+      /*
+       * Полка не сворачивается, а остаётся самым нижним окном во весь экран —
+       * она и есть то, что гость видит вместо рабочего стола. Игра открывается
+       * поверх неё, сверху — что гость ещё запустит; переключается между ними
+       * Alt+Tab. Снимаем с полки фокус, чтобы игра вышла вперёд сама; если
+       * лаунчер открылся под полкой, гость поднимет его тем же Alt+Tab. Закрытая
+       * игра обнажает не чёрный экран, а окно под ней — в самом низу всегда
+       * полка, рабочий стол Windows гость не видит.
+       */
+      lockWindow?.blur();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: asText(error) };
     }
-    /*
-     * Оболочка остаётся на экране: она и есть то, что гость видит вместо
-     * рабочего стола. Игра открывается поверх, а закрыв её, гость возвращается
-     * к полкам, а не к ярлыкам Windows.
-     */
-    lockWindow?.blur();
-    giveWayToGame();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, reason: asText(error) };
-  }
-});
-
-/**
- * Уступить место игре, если она не вышла вперёд сама.
- *
- * Обычно запущенная игра забирает передний план у того, кто её запустил. Но
- * Steam и лаунчеры думают по несколько секунд, а иные окна открываются под
- * нашим полноэкранным — гость смотрит на полки и решает, что нажатие не
- * сработало.
- *
- * Поэтому проверяем несколько раз подряд: если через несколько секунд впереди
- * всё ещё мы, отходим сами. Свернуться на секунду лучше, чем спрятать игру.
- */
-function giveWayToGame(): void {
-  let attempts = 0;
-
-  const step = setInterval(() => {
-    attempts += 1;
-    if (!unlocked || !lockWindow) {
-      clearInterval(step);
-      return;
-    }
-
-    if (lockWindow.isFocused()) {
-      // Сворачивание временное: гость вернёт полки сочетанием, а игра к тому
-      // моменту уже займёт экран.
-      lockWindow.setMinimizable(true);
-      lockWindow.minimize();
-    }
-
-    if (attempts >= 6) clearInterval(step);
-  }, 2000);
-}
+  },
+);
 
 /**
  * Запуск программы с ожиданием отказа.
  *
  * spawn не бросает исключение на неверный путь: ошибка приходит событием позже.
- * Без этой паузы агент сворачивался бы на «успешный» запуск несуществующей
- * игры, и гость оставался бы перед рабочим столом с пропавшими полками —
- * ровно то, ради чего оболочка и делалась. Путь к игре набирают руками в кассе,
- * так что случай обычный, а не редкий.
+ * Без этой паузы касса получала бы «запущено» на несуществующую игру и не
+ * понимала, почему у гостя ничего не открылось. Путь к игре набирают руками в
+ * кассе, так что промах по пути — случай обычный, а не редкий.
  */
 function spawnGame(target: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -324,7 +299,12 @@ function holdLockOnTop(): void {
  */
 setInterval(() => {
   if (unlocked || !lockWindow) return;
-  if (lockWindow.isMinimized() || !lockWindow.isVisible() || !lockWindow.isFocused()) holdLockOnTop();
+  if (
+    lockWindow.isMinimized() ||
+    !lockWindow.isVisible() ||
+    !lockWindow.isFocused()
+  )
+    holdLockOnTop();
 }, 1000);
 
 app.whenReady().then(() => {
@@ -406,7 +386,9 @@ function holdShortcuts(): void {
     try {
       globalShortcut.register(accelerator, () => lockWindow?.focus());
     } catch (error) {
-      console.error(`Сочетание ${accelerator} не перехвачено: ${asText(error)}`);
+      console.error(
+        `Сочетание ${accelerator} не перехвачено: ${asText(error)}`,
+      );
     }
   }
 }
@@ -459,4 +441,3 @@ app.on("will-quit", () => {
 app.on("window-all-closed", () => {
   if (!unlocked) createLockWindow();
 });
-
