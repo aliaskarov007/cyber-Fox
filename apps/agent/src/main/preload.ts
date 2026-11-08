@@ -8,7 +8,7 @@ import type { AgentSettings } from "../shared/settings.js";
  */
 contextBridge.exposeInMainWorld("cyberfox", {
   config: (): Promise<
-    AgentSettings & { hostname: string; macAddress: string; configured: boolean }
+    AgentSettings & { hostname: string; macAddress: string; configured: boolean; version: string }
   > => ipcRenderer.invoke("agent:config"),
   saveConfig: (settings: AgentSettings): Promise<void> =>
     ipcRenderer.invoke("agent:save-config", settings),

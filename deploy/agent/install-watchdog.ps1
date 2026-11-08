@@ -26,17 +26,18 @@ if (-not (Test-Path $AgentPath)) {
 
 # Задача запускается в сеансе вошедшего пользователя, иначе окно блокировки
 # было бы не видно: служба рисует на нулевом рабочем столе.
-$Command = @"
-if (-not (Get-Process -Name 'Cyber-Fox Agent' -ErrorAction SilentlyContinue)) {
-    Start-Process -FilePath '$AgentPath'
-}
-"@
+#
+# Внутри — бесконечная проверка раз в 3 секунды: снятый агент возвращается
+# раньше, чем гость успеет открыть игру. Раньше проверка шла раз в минуту, и
+# минуты хватало, чтобы запустить игру мимо блокировки.
+# Одной строкой: перенос строки в аргументе задачи Windows не переживает.
+$Command = "while (`$true) { if (-not (Get-Process -Name 'Cyber-Fox Agent' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '$AgentPath' }; Start-Sleep -Seconds 3 }"
 
 $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$Command`""
+    -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"$Command`""
 
-# Каждую минуту, бессрочно: проверка стоит доли секунды, а минута без
-# блокировки — это минута бесплатной игры, не больше.
+# Запуск при входе и повтор раз в минуту: если сам сторож снят, через минуту
+# задача поднимет его снова. Второй экземпляр поверх живого не запускается.
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
 $Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
@@ -46,7 +47,8 @@ $Settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
 
 # Группа «Пользователи»: задача должна работать под тем, кто сейчас за
 # машиной, а не под конкретной учётной записью.

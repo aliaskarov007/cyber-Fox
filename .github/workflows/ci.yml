@@ -173,6 +173,24 @@ jobs:
         working-directory: apps/agent
         run: npm run build
 
+      # Сторож ставится установщиком на каждой машине зала, а проверить его
+      # можно только на настоящем Windows: ставим на подставной exe и читаем,
+      # что вышло, — задача должна появиться, а её команда разбираться.
+      - name: Сторож ставится
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force C:\fake | Out-Null
+          Copy-Item C:\Windows\System32\notepad.exe "C:\fake\Cyber-Fox Agent.exe"
+          powershell -NoProfile -ExecutionPolicy Bypass -File deploy\agent\install-watchdog.ps1 -AgentPath "C:\fake\Cyber-Fox Agent.exe"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $task = Get-ScheduledTask -TaskName "Cyber-Fox Watchdog"
+          $arguments = $task.Actions[0].Arguments
+          Write-Host $arguments
+          $script = ($arguments -split '-Command ', 2)[1].Trim('"')
+          [void][scriptblock]::Create($script)
+          if ($task.Settings.MultipleInstances -ne 'IgnoreNew') { throw "Сторож запустится вторым экземпляром" }
+          Unregister-ScheduledTask -TaskName "Cyber-Fox Watchdog" -Confirm:$false
+
       - name: Собрать установщик
         working-directory: apps/agent
         # Подпись включается сама, как только в секретах репозитория появится

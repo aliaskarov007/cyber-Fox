@@ -67,6 +67,15 @@ function createLockWindow(): void {
     }
   });
 
+  // Свернуть запертое окно нельзя: Win+D, Win+M и щелчок по панели задач
+  // возвращают его обратно сразу же.
+  lockWindow.on("minimize", () => {
+    if (!unlocked && lockWindow) holdLockOnTop();
+  });
+  lockWindow.on("hide", () => {
+    if (!unlocked && lockWindow) holdLockOnTop();
+  });
+
   /*
    * Любой сбой запуска экрана заканчивался чёрным окном: фон экрана блокировки
    * тёмный, и пустая заливка выглядит как выключенный монитор. Администратор в
@@ -133,6 +142,7 @@ ipcMain.handle("agent:config", () => {
     // называют MAC-адресом.
     macAddress: machineMac(),
     configured: isConfigured(settings),
+    version: app.getVersion(),
   };
 });
 
@@ -281,16 +291,41 @@ function spawnGame(target: string, args: string[]): Promise<void> {
 
 /** Время кончилось: возвращаем блокировку поверх игры. */
 ipcMain.handle("agent:lock", () => {
-  if (!unlocked && lockWindow?.isVisible()) return;
+  if (!unlocked && lockWindow?.isVisible() && !lockWindow.isMinimized()) return;
   unlocked = false;
   setPlaying(false);
   holdShortcuts();
   void releaseLockdown();
-  lockWindow?.show();
-  lockWindow?.setKiosk(true);
-  lockWindow?.setAlwaysOnTop(true, "screen-saver");
-  lockWindow?.focus();
+  holdLockOnTop();
 });
+
+/**
+ * Вернуть запертое окно на передний план целиком.
+ *
+ * Во время игры окно сворачивается, чтобы уступить место игре, и ему
+ * разрешается сворачиваться. Раньше это разрешение оставалось и после конца
+ * сессии — заблокированный экран сворачивался, и под ним был открытый рабочий
+ * стол.
+ */
+function holdLockOnTop(): void {
+  if (!lockWindow) return;
+  lockWindow.setMinimizable(false);
+  if (lockWindow.isMinimized()) lockWindow.restore();
+  if (!lockWindow.isVisible()) lockWindow.show();
+  if (!lockWindow.isKiosk()) lockWindow.setKiosk(true);
+  lockWindow.setAlwaysOnTop(true, "screen-saver");
+  lockWindow.focus();
+}
+
+/*
+ * Страховка: раз в секунду, пока экран заблокирован, окно проверяет, что оно
+ * на месте. События сворачивания и потери фокуса приходят не всегда — часть
+ * сочетаний Windows обрабатывает мимо приложения.
+ */
+setInterval(() => {
+  if (unlocked || !lockWindow) return;
+  if (lockWindow.isMinimized() || !lockWindow.isVisible() || !lockWindow.isFocused()) holdLockOnTop();
+}, 1000);
 
 app.whenReady().then(() => {
   // Окно поднимается первым: всё, что идёт следом, может не получиться, и

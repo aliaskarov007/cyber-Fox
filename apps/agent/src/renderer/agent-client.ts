@@ -12,6 +12,8 @@ export interface AgentConfig extends AgentSettings {
   macAddress: string;
   /** Машину уже настроили: есть адрес сервера и способ себя назвать. */
   configured: boolean;
+  /** Версия агента — видна в углу экрана блокировки. */
+  version: string;
 }
 
 export interface PairedInfo {
