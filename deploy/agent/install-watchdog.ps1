@@ -1,15 +1,27 @@
-﻿# Сторож агента: поднимает Cyber-Fox Agent, если процесс исчез.
+﻿# Сторож агента и запуск блокировки Cyber-Fox.
 #
-# Зачем. Электронное окно киоска перехватывает обычные способы выйти — Alt+F4,
-# Alt+Tab, клавишу Windows, — но не диспетчер задач: тот снимает процесс мимо
-# приложения. Сторож не мешает этому произойти, он делает это бессмысленным:
-# через минуту блокировка возвращается.
+# Ставит две задачи Windows:
 #
-# Ставится сам установщиком агента. Руками — один раз, от имени администратора:
+#   1. «Cyber-Fox Agent» — запускает окно блокировки в сеансе вошедшего
+#      игрока (при входе и по требованию сторожа). Работает под игроком,
+#      иначе окно рисовалось бы на невидимом нулевом рабочем столе.
+#
+#   2. «Cyber-Fox Watchdog» — сторож под SYSTEM. Раз в 3 секунды проверяет,
+#      жив ли агент, и если нет — поднимает задачу 1. Главное здесь — SYSTEM:
+#      процесс сторожа принадлежит системе, и ограниченный игрок снять его не
+#      может, диспетчер задач отвечает «Отказано в доступе». Снять агента
+#      больше не помогает — через пару секунд блокировка возвращается.
+#
+# ВАЖНО: защита работает, только если игрок входит под ОГРАНИЧЕННОЙ учётной
+# записью. Под администратором гость снимает и процессы SYSTEM — тогда ни
+# сторож, ни запреты не держат.
+#
+# Ставится сам установщиком агента. Руками — один раз, от администратора:
 #   powershell -ExecutionPolicy Bypass -File install-watchdog.ps1
 #
 # Снять:
 #   Unregister-ScheduledTask -TaskName "Cyber-Fox Watchdog" -Confirm:$false
+#   Unregister-ScheduledTask -TaskName "Cyber-Fox Agent" -Confirm:$false
 
 param(
     # Установщик передаёт путь, куда поставил агента; руками — по умолчанию.
@@ -18,48 +30,73 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$TaskName = "Cyber-Fox Watchdog"
+$AgentTask = "Cyber-Fox Agent"
+$WatchTask = "Cyber-Fox Watchdog"
 
 if (-not (Test-Path $AgentPath)) {
     throw "Агент не найден: $AgentPath. Сначала установите Cyber-Fox Agent."
 }
 
-# Задача запускается в сеансе вошедшего пользователя, иначе окно блокировки
-# было бы не видно: служба рисует на нулевом рабочем столе.
+# --- Задача 1: запуск агента в сеансе игрока ---
 #
-# Внутри — бесконечная проверка раз в 3 секунды: снятый агент возвращается
-# раньше, чем гость успеет открыть игру. Раньше проверка шла раз в минуту, и
-# минуты хватало, чтобы запустить игру мимо блокировки.
-# Одной строкой: перенос строки в аргументе задачи Windows не переживает.
-$Command = "while (`$true) { if (-not (Get-Process -Name 'Cyber-Fox Agent' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '$AgentPath' }; Start-Sleep -Seconds 3 }"
+# Группа «Пользователи» (S-1-5-32-545), а не конкретная учётка: задача должна
+# работать под тем, кто сейчас за машиной. Запускается при входе; её же по
+# требованию запускает сторож — тогда агент открывается в сеансе игрока, а не
+# на нулевом рабочем столе, как было бы при запуске из SYSTEM.
+$AgentAction = New-ScheduledTaskAction -Execute $AgentPath
+$AgentTrigger = New-ScheduledTaskTrigger -AtLogOn
+$AgentPrincipal = New-ScheduledTaskPrincipal -GroupId "S-1-5-32-545" -RunLevel Limited
+$AgentSettings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable `
+    -MultipleInstances IgnoreNew
 
-$Action = New-ScheduledTaskAction -Execute "powershell.exe" `
+Register-ScheduledTask -TaskName $AgentTask `
+    -Action $AgentAction -Trigger $AgentTrigger -Settings $AgentSettings -Principal $AgentPrincipal `
+    -Description "Запускает блокировку Cyber-Fox в сеансе игрока." `
+    -Force | Out-Null
+
+# --- Задача 2: сторож под SYSTEM ---
+#
+# Проверка раз в 3 секунды: снятый агент возвращается раньше, чем гость успеет
+# открыть игру. Агента сторож не запускает напрямую — из SYSTEM окно ушло бы на
+# нулевой рабочий стол; он поднимает задачу 1, а та открывает агента у игрока.
+#
+# Сторож сам выходит, когда его задачу отключают: установщик обновления гасит
+# задачу, и цикл не должен поднимать агента в середине копирования файлов.
+#
+# Одной строкой: перенос строки в аргументе задачи Windows не переживает.
+$Command = "while (`$true) { try { if ((Get-ScheduledTask -TaskName '$WatchTask' -ErrorAction SilentlyContinue).State -eq 'Disabled') { break } } catch {}; if (-not (Get-Process -Name 'Cyber-Fox Agent' -ErrorAction SilentlyContinue)) { Start-ScheduledTask -TaskName '$AgentTask' -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 3 }"
+
+$WatchAction = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"$Command`""
 
-# Запуск при входе и повтор раз в минуту: если сам сторож снят, через минуту
-# задача поднимет его снова. Второй экземпляр поверх живого не запускается.
-$Trigger = New-ScheduledTaskTrigger -AtLogOn
+# Запуск при старте системы и повтор раз в минуту: если сам сторож сняли, через
+# минуту задача поднимет его снова. Второй экземпляр поверх живого не идёт.
+$WatchTrigger = New-ScheduledTaskTrigger -AtStartup
 # Срок повтора — 9999 дней, а не [TimeSpan]::MaxValue: «бесконечность» Windows
 # отвергает («value incorrectly formatted or out of range»), и задача не
-# ставилась вовсе — сторожа не было ни на одной машине.
-$Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
+# ставилась бы вовсе.
+$WatchTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
     -RepetitionDuration (New-TimeSpan -Days 9999)).Repetition
 
-$Settings = New-ScheduledTaskSettingsSet `
+$WatchSettings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
     -MultipleInstances IgnoreNew `
     -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
 
-# Группа «Пользователи»: задача должна работать под тем, кто сейчас за
-# машиной, а не под конкретной учётной записью.
-$Principal = New-ScheduledTaskPrincipal -GroupId "S-1-5-32-545" -RunLevel Limited
+# SYSTEM с наивысшими правами: именно это делает сторожа неснимаемым для игрока.
+$WatchPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
+    -LogonType ServiceAccount -RunLevel Highest
 
-Register-ScheduledTask -TaskName $TaskName `
-    -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal `
-    -Description "Возвращает блокировку Cyber-Fox, если агента сняли через диспетчер задач." `
+Register-ScheduledTask -TaskName $WatchTask `
+    -Action $WatchAction -Trigger $WatchTrigger -Settings $WatchSettings -Principal $WatchPrincipal `
+    -Description "Возвращает блокировку Cyber-Fox, если агента сняли. Работает под SYSTEM — игрок снять не может." `
     -Force | Out-Null
 
-Write-Host "Сторож установлен. Проверить: Get-ScheduledTask -TaskName '$TaskName'"
+Write-Host "Готово: задача запуска агента и сторож (SYSTEM) установлены."
+Write-Host "Проверить: Get-ScheduledTask -TaskName '$AgentTask','$WatchTask'"

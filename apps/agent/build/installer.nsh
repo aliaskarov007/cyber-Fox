@@ -11,11 +11,16 @@
 !macro customInit
   ; Ошибки не проверяем намеренно: и сторожа, и агента может не быть вовсе —
   ; это первая установка, и останавливать нечего.
+  ;
+  ; Гасим обе задачи до того, как снять процесс: сторож под SYSTEM выходит сам,
+  ; когда его задачу отключают, а отключённая задача запуска агента не даст
+  ; поднять его обратно в середине копирования файлов.
   nsExec::Exec 'schtasks /change /tn "Cyber-Fox Watchdog" /disable'
+  nsExec::Exec 'schtasks /change /tn "Cyber-Fox Agent" /disable'
   nsExec::Exec 'taskkill /f /im "Cyber-Fox Agent.exe"'
-  ; Пауза даёт Windows отпустить файлы закрытого процесса: без неё копирование
-  ; иногда упирается в занятый exe.
-  Sleep 1500
+  ; Пауза даёт сторожу выйти по отключённой задаче и Windows — отпустить файлы
+  ; закрытого процесса: без неё копирование иногда упирается в занятый exe.
+  Sleep 4000
 !macroend
 
 !macro customInstall
@@ -23,12 +28,14 @@
   ; сняли. Раньше её ставили отдельным скриптом руками — и в залах её не было.
   ; Установка идёт от администратора (perMachine), поэтому прав хватает.
   ; Повторная установка задачу просто перезаписывает.
+  ; Скрипт ставит обе задачи сразу (запуск агента и сторож под SYSTEM) и
+  ; создаёт их заново -Force, то есть включёнными — отдельное включение не нужно.
   nsExec::Exec 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\install-watchdog.ps1" -AgentPath "$INSTDIR\Cyber-Fox Agent.exe"'
-  nsExec::Exec 'schtasks /change /tn "Cyber-Fox Watchdog" /enable'
 !macroend
 
 !macro customUnInstall
-  ; При удалении сторож не нужен вовсе: он будет пытаться запускать то, чего
-  ; больше нет.
+  ; При удалении обе задачи не нужны: сторож будет пытаться запускать то, чего
+  ; больше нет, а задача запуска — открывать удалённый exe.
   nsExec::Exec 'schtasks /delete /tn "Cyber-Fox Watchdog" /f'
+  nsExec::Exec 'schtasks /delete /tn "Cyber-Fox Agent" /f'
 !macroend

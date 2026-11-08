@@ -183,13 +183,25 @@ jobs:
           Copy-Item C:\Windows\System32\notepad.exe "C:\fake\Cyber-Fox Agent.exe"
           powershell -NoProfile -ExecutionPolicy Bypass -File deploy\agent\install-watchdog.ps1 -AgentPath "C:\fake\Cyber-Fox Agent.exe"
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          $task = Get-ScheduledTask -TaskName "Cyber-Fox Watchdog"
-          $arguments = $task.Actions[0].Arguments
+
+          # Задача запуска агента должна появиться и открывать именно агента.
+          $agent = Get-ScheduledTask -TaskName "Cyber-Fox Agent"
+          if ($agent.Actions[0].Execute -ne "C:\fake\Cyber-Fox Agent.exe") { throw "Запуск агента указывает не на агента" }
+
+          # Сторож должен появиться, работать под SYSTEM — иначе игрок его снимет,
+          # и вся защита бессмысленна, — и не плодить второй экземпляр.
+          $watch = Get-ScheduledTask -TaskName "Cyber-Fox Watchdog"
+          if ($watch.Principal.UserId -notmatch 'SYSTEM') { throw "Сторож не под SYSTEM: $($watch.Principal.UserId)" }
+          if ($watch.Settings.MultipleInstances -ne 'IgnoreNew') { throw "Сторож запустится вторым экземпляром" }
+
+          # Команда сторожа должна разбираться как корректный scriptblock.
+          $arguments = $watch.Actions[0].Arguments
           Write-Host $arguments
           $script = ($arguments -split '-Command ', 2)[1].Trim('"')
           [void][scriptblock]::Create($script)
-          if ($task.Settings.MultipleInstances -ne 'IgnoreNew') { throw "Сторож запустится вторым экземпляром" }
+
           Unregister-ScheduledTask -TaskName "Cyber-Fox Watchdog" -Confirm:$false
+          Unregister-ScheduledTask -TaskName "Cyber-Fox Agent" -Confirm:$false
 
       - name: Собрать установщик
         working-directory: apps/agent
