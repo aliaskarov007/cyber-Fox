@@ -453,6 +453,23 @@ label {
   padding: 0 32px 28px;
 }
 
+.fx-legal {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+  padding: 0 16px 16px;
+  font-size: 13px;
+}
+.fx-legal a { color: #8a92a5; text-decoration: none; }
+.fx-legal a:hover { color: #fff; }
+
+@media (min-width: 900px) {
+  .fx-legal { position: fixed; left: 40px; bottom: 28px; justify-content: flex-start; padding: 0; }
+}
+
 .fx-support {
   width: 300px;
   box-sizing: border-box;

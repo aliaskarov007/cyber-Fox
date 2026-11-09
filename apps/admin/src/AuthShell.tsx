@@ -93,6 +93,14 @@ export function AuthShell({ children }: { children: ReactNode }) {
           </ul>
         </section>
       </footer>
+
+      {/* Документы для гостей и банка-эквайера: оферта, оплата и возврат, политика, реквизиты. */}
+      <nav className="fx-legal" aria-label="Документы">
+        <a href="/oferta.html">Публичная оферта</a>
+        <a href="/oplata.html">Оплата и возврат</a>
+        <a href="/privacy.html">Политика конфиденциальности</a>
+        <a href="/rekvizity.html">Реквизиты</a>
+      </nav>
     </div>
   );
 }
