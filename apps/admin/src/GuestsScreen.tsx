@@ -11,6 +11,7 @@ import {
   toTiyn,
 } from "./api.js";
 import { GuestNewForm } from "./GuestNewForm.js";
+import { GuestDiscountForm } from "./GuestDiscountForm.js";
 import { GuestPhoneVerify } from "./GuestPhoneVerify.js";
 import { GuestPinForm } from "./GuestPinForm.js";
 import { GuestPromoForm } from "./GuestPromoForm.js";
@@ -42,7 +43,10 @@ export function GuestsScreen({ club }: { club: Club }) {
 
   return (
     <main>
-      <div className="section" style={{ borderTop: "none", paddingTop: 0, marginBottom: 16 }}>
+      <div
+        className="section"
+        style={{ borderTop: "none", paddingTop: 0, marginBottom: 16 }}
+      >
         <div className="actions">
           <input
             placeholder="Телефон или имя"
@@ -75,9 +79,17 @@ export function GuestsScreen({ club }: { club: Club }) {
                 <td className="num">{guest.phone}</td>
                 <td className="num">{formatMoney(guest.bonusPoints)}</td>
                 <td>{guest.hasPin ? "задан" : "—"}</td>
-                <td>{guest.phoneVerified ? (guest.invitesOptOut ? "отписан" : "✓") : "—"}</td>
                 <td>
-                  <button onClick={() => setSelectedId(guest.id)}>Карточка</button>
+                  {guest.phoneVerified
+                    ? guest.invitesOptOut
+                      ? "отписан"
+                      : "✓"
+                    : "—"}
+                </td>
+                <td>
+                  <button onClick={() => setSelectedId(guest.id)}>
+                    Карточка
+                  </button>
                 </td>
               </tr>
             ))}
@@ -94,7 +106,11 @@ export function GuestsScreen({ club }: { club: Club }) {
 
       {selectedId && (
         <>
-          <button className="backdrop" aria-label="Закрыть" onClick={() => setSelectedId(null)} />
+          <button
+            className="backdrop"
+            aria-label="Закрыть"
+            onClick={() => setSelectedId(null)}
+          />
           <aside className="drawer">
             <GuestCardPanel
               club={club}
@@ -155,8 +171,8 @@ function GuestCardPanel({
 
       {inDebt && (
         <div className="notice warn">
-          Долг {formatMoney(Math.abs(card.balance))}. Пока он не погашен, новую сессию начать
-          нельзя.
+          Долг {formatMoney(Math.abs(card.balance))}. Пока он не погашен, новую
+          сессию начать нельзя.
         </div>
       )}
 
@@ -166,6 +182,19 @@ function GuestCardPanel({
           club={club}
           guestId={guestId}
           hasPin={card.guest.hasPin}
+          onChanged={() => {
+            void load();
+            onChanged();
+          }}
+        />
+      </div>
+
+      <div className="section">
+        <h3>Скидка на игровое время</h3>
+        <GuestDiscountForm
+          club={club}
+          guestId={guestId}
+          current={card.guest.discountPercent}
           onChanged={() => {
             void load();
             onChanged();
@@ -199,7 +228,9 @@ function GuestCardPanel({
           <div className="row">
             <span className="k">Кошелёк</span>
             {/* Общий кошелёк сети не привязан к клубу — это видно по пустому clubId. */}
-            <span>{card.walletClubId === null ? "общий по сети" : "этого клуба"}</span>
+            <span>
+              {card.walletClubId === null ? "общий по сети" : "этого клуба"}
+            </span>
           </div>
         </div>
 
@@ -235,7 +266,9 @@ function GuestCardPanel({
               setBusy(true);
               setError(null);
               try {
-                setCheckout(await api.createOnlineTopUp(club.id, guestId, toTiyn(amount)));
+                setCheckout(
+                  await api.createOnlineTopUp(club.id, guestId, toTiyn(amount)),
+                );
               } catch (cause) {
                 setError((cause as Error).message);
               } finally {
@@ -251,13 +284,15 @@ function GuestCardPanel({
           <div className="notice">
             {checkout.url ? (
               <>
-                Ссылка на оплату {formatMoney(checkout.amount)}: гость открывает её с телефона.
+                Ссылка на оплату {formatMoney(checkout.amount)}: гость открывает
+                её с телефона.
                 {/* Деньги зачислятся сами, когда провайдер подтвердит оплату. */}
                 <div className="checkout-link">{checkout.url}</div>
               </>
             ) : (
               <>
-                Провайдер оплаты не подключён — примите перевод и отметьте платёж вручную.
+                Провайдер оплаты не подключён — примите перевод и отметьте
+                платёж вручную.
               </>
             )}
             <div className="actions" style={{ marginTop: 8 }}>
@@ -268,7 +303,8 @@ function GuestCardPanel({
                   setError(null);
                   try {
                     const result = await api.confirmPayment(checkout.intentId);
-                    if (!result.applied && result.reason) setError(result.reason);
+                    if (!result.applied && result.reason)
+                      setError(result.reason);
                     setCheckout(null);
                     await load();
                     onChanged();
@@ -308,7 +344,9 @@ function GuestCardPanel({
             {card.packages.map((p) => (
               <div className="row" key={p.id}>
                 <span className="k">{p.minutesRemaining} мин</span>
-                <span>до {new Date(p.expiresAt).toLocaleDateString("ru-KZ")}</span>
+                <span>
+                  до {new Date(p.expiresAt).toLocaleDateString("ru-KZ")}
+                </span>
               </div>
             ))}
           </div>

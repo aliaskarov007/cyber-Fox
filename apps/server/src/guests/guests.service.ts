@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   type Guest,
   type GuestPackage,
@@ -12,6 +16,7 @@ import bcrypt from "bcryptjs";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { discountedPrice } from "../billing/billing.rules.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
 import { WalletService } from "./wallet.service.js";
@@ -28,6 +33,8 @@ export interface PublicGuest {
   fullName: string;
   phone: string;
   bonusPoints: number;
+  /** Личная скидка гостя в процентах на игровое время. 0 — без скидки. */
+  discountPercent: number;
   hasPin: boolean;
   /** Номер подтверждён кодом из WhatsApp: только таким гостям уходят приглашения. */
   phoneVerified: boolean;
@@ -74,7 +81,9 @@ export function groupSessionCharges(
   }>,
   sessions: Array<{ id: string; computer: { name: string } }>,
 ): HistoryEntry[] {
-  const computerBySession = new Map(sessions.map((s) => [s.id, s.computer.name]));
+  const computerBySession = new Map(
+    sessions.map((s) => [s.id, s.computer.name]),
+  );
   const grouped = new Map<string, HistoryEntry>();
   const entries: HistoryEntry[] = [];
 
@@ -116,6 +125,7 @@ export function toPublicGuest(guest: Guest): PublicGuest {
     fullName: guest.fullName,
     phone: guest.phone,
     bonusPoints: guest.bonusPoints,
+    discountPercent: guest.discountPercent,
     hasPin: guest.pinHash !== null,
     phoneVerified: guest.phoneVerifiedAt !== null,
     invitesOptOut: guest.invitesOptOutAt !== null,
@@ -131,7 +141,11 @@ export class GuestsService {
     private readonly wallets: WalletService,
   ) {}
 
-  async search(staff: AuthenticatedStaff, clubId: string, query: string): Promise<PublicGuest[]> {
+  async search(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    query: string,
+  ): Promise<PublicGuest[]> {
     await this.access.requireClub(staff, clubId);
     const trimmed = query.trim();
 
@@ -167,7 +181,8 @@ export class GuestsService {
     const existing = await this.prisma.guest.findUnique({
       where: { tenantId_phone: { tenantId: staff.tenantId, phone } },
     });
-    if (existing) throw new BadRequestException("Гость с таким телефоном уже есть");
+    if (existing)
+      throw new BadRequestException("Гость с таким телефоном уже есть");
 
     const guest = await this.prisma.guest.create({
       data: {
@@ -318,14 +333,20 @@ export class GuestsService {
     const club = await this.access.requireClub(staff, clubId);
     const guest = await this.requireGuest(staff.tenantId, guestId);
 
-    const tariff = await this.prisma.tariff.findUnique({ where: { id: dto.tariffId } });
-    if (!tariff || tariff.clubId !== clubId) throw new NotFoundException("Тариф не найден");
-    if (tariff.kind !== TariffKind.PACKAGE) throw new BadRequestException("Это не пакетный тариф");
+    const tariff = await this.prisma.tariff.findUnique({
+      where: { id: dto.tariffId },
+    });
+    if (!tariff || tariff.clubId !== clubId)
+      throw new NotFoundException("Тариф не найден");
+    if (tariff.kind !== TariffKind.PACKAGE)
+      throw new BadRequestException("Это не пакетный тариф");
     if (!tariff.packageMinutes || tariff.packagePrice === null) {
       throw new BadRequestException("У тарифа не заданы минуты или цена");
     }
 
-    const price = tariff.packagePrice;
+    // Личная скидка гостя режет и цену пакета. Бонусы потом считаются уже с
+    // этой, фактически уплаченной суммы.
+    const price = discountedPrice(tariff.packagePrice, guest.discountPercent);
     const validityDays = tariff.validityDays ?? club.packageValidityDays;
     const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
@@ -405,9 +426,36 @@ export class GuestsService {
     });
   }
 
-  private async requireGuest(tenantId: string, guestId: string): Promise<Guest> {
-    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
-    if (!guest || guest.tenantId !== tenantId) throw new NotFoundException("Гость не найден");
+  /**
+   * Личная скидка гостя в процентах (0–100) на игровое время. Действует с
+   * этой минуты: следующее списание и покупка пакета идут уже со скидкой.
+   */
+  async setDiscount(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    guestId: string,
+    percent: number,
+  ): Promise<PublicGuest> {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+    const clamped = Math.min(100, Math.max(0, Math.round(percent)));
+
+    const updated = await this.prisma.guest.update({
+      where: { id: guest.id },
+      data: { discountPercent: clamped },
+    });
+    return toPublicGuest(updated);
+  }
+
+  private async requireGuest(
+    tenantId: string,
+    guestId: string,
+  ): Promise<Guest> {
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest || guest.tenantId !== tenantId)
+      throw new NotFoundException("Гость не найден");
     return guest;
   }
 

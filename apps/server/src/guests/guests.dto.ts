@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   Min,
   MinLength,
 } from "class-validator";
@@ -45,4 +46,12 @@ export class BuyPackageDto {
 export class SetPinDto {
   @Matches(/^\d{4}$/, { message: "PIN — четыре цифры" })
   pin!: string;
+}
+
+export class SetDiscountDto {
+  /** Личная скидка гостя в процентах на игровое время, 0–100. */
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  percent!: number;
 }

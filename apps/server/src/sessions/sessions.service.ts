@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   ComputerStatus,
   PaymentMethod,
@@ -20,6 +25,7 @@ import {
   type WalletState,
   creditLeft,
   decideNextMinute,
+  discountedPrice,
   minutesAffordable,
   pickNextPackage,
   pickPerMinuteTariff,
@@ -98,7 +104,9 @@ export class SessionsService {
     /** Предоплата для анонимной посадки, в тиын. */
     prepaidAmount?: number | null;
   }): Promise<Session> {
-    const club = await this.prisma.club.findUniqueOrThrow({ where: { id: params.clubId } });
+    const club = await this.prisma.club.findUniqueOrThrow({
+      where: { id: params.clubId },
+    });
     // Подписка проверяется только при старте: уже идущие сессии доигрывают
     // при любом её состоянии — гость заплатил клубу, а не нам.
     await this.subscriptions.assertCanStartSession(club.tenantId);
@@ -117,7 +125,10 @@ export class SessionsService {
     }
 
     const active = await this.prisma.session.findFirst({
-      where: { computerId: computer.id, status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] } },
+      where: {
+        computerId: computer.id,
+        status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] },
+      },
     });
     if (active) throw new BadRequestException("За этим ПК уже идёт сессия");
 
@@ -133,7 +144,9 @@ export class SessionsService {
         include: { computer: { select: { name: true } } },
       });
       if (guestActive) {
-        throw new BadRequestException(`У гостя открыта сессия на ${guestActive.computer.name}`);
+        throw new BadRequestException(
+          `У гостя открыта сессия на ${guestActive.computer.name}`,
+        );
       }
     }
 
@@ -180,7 +193,9 @@ export class SessionsService {
     } else {
       const fallback = pickPerMinuteTariff(perMinuteTariffs, moment);
       if (!fallback) {
-        throw new BadRequestException("В зоне нет действующего поминутного тарифа");
+        throw new BadRequestException(
+          "В зоне нет действующего поминутного тарифа",
+        );
       }
       segmentKind = TariffKind.PER_MINUTE;
       segmentTariffId = fallback.id;
@@ -188,7 +203,11 @@ export class SessionsService {
 
     // Анонимная посадка идёт строго по предоплате: кошелька, с которого списывать
     // поминутно, у гостя без аккаунта нет, поэтому деньги берутся вперёд на стойке.
-    if (!params.guestId && segmentKind === TariffKind.PER_MINUTE && !params.prepaidAmount) {
+    if (
+      !params.guestId &&
+      segmentKind === TariffKind.PER_MINUTE &&
+      !params.prepaidAmount
+    ) {
       throw new BadRequestException(
         "Анонимная посадка возможна только по предоплате: укажите принятую сумму",
       );
@@ -200,7 +219,11 @@ export class SessionsService {
       const tariff = perMinuteTariffs.find((t) => t.id === segmentTariffId);
       const price = tariff?.pricePerMinute ?? 0;
       const wallet = params.guestId
-        ? await this.walletState(params.guestId, params.clubId, club.creditLimit)
+        ? await this.walletState(
+            params.guestId,
+            params.clubId,
+            club.creditLimit,
+          )
         : { balance: params.prepaidAmount ?? 0, creditLimit: 0 };
 
       if (wallet.balance - price < -wallet.creditLimit) {
@@ -221,7 +244,9 @@ export class SessionsService {
           guestId: params.guestId,
           startedBy: params.startedBy,
           status: SessionStatus.ACTIVE,
-          prepaidRemaining: params.guestId ? null : (params.prepaidAmount ?? null),
+          prepaidRemaining: params.guestId
+            ? null
+            : (params.prepaidAmount ?? null),
           // Срок первой минуты — сам момент старта: она оплачивается авансом,
           // как и все последующие (docs/billing.md, раздел 5.4).
           nextChargeAt: new Date(),
@@ -291,7 +316,10 @@ export class SessionsService {
   async chargeDueSessions(now = new Date()): Promise<number> {
     const due = await this.prisma.session.findMany({
       where: { status: SessionStatus.ACTIVE, nextChargeAt: { lte: now } },
-      select: { id: true, computer: { select: { id: true, name: true, lastSeenAt: true } } },
+      select: {
+        id: true,
+        computer: { select: { id: true, name: true, lastSeenAt: true } },
+      },
       take: 500,
     });
 
@@ -323,7 +351,10 @@ export class SessionsService {
         await this.chargeOneMinute(session.id, now);
         processed += 1;
       } catch (error) {
-        this.logger.error(`Не удалось списать минуту сессии ${session.id}`, error as Error);
+        this.logger.error(
+          `Не удалось списать минуту сессии ${session.id}`,
+          error as Error,
+        );
       }
     }
     return processed;
@@ -347,6 +378,7 @@ export class SessionsService {
       where: { id: sessionId },
       include: {
         club: true,
+        guest: { select: { discountPercent: true } },
         segments: { orderBy: { startedAt: "desc" }, take: 1 },
       },
     });
@@ -356,14 +388,21 @@ export class SessionsService {
     const segment = session.segments[0];
     if (!segment) return true;
 
-    const moment = toLocalMoment(session.nextChargeAt ?? now, session.club.timezone);
+    const moment = toLocalMoment(
+      session.nextChargeAt ?? now,
+      session.club.timezone,
+    );
     const packages = session.guestId
       ? await this.loadPackages(session.guestId, session.clubId, session.zoneId)
       : [];
     // Для расчёта анонимная посадка — тот же кошелёк, только с предоплаченной
     // суммой и без права уйти в минус. Правила остаются одни на оба случая.
     const wallet = session.guestId
-      ? await this.walletState(session.guestId, session.clubId, session.club.creditLimit)
+      ? await this.walletState(
+          session.guestId,
+          session.clubId,
+          session.club.creditLimit,
+        )
       : session.prepaidRemaining !== null
         ? { balance: session.prepaidRemaining, creditLimit: 0 }
         : null;
@@ -377,7 +416,10 @@ export class SessionsService {
       },
       packages,
       wallet,
-      perMinuteTariffs: await this.loadPerMinuteTariffs(session.zoneId),
+      perMinuteTariffs: await this.loadPerMinuteTariffs(
+        session.zoneId,
+        session.guest?.discountPercent ?? 0,
+      ),
     };
 
     const decision = decideNextMinute(state, moment);
@@ -473,11 +515,16 @@ export class SessionsService {
         const pkg = await this.prisma.guestPackage.findUniqueOrThrow({
           where: { id: decision.packageId },
         });
-        await this.closeAndOpenSegment(session.id, segment.id, decision.closeReason, {
-          tariffId: pkg.sourceTariffId,
-          kind: TariffKind.PACKAGE,
-          guestPackageId: pkg.id,
-        });
+        await this.closeAndOpenSegment(
+          session.id,
+          segment.id,
+          decision.closeReason,
+          {
+            tariffId: pkg.sourceTariffId,
+            kind: TariffKind.PACKAGE,
+            guestPackageId: pkg.id,
+          },
+        );
         this.bus.emit("session.switched", {
           clubId: session.clubId,
           computerId: session.computerId,
@@ -494,11 +541,16 @@ export class SessionsService {
         const tariff = await this.prisma.tariff.findUniqueOrThrow({
           where: { id: decision.tariffId },
         });
-        await this.closeAndOpenSegment(session.id, segment.id, decision.closeReason, {
-          tariffId: tariff.id,
-          kind: TariffKind.PER_MINUTE,
-          guestPackageId: null,
-        });
+        await this.closeAndOpenSegment(
+          session.id,
+          segment.id,
+          decision.closeReason,
+          {
+            tariffId: tariff.id,
+            kind: TariffKind.PER_MINUTE,
+            guestPackageId: null,
+          },
+        );
         this.bus.emit("session.switched", {
           clubId: session.clubId,
           computerId: session.computerId,
@@ -577,7 +629,11 @@ export class SessionsService {
       });
       return tx.session.update({
         where: { id: sessionId },
-        data: { status: SessionStatus.FINISHED, endedAt: now, nextChargeAt: null },
+        data: {
+          status: SessionStatus.FINISHED,
+          endedAt: now,
+          nextChargeAt: null,
+        },
       });
     });
 
@@ -596,7 +652,11 @@ export class SessionsService {
     return finished;
   }
 
-  async pause(staff: AuthenticatedStaff, clubId: string, sessionId: string): Promise<Session> {
+  async pause(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    sessionId: string,
+  ): Promise<Session> {
     await this.access.requireClub(staff, clubId);
     const session = await this.requireSession(clubId, sessionId);
     if (session.status !== SessionStatus.ACTIVE) {
@@ -616,14 +676,20 @@ export class SessionsService {
     });
   }
 
-  async resume(staff: AuthenticatedStaff, clubId: string, sessionId: string): Promise<Session> {
+  async resume(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    sessionId: string,
+  ): Promise<Session> {
     await this.access.requireClub(staff, clubId);
     const session = await this.requireSession(clubId, sessionId);
     if (session.status !== SessionStatus.PAUSED) {
       throw new BadRequestException("Сессия не на паузе");
     }
 
-    const club = await this.prisma.club.findUniqueOrThrow({ where: { id: clubId } });
+    const club = await this.prisma.club.findUniqueOrThrow({
+      where: { id: clubId },
+    });
     const moment = toLocalMoment(new Date(), club.timezone);
     const packages = session.guestId
       ? await this.loadPackages(session.guestId, clubId, session.zoneId)
@@ -635,13 +701,21 @@ export class SessionsService {
     let guestPackageId: string | null = null;
 
     if (usable) {
-      const pkg = await this.prisma.guestPackage.findUniqueOrThrow({ where: { id: usable.id } });
+      const pkg = await this.prisma.guestPackage.findUniqueOrThrow({
+        where: { id: usable.id },
+      });
       tariffId = pkg.sourceTariffId;
       kind = TariffKind.PACKAGE;
       guestPackageId = pkg.id;
     } else {
-      const fallback = pickPerMinuteTariff(await this.loadPerMinuteTariffs(session.zoneId), moment);
-      if (!fallback) throw new BadRequestException("В зоне нет действующего поминутного тарифа");
+      const fallback = pickPerMinuteTariff(
+        await this.loadPerMinuteTariffs(session.zoneId),
+        moment,
+      );
+      if (!fallback)
+        throw new BadRequestException(
+          "В зоне нет действующего поминутного тарифа",
+        );
       tariffId = fallback.id;
       kind = TariffKind.PER_MINUTE;
     }
@@ -681,9 +755,13 @@ export class SessionsService {
       throw new BadRequestException("Сессия не активна");
     }
 
-    const target = await this.prisma.computer.findUnique({ where: { id: dto.computerId } });
-    if (!target || target.clubId !== clubId) throw new NotFoundException("ПК не найден");
-    if (target.status === ComputerStatus.IN_USE) throw new BadRequestException("ПК занят");
+    const target = await this.prisma.computer.findUnique({
+      where: { id: dto.computerId },
+    });
+    if (!target || target.clubId !== clubId)
+      throw new NotFoundException("ПК не найден");
+    if (target.status === ComputerStatus.IN_USE)
+      throw new BadRequestException("ПК занят");
 
     const sameZone = target.zoneId === session.zoneId;
     const previousComputerId = session.computerId;
@@ -701,7 +779,10 @@ export class SessionsService {
       if (!sameZone) {
         await tx.sessionSegment.updateMany({
           where: { sessionId, endedAt: null },
-          data: { endedAt: new Date(), endReason: SegmentEndReason.ZONE_CHANGE },
+          data: {
+            endedAt: new Date(),
+            endReason: SegmentEndReason.ZONE_CHANGE,
+          },
         });
       }
 
@@ -720,7 +801,9 @@ export class SessionsService {
       const usable = pickNextPackage(packages, target.zoneId, moment);
 
       if (usable) {
-        const pkg = await this.prisma.guestPackage.findUniqueOrThrow({ where: { id: usable.id } });
+        const pkg = await this.prisma.guestPackage.findUniqueOrThrow({
+          where: { id: usable.id },
+        });
         await this.prisma.sessionSegment.create({
           data: {
             sessionId,
@@ -734,9 +817,16 @@ export class SessionsService {
           await this.loadPerMinuteTariffs(target.zoneId),
           moment,
         );
-        if (!fallback) throw new BadRequestException("В целевой зоне нет поминутного тарифа");
+        if (!fallback)
+          throw new BadRequestException(
+            "В целевой зоне нет поминутного тарифа",
+          );
         await this.prisma.sessionSegment.create({
-          data: { sessionId, tariffId: fallback.id, kind: TariffKind.PER_MINUTE },
+          data: {
+            sessionId,
+            tariffId: fallback.id,
+            kind: TariffKind.PER_MINUTE,
+          },
         });
       }
     }
@@ -766,16 +856,27 @@ export class SessionsService {
       include: {
         zone: { select: { id: true, name: true } },
         sessions: {
-          where: { status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] } },
+          where: {
+            status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] },
+          },
           include: {
-            guest: { select: { id: true, fullName: true, phone: true } },
+            guest: {
+              select: {
+                id: true,
+                fullName: true,
+                phone: true,
+                discountPercent: true,
+              },
+            },
             segments: { orderBy: { startedAt: "desc" }, take: 1 },
           },
         },
       },
     });
 
-    const club = await this.prisma.club.findUniqueOrThrow({ where: { id: clubId } });
+    const club = await this.prisma.club.findUniqueOrThrow({
+      where: { id: clubId },
+    });
 
     return Promise.all(
       computers.map(async (computer) => {
@@ -792,13 +893,20 @@ export class SessionsService {
             : null;
         const segment = session.segments[0] ?? null;
         const pkg = segment?.guestPackageId
-          ? await this.prisma.guestPackage.findUnique({ where: { id: segment.guestPackageId } })
+          ? await this.prisma.guestPackage.findUnique({
+              where: { id: segment.guestPackageId },
+            })
           : null;
 
         const tariff = segment
-          ? await this.prisma.tariff.findUnique({ where: { id: segment.tariffId } })
+          ? await this.prisma.tariff.findUnique({
+              where: { id: segment.tariffId },
+            })
           : null;
-        const price = tariff?.pricePerMinute ?? 0;
+        const price = discountedPrice(
+          tariff?.pricePerMinute ?? 0,
+          session.guest?.discountPercent ?? 0,
+        );
 
         return {
           computer: this.publicComputer(computer),
@@ -813,7 +921,8 @@ export class SessionsService {
             packageMinutesLeft: pkg?.minutesRemaining ?? null,
             balance: wallet?.balance ?? null,
             creditLeft: wallet ? creditLeft(wallet) : null,
-            minutesAffordable: wallet && price > 0 ? minutesAffordable(wallet, price) : null,
+            minutesAffordable:
+              wallet && price > 0 ? minutesAffordable(wallet, price) : null,
             /** Гость ушёл в минус — админу стоит подойти и предложить пополнение. */
             onCredit: wallet !== null && wallet.balance < 0,
           },
@@ -855,7 +964,9 @@ export class SessionsService {
         guestId,
         clubId,
         zoneId,
-        status: { in: [GuestPackageStatus.ACTIVE, GuestPackageStatus.EXHAUSTED] },
+        status: {
+          in: [GuestPackageStatus.ACTIVE, GuestPackageStatus.EXHAUSTED],
+        },
       },
       orderBy: { expiresAt: "asc" },
     });
@@ -868,7 +979,15 @@ export class SessionsService {
     }));
   }
 
-  private async loadPerMinuteTariffs(zoneId: string): Promise<PerMinuteTariffState[]> {
+  /**
+   * Поминутные тарифы зоны. discountPercent — личная скидка гостя: цена минуты
+   * режется на этот процент, и дальше весь расчёт (списание, остаток минут)
+   * идёт уже со скидкой. 0 (или анонимная посадка) — цены как есть.
+   */
+  private async loadPerMinuteTariffs(
+    zoneId: string,
+    discountPercent = 0,
+  ): Promise<PerMinuteTariffState[]> {
     const tariffs = await this.prisma.tariff.findMany({
       where: { zoneId, kind: TariffKind.PER_MINUTE, isActive: true },
       orderBy: { createdAt: "asc" },
@@ -876,7 +995,7 @@ export class SessionsService {
 
     return tariffs.map((t) => ({
       id: t.id,
-      pricePerMinute: t.pricePerMinute ?? 0,
+      pricePerMinute: discountedPrice(t.pricePerMinute ?? 0, discountPercent),
       activeFromMinute: t.activeFromMinute,
       activeToMinute: t.activeToMinute,
       daysOfWeek: t.daysOfWeek,
@@ -892,9 +1011,15 @@ export class SessionsService {
     return { balance: wallet.balance, creditLimit };
   }
 
-  private async requireSession(clubId: string, sessionId: string): Promise<Session> {
-    const session = await this.prisma.session.findUnique({ where: { id: sessionId } });
-    if (!session || session.clubId !== clubId) throw new NotFoundException("Сессия не найдена");
+  private async requireSession(
+    clubId: string,
+    sessionId: string,
+  ): Promise<Session> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session || session.clubId !== clubId)
+      throw new NotFoundException("Сессия не найдена");
     return session;
   }
 
@@ -923,7 +1048,9 @@ export class SessionsService {
       where: { id: sessionId },
       include: {
         club: true,
-        guest: { select: { fullName: true, bonusPoints: true } },
+        guest: {
+          select: { fullName: true, bonusPoints: true, discountPercent: true },
+        },
         segments: { orderBy: { startedAt: "desc" }, take: 1 },
       },
     });
@@ -931,17 +1058,27 @@ export class SessionsService {
 
     const segment = session.segments[0] ?? null;
     const pkg = segment?.guestPackageId
-      ? await this.prisma.guestPackage.findUnique({ where: { id: segment.guestPackageId } })
+      ? await this.prisma.guestPackage.findUnique({
+          where: { id: segment.guestPackageId },
+        })
       : null;
     const wallet = session.guestId
-      ? await this.walletState(session.guestId, session.clubId, session.club.creditLimit)
+      ? await this.walletState(
+          session.guestId,
+          session.clubId,
+          session.club.creditLimit,
+        )
       : session.prepaidRemaining !== null
         ? { balance: session.prepaidRemaining, creditLimit: 0 }
         : null;
     const tariff = segment
       ? await this.prisma.tariff.findUnique({ where: { id: segment.tariffId } })
       : null;
-    const price = tariff?.pricePerMinute ?? 0;
+    // Остаток минут показываем по цене со скидкой гостя — как и спишется.
+    const price = discountedPrice(
+      tariff?.pricePerMinute ?? 0,
+      session.guest?.discountPercent ?? 0,
+    );
 
     return {
       clubId: session.clubId,
@@ -949,7 +1086,8 @@ export class SessionsService {
       sessionId: session.id,
       packageMinutesLeft: pkg?.minutesRemaining ?? null,
       balance: wallet?.balance ?? 0,
-      minutesAffordable: wallet && price > 0 ? minutesAffordable(wallet, price) : null,
+      minutesAffordable:
+        wallet && price > 0 ? minutesAffordable(wallet, price) : null,
       creditLeft: wallet ? creditLeft(wallet) : null,
       accruedCost: session.totalCharged,
       // У анонимной посадки гостя нет — панель покажет только время и остаток.
@@ -996,7 +1134,10 @@ export class SessionsService {
    * движку: он применит те же правила, что и онлайн, включая тарифы по времени
    * суток и остановку на кредитном лимите.
    */
-  async chargeConfirmedMinutes(sessionId: string, minutes: number): Promise<void> {
+  async chargeConfirmedMinutes(
+    sessionId: string,
+    minutes: number,
+  ): Promise<void> {
     if (minutes <= 0) return;
 
     /*

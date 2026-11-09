@@ -19,7 +19,8 @@ export const SegmentEndReason = {
   STOPPED_BY_GUEST: "STOPPED_BY_GUEST",
   PAUSED: "PAUSED",
 } as const;
-export type SegmentEndReason = (typeof SegmentEndReason)[keyof typeof SegmentEndReason];
+export type SegmentEndReason =
+  (typeof SegmentEndReason)[keyof typeof SegmentEndReason];
 
 export interface PackageState {
   id: string;
@@ -82,7 +83,11 @@ export type BillingDecision =
   /** Текущий пакет исчерпан, но в зоне есть следующий — продолжаем на нём. */
   | { kind: "SWITCH_PACKAGE"; packageId: string; closeReason: SegmentEndReason }
   /** Минут в зоне не осталось либо сменился тариф по расписанию. */
-  | { kind: "SWITCH_PER_MINUTE"; tariffId: string; closeReason: SegmentEndReason }
+  | {
+      kind: "SWITCH_PER_MINUTE";
+      tariffId: string;
+      closeReason: SegmentEndReason;
+    }
   /** Играть дальше не на что. */
   | { kind: "STOP"; reason: SegmentEndReason };
 
@@ -90,8 +95,14 @@ export type BillingDecision =
  * Действует ли тариф в этот момент. Окно может пересекать полночь:
  * ночной тариф 22:00–08:00 действует и в 23:00, и в 03:00.
  */
-export function isTariffActiveAt(tariff: PerMinuteTariffState, moment: LocalMoment): boolean {
-  if (tariff.daysOfWeek.length > 0 && !tariff.daysOfWeek.includes(moment.dayOfWeek)) {
+export function isTariffActiveAt(
+  tariff: PerMinuteTariffState,
+  moment: LocalMoment,
+): boolean {
+  if (
+    tariff.daysOfWeek.length > 0 &&
+    !tariff.daysOfWeek.includes(moment.dayOfWeek)
+  ) {
     return false;
   }
   const { activeFromMinute: from, activeToMinute: to } = tariff;
@@ -112,7 +123,9 @@ export function pickPerMinuteTariff(
 ): PerMinuteTariffState | null {
   const active = tariffs.filter((t) => isTariffActiveAt(t, moment));
   if (active.length === 0) return null;
-  const scheduled = active.filter((t) => t.activeFromMinute !== null && t.activeToMinute !== null);
+  const scheduled = active.filter(
+    (t) => t.activeFromMinute !== null && t.activeToMinute !== null,
+  );
   return (scheduled.length > 0 ? scheduled : active)[0];
 }
 
@@ -126,13 +139,31 @@ export function pickNextPackage(
   moment: LocalMoment,
 ): PackageState | null {
   const usable = packages
-    .filter((p) => p.zoneId === zoneId && p.minutesRemaining > 0 && p.expiresAt > moment.at)
+    .filter(
+      (p) =>
+        p.zoneId === zoneId &&
+        p.minutesRemaining > 0 &&
+        p.expiresAt > moment.at,
+    )
     .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime());
   return usable[0] ?? null;
 }
 
 /** Хватает ли на очередную минуту с учётом кредита. */
-export function canAffordMinute(wallet: WalletState | null, price: Money): boolean {
+/**
+ * Цена со скидкой гостя в процентах. Скидка режет только игровое время
+ * (поминутную оплату и пакеты); 0 — без изменения. Округляем до тиына.
+ */
+export function discountedPrice(price: Money, percent: number): Money {
+  const p = Math.min(100, Math.max(0, Math.round(percent)));
+  if (p === 0) return price;
+  return Math.round((price * (100 - p)) / 100);
+}
+
+export function canAffordMinute(
+  wallet: WalletState | null,
+  price: Money,
+): boolean {
   if (wallet === null) return false;
   return wallet.balance - price >= -wallet.creditLimit;
 }
@@ -141,7 +172,10 @@ export function canAffordMinute(wallet: WalletState | null, price: Money): boole
  * На сколько минут хватит кошелька вместе с кредитом. Это то число,
  * которое видит гость на экране, поэтому считается тут, а не в интерфейсе.
  */
-export function minutesAffordable(wallet: WalletState | null, price: Money): number {
+export function minutesAffordable(
+  wallet: WalletState | null,
+  price: Money,
+): number {
   if (wallet === null || price <= 0) return 0;
   return Math.max(0, Math.floor((wallet.balance + wallet.creditLimit) / price));
 }
@@ -185,7 +219,8 @@ export function decideNextMinute(
       };
     }
     const fallback = pickPerMinuteTariff(state.perMinuteTariffs, moment);
-    if (!fallback) return { kind: "STOP", reason: SegmentEndReason.PACKAGE_EXHAUSTED };
+    if (!fallback)
+      return { kind: "STOP", reason: SegmentEndReason.PACKAGE_EXHAUSTED };
     return {
       kind: "SWITCH_PER_MINUTE",
       tariffId: fallback.id,
@@ -194,7 +229,8 @@ export function decideNextMinute(
   }
 
   const scheduled = pickPerMinuteTariff(state.perMinuteTariffs, moment);
-  if (!scheduled) return { kind: "STOP", reason: SegmentEndReason.CREDIT_LIMIT };
+  if (!scheduled)
+    return { kind: "STOP", reason: SegmentEndReason.CREDIT_LIMIT };
 
   // Сменилось окно тарифа — например, наступил ночной час.
   if (scheduled.id !== segment.tariffId) {

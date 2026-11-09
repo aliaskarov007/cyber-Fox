@@ -106,6 +106,8 @@ export interface Guest {
   fullName: string;
   phone: string;
   bonusPoints: number;
+  /** Личная скидка гостя в процентах на игровое время. 0 — без скидки. */
+  discountPercent: number;
   hasPin: boolean;
   /** Номер подтверждён кодом из WhatsApp — только таким гостям уходят приглашения. */
   phoneVerified: boolean;
@@ -523,6 +525,13 @@ export const api = {
     request<{ ok: true }>(`/clubs/${clubId}/guests/${guestId}/pin`, {
       method: "POST",
       body: JSON.stringify({ pin }),
+    }),
+
+  /** Личная скидка гостя в процентах на игровое время. */
+  setGuestDiscount: (clubId: string, guestId: string, percent: number) =>
+    request<Guest>(`/clubs/${clubId}/guests/${guestId}/discount`, {
+      method: "POST",
+      body: JSON.stringify({ percent }),
     }),
 
   topUp: (clubId: string, guestId: string, amount: number, method: string) =>

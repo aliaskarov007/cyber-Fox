@@ -2,7 +2,13 @@ import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
-import { BuyPackageDto, CreateGuestDto, SetPinDto, TopUpDto } from "./guests.dto.js";
+import {
+  BuyPackageDto,
+  CreateGuestDto,
+  SetDiscountDto,
+  SetPinDto,
+  TopUpDto,
+} from "./guests.dto.js";
 import { GuestsService } from "./guests.service.js";
 
 @Controller("clubs/:clubId/guests")
@@ -74,5 +80,15 @@ export class GuestsController {
   ) {
     await this.guests.setPin(staff, clubId, guestId, dto.pin);
     return { ok: true };
+  }
+
+  @Post(":guestId/discount")
+  async setDiscount(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+    @Body() dto: SetDiscountDto,
+  ) {
+    return this.guests.setDiscount(staff, clubId, guestId, dto.percent);
   }
 }
