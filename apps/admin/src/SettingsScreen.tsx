@@ -4,6 +4,7 @@ import { type Club, type Staff, type StaffMember, type Tenant, api, formatMoney,
 import { ComputersSection } from "./ComputersSection.js";
 import { ZonesSection } from "./ZonesSection.js";
 import { GuestScreenSettings } from "./GuestScreenSettings.js";
+import { KaspiProviderSettings } from "./KaspiProviderSettings.js";
 import { KaspiSettings } from "./KaspiSettings.js";
 import { WhatsAppSettings } from "./WhatsAppSettings.js";
 
@@ -88,6 +89,7 @@ export function SettingsScreen({
         <>
           <WhatsAppSettings onSaved={(msg) => void run(async () => {}, msg)} />
           <KaspiSettings onSaved={(msg) => void run(async () => {}, msg)} />
+          <KaspiProviderSettings onSaved={(msg) => void run(async () => {}, msg)} />
           <WalletSettings
             tenant={tenant}
             clubs={clubs}

@@ -59,6 +59,8 @@ model Tenant {
   winbackCampaigns WinbackCampaign[]
   screenSlides ScreenSlide[]
   kaspiChannel KaspiChannel?
+  kaspiProvider KaspiProviderChannel?
+  kaspiTxns    KaspiTxn[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -528,6 +530,7 @@ model Guest {
   payments Payment[]
   sales    ProductSale[]
   paymentIntents PaymentIntent[]
+  kaspiTxns  KaspiTxn[]
   phoneCodes PhoneVerification[]
   invites    EventInvite[]
   promoRedemptions PromoRedemption[]
@@ -1499,6 +1502,58 @@ model KaspiChannel {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * Прямое подключение к Kaspi.kz по протоколу провайдера (check/pay): гость
+ * платит в приложении Kaspi в разделе «Платежи», вводя свой номер телефона,
+ * а Kaspi сам спрашивает сервер, есть ли такой гость, и сообщает об оплате.
+ * Деньги приходят на счёт юрлица по договору с Kaspi, не через ApiPay.
+ */
+model KaspiProviderChannel {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Часть адреса, который отдаётся Kaspi: по ней сервер узнаёт сеть.
+  token   String  @unique @default(dbgenerated("(gen_random_uuid())::text"))
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * Платёж Kaspi по протоколу провайдера. Номер записи — наш prv_txn, который
+ * Kaspi хранит для сверки; txn_id Kaspi уникален: повторный запрос с тем же
+ * номером получает прежний ответ, а не второе зачисление.
+ */
+model KaspiTxn {
+  /// prv_txn — целое до 20 знаков, поэтому отдельный счётчик, а не uuid.
+  id       BigInt @id @default(autoincrement())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// txn_id из запроса Kaspi.
+  txnId   String @unique
+  account String
+  /// Сумма в тиын.
+  amount  Int
+  /// txn_date — дата, по которой Kaspi учитывает платёж в сверке.
+  txnDate DateTime?
+
+  guestId  String?
+  guest    Guest?  @relation(fields: [guestId], references: [id])
+  intentId String? @unique
+
+  /// Код ответа Kaspi (0 — зачислено, 1 — гость не найден). Пусто — обработка не завершилась.
+  result  Int?
+  comment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, createdAt])
 }
 
 /**

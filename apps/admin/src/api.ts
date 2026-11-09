@@ -627,6 +627,9 @@ export const api = {
     request<KaspiChannel>("/network/kaspi", { method: "PUT", body: JSON.stringify(body) }),
 
   disconnectKaspi: () => request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
+  kaspiProvider: () => request<KaspiProvider>("/network/kaspi-provider"),
+  saveKaspiProvider: (enabled: boolean) =>
+    request<KaspiProvider>("/network/kaspi-provider", { method: "PUT", body: JSON.stringify({ enabled }) }),
 
   whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
 
@@ -969,6 +972,16 @@ export interface KaspiChannel {
   webhookPath: string | null;
   lastState: string | null;
   lastCheckAt: string | null;
+}
+
+/** Kaspi.kz напрямую по протоколу провайдера: гость платит в «Платежах» Kaspi по номеру телефона. */
+export interface KaspiProvider {
+  connected: boolean;
+  enabled: boolean;
+  /** Путь для Kaspi; полный адрес = домен кассы + путь. */
+  path: string | null;
+  accountRegex: string;
+  allowedIps: string[];
 }
 
 export type PromoKind = "BALANCE" | "BONUS";

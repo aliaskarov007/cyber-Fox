@@ -4,6 +4,8 @@ import { ClubAccessService } from "../common/club-access.service.js";
 import { GuestsModule } from "../guests/guests.module.js";
 import { SessionsModule } from "../sessions/sessions.module.js";
 import { ApiPayClient } from "./apipay.client.js";
+import { KaspiProviderController } from "./kaspi-provider.controller.js";
+import { KaspiProviderService } from "./kaspi-provider.service.js";
 import { KaspiController } from "./kaspi.controller.js";
 import { KaspiService } from "./kaspi.service.js";
 import { HmacPaymentProvider } from "./payment.provider.js";
@@ -12,8 +14,8 @@ import { PaymentsService } from "./payments.service.js";
 
 @Module({
   imports: [GuestsModule, SessionsModule],
-  controllers: [PaymentsController, KaspiController],
-  providers: [PaymentsService, HmacPaymentProvider, ClubAccessService, ApiPayClient, KaspiService],
+  controllers: [PaymentsController, KaspiController, KaspiProviderController],
+  providers: [PaymentsService, HmacPaymentProvider, ClubAccessService, ApiPayClient, KaspiService, KaspiProviderService],
   exports: [PaymentsService, KaspiService],
 })
 export class PaymentsModule {}
