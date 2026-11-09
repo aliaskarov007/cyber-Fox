@@ -1,10 +1,15 @@
 import { BrowserWindow, app, globalShortcut, ipcMain, shell } from "electron";
-import { spawn } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import { machineMac, readSettings, writeSettings } from "./config.js";
-import { applyGuard, applyLockdown, releaseLockdown } from "./lockdown.js";
+import {
+  applyGuard,
+  applyLockdown,
+  releaseGuard,
+  releaseLockdown,
+} from "./lockdown.js";
 import { scanInstalled } from "./scan.js";
 import { setPlaying, startUpdater } from "./updater.js";
 
@@ -31,6 +36,12 @@ let lockWindow: BrowserWindow | null = null;
 let unlocked = false;
 /** Пользователь закрывает агента осознанно — только при выходе из системы. */
 let quitting = false;
+/**
+ * Сервисный режим: админ ввёл пароль выхода, машина отдана на обслуживание.
+ * Блокировка снята, окно спрятано, но процесс жив (иначе сторож поднял бы
+ * новый, запертый). Пока флаг стоит, страховки не возвращают блокировку.
+ */
+let servicing = false;
 
 function createLockWindow(): void {
   lockWindow = new BrowserWindow({
@@ -61,19 +72,19 @@ function createLockWindow(): void {
   // Пока сессия не начата, окно возвращает себе фокус: свернуть блокировку
   // и сесть играть бесплатно не должно получаться.
   lockWindow.on("blur", () => {
-    if (!unlocked && lockWindow) {
+    if (!unlocked && !servicing && lockWindow) {
       lockWindow.focus();
       lockWindow.setAlwaysOnTop(true, "screen-saver");
     }
   });
 
   // Свернуть запертое окно нельзя: Win+D, Win+M и щелчок по панели задач
-  // возвращают его обратно сразу же.
+  // возвращают его обратно сразу же. В сервисном режиме окно прячут намеренно.
   lockWindow.on("minimize", () => {
-    if (!unlocked && lockWindow) holdLockOnTop();
+    if (!unlocked && !servicing && lockWindow) holdLockOnTop();
   });
   lockWindow.on("hide", () => {
-    if (!unlocked && lockWindow) holdLockOnTop();
+    if (!unlocked && !servicing && lockWindow) holdLockOnTop();
   });
 
   /*
@@ -266,13 +277,82 @@ function spawnGame(target: string, args: string[]): Promise<void> {
 
 /** Время кончилось: возвращаем блокировку поверх игры. */
 ipcMain.handle("agent:lock", () => {
-  if (!unlocked && lockWindow?.isVisible() && !lockWindow.isMinimized()) return;
+  if (
+    !unlocked &&
+    !servicing &&
+    lockWindow?.isVisible() &&
+    !lockWindow.isMinimized()
+  )
+    return;
   unlocked = false;
   setPlaying(false);
   holdShortcuts();
   void releaseLockdown();
   holdLockOnTop();
 });
+
+/**
+ * Сервисный режим по паролю выхода.
+ *
+ * Пароль уже проверен сервером (shell.exit): админ обслуживает машину. Снимаем
+ * блокировку и все запреты, отпускаем перехваченные клавиши и прячем окно,
+ * показывая рабочий стол. Процесс агента НЕ закрываем — иначе сторож под SYSTEM
+ * поднял бы новый, снова запертый. Вернуть блокировку: перезагрузка (агент
+ * стартует запертым) или Ctrl+Alt+Shift+L.
+ */
+ipcMain.handle("agent:service-mode", async () => {
+  servicing = true;
+  unlocked = false;
+  setPlaying(false);
+
+  // Отпускаем все перехваты клавиш, оставляя только возврат блокировки.
+  releaseShortcuts();
+  try {
+    globalShortcut.register("Control+Alt+Shift+L", () => relock());
+  } catch (error) {
+    console.error(`Не удалось повесить возврат блокировки: ${asText(error)}`);
+  }
+
+  // Возвращаем диспетчер задач, cmd, диски и снимаем запреты побега: админу
+  // нужен полный доступ к машине.
+  await releaseLockdown();
+  await releaseGuard();
+
+  // Прячем окно и показываем рабочий стол. На этой машине explorer мог быть не
+  // запущен (окно агента — единственное), тогда за ним пусто: поднимаем его.
+  if (lockWindow) {
+    lockWindow.setKiosk(false);
+    lockWindow.setAlwaysOnTop(false);
+    lockWindow.setFullScreen(false);
+    lockWindow.hide();
+  }
+  ensureExplorer();
+  return { ok: true };
+});
+
+/** Поднять «Проводник», если он не запущен: иначе за спрятанным окном пусто. */
+function ensureExplorer(): void {
+  if (process.platform !== "win32") return;
+  exec('tasklist /fi "imagename eq explorer.exe" /nh', (error, stdout) => {
+    if (!error && /explorer\.exe/i.test(stdout)) return; // уже работает
+    try {
+      spawn("explorer.exe", [], { detached: true, stdio: "ignore" }).unref();
+    } catch (cause) {
+      console.error(`Не удалось поднять Проводник: ${asText(cause)}`);
+    }
+  });
+}
+
+/** Вернуть блокировку из сервисного режима (Ctrl+Alt+Shift+L или перезагрузка). */
+function relock(): void {
+  servicing = false;
+  unlocked = false;
+  setPlaying(false);
+  releaseShortcuts(["Control+Alt+Shift+L"]);
+  holdShortcuts();
+  void applyGuard();
+  holdLockOnTop();
+}
 
 /**
  * Вернуть запертое окно на передний план целиком.
@@ -298,7 +378,7 @@ function holdLockOnTop(): void {
  * сочетаний Windows обрабатывает мимо приложения.
  */
 setInterval(() => {
-  if (unlocked || !lockWindow) return;
+  if (unlocked || servicing || !lockWindow) return;
   if (
     lockWindow.isMinimized() ||
     !lockWindow.isVisible() ||

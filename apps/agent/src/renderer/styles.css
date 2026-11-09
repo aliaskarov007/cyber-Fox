@@ -25,7 +25,11 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(120% 90% at 50% 0%, #1a1f2b 0%, var(--ground) 60%);
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    #1a1f2b 0%,
+    var(--ground) 60%
+  );
   color: var(--ink);
   font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
   display: grid;
@@ -417,7 +421,9 @@ button:disabled {
   border: 2px solid transparent;
   display: grid;
   place-items: center;
-  transition: transform 120ms ease, border-color 120ms ease;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
 }
 
 .tile:hover .tile-art,
@@ -888,7 +894,9 @@ button:disabled {
   height: 8px;
   border-radius: 50%;
   background: var(--line);
-  transition: background 0.3s, width 0.3s;
+  transition:
+    background 0.3s,
+    width 0.3s;
 }
 
 .dots span.on {
@@ -912,4 +920,75 @@ button:disabled {
   .slide {
     animation: none;
   }
+}
+
+/* Окно пароля выхода в сервисный режим (Ctrl+Alt+Shift+S). */
+.service-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+}
+.service-dialog {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #17181e;
+  border: 1px solid #2c2f3a;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.service-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.service-dialog p {
+  margin: 0;
+  font-size: 14px;
+  color: #a3aab8;
+}
+.service-dialog input {
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #2c2f3a;
+  border-radius: 8px;
+  background: #0f1014;
+  color: #eceef3;
+  font: inherit;
+  font-size: 15px;
+}
+.service-dialog input:focus {
+  outline: 2px solid #e1521c;
+  outline-offset: -1px;
+  border-color: transparent;
+}
+.service-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.service-actions button {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid #3a3d48;
+  background: transparent;
+  color: #eceef3;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.service-actions button[type="submit"] {
+  background: #e1521c;
+  border-color: #e1521c;
+  color: #fff;
+}
+.service-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

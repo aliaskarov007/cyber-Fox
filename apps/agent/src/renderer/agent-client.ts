@@ -53,14 +53,28 @@ export interface GuestLoginResult {
   ok: boolean;
   reason: string | null;
   guest: { id: string; fullName: string; balance: number } | null;
-  packagesInZone: Array<{ id: string; minutesRemaining: number; expiresAt: string }>;
-  packagesElsewhere: Array<{ id: string; zoneName: string; minutesRemaining: number }>;
+  packagesInZone: Array<{
+    id: string;
+    minutesRemaining: number;
+    expiresAt: string;
+  }>;
+  packagesElsewhere: Array<{
+    id: string;
+    zoneName: string;
+    minutesRemaining: number;
+  }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;
 }
 
 export type SignupStart =
-  | { ok: true; code: string; link: string; clubPhone: string; expiresAt: string }
+  | {
+      ok: true;
+      code: string;
+      link: string;
+      clubPhone: string;
+      expiresAt: string;
+    }
   | { ok: false; reason: string };
 
 export interface SignupConfirmed {
@@ -135,7 +149,10 @@ declare global {
       saveConfig: (settings: AgentSettings) => Promise<void>;
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
-      scan: () => Promise<Array<{ name: string; target: string; coverUrl: string }>>;
+      serviceMode: () => Promise<{ ok: boolean }>;
+      scan: () => Promise<
+        Array<{ name: string; target: string; coverUrl: string }>
+      >;
       launch: (app: {
         kind: string;
         target: string;
@@ -205,7 +222,8 @@ export class AgentClient {
     this.socket.on("session.switched", handlers.onSwitched);
     this.socket.on("lock", handlers.onLock);
     this.socket.on("library.changed", handlers.onLibraryChanged);
-    if (handlers.onScreenChanged) this.socket.on("screen.changed", handlers.onScreenChanged);
+    if (handlers.onScreenChanged)
+      this.socket.on("screen.changed", handlers.onScreenChanged);
 
     // Сердцебиение: по нему админ видит, что машина на связи.
     setInterval(() => this.socket?.emit("heartbeat"), 30_000);
@@ -239,6 +257,14 @@ export class AgentClient {
     return this.request("guest.login", { phone, pin });
   }
 
+  /**
+   * Проверка пароля выхода из оболочки на сервере. У каждого клуба свой пароль;
+   * сервер берёт клуб по сокету. Верно — агент уходит в сервисный режим.
+   */
+  shellExit(password: string): Promise<{ ok: boolean; reason?: string }> {
+    return this.request("shell.exit", { password });
+  }
+
   /** Адрес с сервера («/api/covers/…») — в полный: экран открыт не с сервера. */
   resolveUrl(url: string): string {
     try {
@@ -253,12 +279,17 @@ export class AgentClient {
   }
 
   /** Заказ из бара с оплатой с баланса гостя этой сессии. */
-  barOrder(items: Array<{ productId: string; quantity: number }>): Promise<BarOrderResult> {
+  barOrder(
+    items: Array<{ productId: string; quantity: number }>,
+  ): Promise<BarOrderResult> {
     return this.request("bar.order", { items });
   }
 
   /** Пополнение. Сумма в тиын; способ — QR или счёт в Kaspi на номер гостя. */
-  createTopUp(amount: number, method: "qr" | "phone" = "qr"): Promise<TopUpStart> {
+  createTopUp(
+    amount: number,
+    method: "qr" | "phone" = "qr",
+  ): Promise<TopUpStart> {
     return this.request("topup.create", { amount, method });
   }
 
@@ -268,7 +299,9 @@ export class AgentClient {
   }
 
   /** Счёт Kaspi не состоялся: истёк, отменён или Kaspi отказал. */
-  onTopUpFailed(listener: (event: { intentId: string; reason: string }) => void): () => void {
+  onTopUpFailed(
+    listener: (event: { intentId: string; reason: string }) => void,
+  ): () => void {
     this.socket?.on("topup.failed", listener);
     return () => {
       this.socket?.off("topup.failed", listener);
@@ -281,7 +314,9 @@ export class AgentClient {
   }
 
   /** Деньги по QR зачислены. Возвращается функция отписки. */
-  onTopUpPaid(listener: (event: { intentId: string; amount: number }) => void): () => void {
+  onTopUpPaid(
+    listener: (event: { intentId: string; amount: number }) => void,
+  ): () => void {
     this.socket?.on("topup.paid", listener);
     return () => {
       this.socket?.off("topup.paid", listener);
@@ -308,7 +343,10 @@ export class AgentClient {
     return this.request("promo.redeem", { code });
   }
 
-  startSession(guestId: string, tariffId?: string): Promise<{ ok: boolean; reason?: string }> {
+  startSession(
+    guestId: string,
+    tariffId?: string,
+  ): Promise<{ ok: boolean; reason?: string }> {
     return this.request("session.start", { guestId, tariffId });
   }
 
@@ -317,7 +355,9 @@ export class AgentClient {
   }
 
   /** Отчёт о том, что установлено на машине. */
-  reportLibrary(items: Array<{ name: string; target: string; coverUrl: string }>): Promise<{
+  reportLibrary(
+    items: Array<{ name: string; target: string; coverUrl: string }>,
+  ): Promise<{
     ok: boolean;
     saved?: number;
   }> {
@@ -325,7 +365,11 @@ export class AgentClient {
   }
 
   /** Полки этой машины: общие игры клуба плюс игры её зоны. */
-  library(): Promise<{ ok: boolean; apps: LibraryApp[]; favourites?: string[] }> {
+  library(): Promise<{
+    ok: boolean;
+    apps: LibraryApp[];
+    favourites?: string[];
+  }> {
     return this.request("library.fetch", {});
   }
 
@@ -365,10 +409,12 @@ export class AgentClient {
         reject(new Error("Нет соединения с сервером"));
         return;
       }
-      this.socket.timeout(10_000).emit(event, payload, (error: Error | null, response: T) => {
-        if (error) reject(error);
-        else resolve(response);
-      });
+      this.socket
+        .timeout(10_000)
+        .emit(event, payload, (error: Error | null, response: T) => {
+          if (error) reject(error);
+          else resolve(response);
+        });
     });
   }
 }
@@ -384,7 +430,10 @@ export function formatMoney(tiyn: number): string {
  * Часы и минуты подписываются словами: «10:12» под подписью «минут» гость
  * читает как двенадцать минут и идёт к администратору раньше времени.
  */
-export function formatRemaining(minutes: number): { value: string; unit: string | null } {
+export function formatRemaining(minutes: number): {
+  value: string;
+  unit: string | null;
+} {
   if (minutes < 60) return { value: String(minutes), unit: "минут" };
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;

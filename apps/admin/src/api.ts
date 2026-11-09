@@ -311,8 +311,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
-    const message = Array.isArray(body?.message) ? body.message.join(", ") : body?.message;
+    const body = (await response.json().catch(() => null)) as {
+      message?: string | string[];
+    } | null;
+    const message = Array.isArray(body?.message)
+      ? body.message.join(", ")
+      : body?.message;
     throw new Error(message ?? `Ошибка ${response.status}`);
   }
 
@@ -332,7 +336,10 @@ export const api = {
   me: () => request<Staff>("/auth/me"),
 
   setMyPhone: (phone: string) =>
-    request<{ phone: string }>("/auth/me/phone", { method: "PATCH", body: JSON.stringify({ phone }) }),
+    request<{ phone: string }>("/auth/me/phone", {
+      method: "PATCH",
+      body: JSON.stringify({ phone }),
+    }),
 
   requestPasswordReset: (email: string) =>
     request<{ sent: true }>("/auth/password-reset/request", {
@@ -340,11 +347,18 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
-  confirmPasswordReset: (body: { email: string; code: string; password: string }) =>
-    request<{ ok: true } | { ok: false; error: string }>("/auth/password-reset/confirm", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  confirmPasswordReset: (body: {
+    email: string;
+    code: string;
+    password: string;
+  }) =>
+    request<{ ok: true } | { ok: false; error: string }>(
+      "/auth/password-reset/confirm",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
 
   clubs: () => request<Club[]>("/clubs"),
 
@@ -353,36 +367,59 @@ export const api = {
   tariffs: (clubId: string) => request<Tariff[]>(`/clubs/${clubId}/tariffs`),
 
   createTariff: (clubId: string, body: TariffInput) =>
-    request<Tariff>(`/clubs/${clubId}/tariffs`, { method: "POST", body: JSON.stringify(body) }),
+    request<Tariff>(`/clubs/${clubId}/tariffs`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  updateTariff: (clubId: string, tariffId: string, body: Partial<TariffInput> & { isActive?: boolean }) =>
+  updateTariff: (
+    clubId: string,
+    tariffId: string,
+    body: Partial<TariffInput> & { isActive?: boolean },
+  ) =>
     request<Tariff>(`/clubs/${clubId}/tariffs/${tariffId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
 
   createZone: (clubId: string, body: { name: string; sortOrder?: number }) =>
-    request<Zone>(`/clubs/${clubId}/zones`, { method: "POST", body: JSON.stringify(body) }),
+    request<Zone>(`/clubs/${clubId}/zones`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateZone: (
     clubId: string,
     zoneId: string,
-    body: Partial<{ name: string; sortOrder: number; defaultPerMinuteTariffId: string }>,
+    body: Partial<{
+      name: string;
+      sortOrder: number;
+      defaultPerMinuteTariffId: string;
+    }>,
   ) =>
     request<Zone>(`/clubs/${clubId}/zones/${zoneId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
 
-  computers: (clubId: string) => request<Computer[]>(`/clubs/${clubId}/computers`),
+  computers: (clubId: string) =>
+    request<Computer[]>(`/clubs/${clubId}/computers`),
 
   createComputer: (clubId: string, body: { name: string; zoneId: string }) =>
-    request<Computer>(`/clubs/${clubId}/computers`, { method: "POST", body: JSON.stringify(body) }),
+    request<Computer>(`/clubs/${clubId}/computers`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateComputer: (
     clubId: string,
     computerId: string,
-    body: Partial<{ name: string; zoneId: string; posX: number | null; posY: number | null }>,
+    body: Partial<{
+      name: string;
+      zoneId: string;
+      posX: number | null;
+      posY: number | null;
+    }>,
   ) =>
     request<Computer>(`/clubs/${clubId}/computers/${computerId}`, {
       method: "PATCH",
@@ -397,15 +434,28 @@ export const api = {
   guestCard: (clubId: string, guestId: string) =>
     request<GuestCard>(`/clubs/${clubId}/guests/${guestId}`),
 
-  createGuest: (clubId: string, body: { fullName: string; phone: string; pin?: string }) =>
-    request<Guest>(`/clubs/${clubId}/guests`, { method: "POST", body: JSON.stringify(body) }),
+  createGuest: (
+    clubId: string,
+    body: { fullName: string; phone: string; pin?: string },
+  ) =>
+    request<Guest>(`/clubs/${clubId}/guests`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   apps: (clubId: string) => request<ClubApp[]>(`/clubs/${clubId}/apps`),
 
   createApp: (clubId: string, body: ClubAppInput) =>
-    request<ClubApp>(`/clubs/${clubId}/apps`, { method: "POST", body: JSON.stringify(body) }),
+    request<ClubApp>(`/clubs/${clubId}/apps`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  updateApp: (clubId: string, appId: string, body: Partial<ClubAppInput> & { isActive?: boolean }) =>
+  updateApp: (
+    clubId: string,
+    appId: string,
+    body: Partial<ClubAppInput> & { isActive?: boolean },
+  ) =>
     request<ClubApp>(`/clubs/${clubId}/apps/${appId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -425,13 +475,16 @@ export const api = {
       body: form,
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      const body = (await response.json().catch(() => null)) as {
+        message?: string;
+      } | null;
       throw new Error(body?.message ?? `Ошибка ${response.status}`);
     }
     return (await response.json()) as { url: string };
   },
 
-  appSuggestions: (clubId: string) => request<AppSuggestion[]>(`/clubs/${clubId}/apps/suggestions`),
+  appSuggestions: (clubId: string) =>
+    request<AppSuggestion[]>(`/clubs/${clubId}/apps/suggestions`),
 
   acceptSuggestions: (clubId: string, ids: string[]) =>
     request<{ added: number }>(`/clubs/${clubId}/apps/suggestions/accept`, {
@@ -440,15 +493,26 @@ export const api = {
     }),
 
   dismissSuggestion: (clubId: string, id: string) =>
-    request<{ ok: true }>(`/clubs/${clubId}/apps/suggestions/${id}`, { method: "DELETE" }),
+    request<{ ok: true }>(`/clubs/${clubId}/apps/suggestions/${id}`, {
+      method: "DELETE",
+    }),
 
   deleteApp: (clubId: string, appId: string) =>
-    request<{ ok: true }>(`/clubs/${clubId}/apps/${appId}`, { method: "DELETE" }),
+    request<{ ok: true }>(`/clubs/${clubId}/apps/${appId}`, {
+      method: "DELETE",
+    }),
 
   createProduct: (clubId: string, body: ProductInput) =>
-    request<Product>(`/clubs/${clubId}/products`, { method: "POST", body: JSON.stringify(body) }),
+    request<Product>(`/clubs/${clubId}/products`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  updateProduct: (clubId: string, productId: string, body: Partial<ProductInput> & { isActive?: boolean }) =>
+  updateProduct: (
+    clubId: string,
+    productId: string,
+    body: Partial<ProductInput> & { isActive?: boolean },
+  ) =>
     request<Product>(`/clubs/${clubId}/products/${productId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -467,7 +531,12 @@ export const api = {
       body: JSON.stringify({ amount, method }),
     }),
 
-  buyPackage: (clubId: string, guestId: string, tariffId: string, method: string) =>
+  buyPackage: (
+    clubId: string,
+    guestId: string,
+    tariffId: string,
+    method: string,
+  ) =>
     request<GuestPackage>(`/clubs/${clubId}/guests/${guestId}/packages`, {
       method: "POST",
       body: JSON.stringify({ tariffId, method }),
@@ -475,7 +544,12 @@ export const api = {
 
   startSession: (
     clubId: string,
-    body: { computerId: string; guestId?: string; tariffId?: string; prepaidAmount?: number },
+    body: {
+      computerId: string;
+      guestId?: string;
+      tariffId?: string;
+      prepaidAmount?: number;
+    },
   ) =>
     request<{ id: string }>(`/clubs/${clubId}/sessions`, {
       method: "POST",
@@ -483,13 +557,19 @@ export const api = {
     }),
 
   stopSession: (clubId: string, sessionId: string) =>
-    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/stop`, { method: "POST" }),
+    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/stop`, {
+      method: "POST",
+    }),
 
   pauseSession: (clubId: string, sessionId: string) =>
-    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/pause`, { method: "POST" }),
+    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/pause`, {
+      method: "POST",
+    }),
 
   resumeSession: (clubId: string, sessionId: string) =>
-    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/resume`, { method: "POST" }),
+    request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/resume`, {
+      method: "POST",
+    }),
 
   moveSession: (clubId: string, sessionId: string, computerId: string) =>
     request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/move`, {
@@ -504,10 +584,21 @@ export const api = {
 
   sellProduct: (
     clubId: string,
-    body: { productId: string; quantity: number; method: string; guestId?: string; sessionId?: string },
-  ) => request<unknown>(`/clubs/${clubId}/products/sell`, { method: "POST", body: JSON.stringify(body) }),
+    body: {
+      productId: string;
+      quantity: number;
+      method: string;
+      guestId?: string;
+      sessionId?: string;
+    },
+  ) =>
+    request<unknown>(`/clubs/${clubId}/products/sell`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  currentShift: (clubId: string) => request<Shift | null>(`/clubs/${clubId}/shifts/current`),
+  currentShift: (clubId: string) =>
+    request<Shift | null>(`/clubs/${clubId}/shifts/current`),
 
   shifts: (clubId: string) => request<Shift[]>(`/clubs/${clubId}/shifts`),
 
@@ -520,7 +611,12 @@ export const api = {
   shiftReport: (clubId: string, shiftId: string) =>
     request<ShiftReport>(`/clubs/${clubId}/shifts/${shiftId}/report`),
 
-  closeShift: (clubId: string, shiftId: string, cashCounted: number, note?: string) =>
+  closeShift: (
+    clubId: string,
+    shiftId: string,
+    cashCounted: number,
+    note?: string,
+  ) =>
     request<ShiftReport>(`/clubs/${clubId}/shifts/${shiftId}/close`, {
       method: "POST",
       body: JSON.stringify({ cashCounted, note }),
@@ -530,11 +626,21 @@ export const api = {
 
   tenant: () => request<Tenant>("/network/tenant"),
 
-  updateTenant: (body: { name?: string; sharedBalance?: boolean; moveBalancesToClubId?: string }) =>
-    request<Tenant>("/network/tenant", { method: "PATCH", body: JSON.stringify(body) }),
+  updateTenant: (body: {
+    name?: string;
+    sharedBalance?: boolean;
+    moveBalancesToClubId?: string;
+  }) =>
+    request<Tenant>("/network/tenant", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   createClub: (body: { name: string; city?: string; timezone?: string }) =>
-    request<Club>("/network/clubs", { method: "POST", body: JSON.stringify(body) }),
+    request<Club>("/network/clubs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateClub: (
     clubId: string,
@@ -548,8 +654,14 @@ export const api = {
       barOrdersFromPc: boolean;
       paymentQrImageUrl: string | null;
       slogan: string | null;
+      /** Пароль выхода из оболочки (Ctrl+Alt+Shift+S на ПК). Пусто — не менять. */
+      shellExitPassword: string;
     }>,
-  ) => request<Club>(`/network/clubs/${clubId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  ) =>
+    request<Club>(`/network/clubs/${clubId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   staff: () => request<StaffMember[]>("/network/staff"),
 
@@ -560,7 +672,11 @@ export const api = {
     role: string;
     clubId?: string;
     phone?: string;
-  }) => request<StaffMember>("/network/staff", { method: "POST", body: JSON.stringify(body) }),
+  }) =>
+    request<StaffMember>("/network/staff", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   updateStaff: (
     staffId: string,
@@ -572,7 +688,11 @@ export const api = {
       isActive: boolean;
       phone: string;
     }>,
-  ) => request<StaffMember>(`/network/staff/${staffId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  ) =>
+    request<StaffMember>(`/network/staff/${staffId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   // --- Отчёты ---
 
@@ -582,11 +702,18 @@ export const api = {
   settlement: (period: { from?: string; to?: string } = {}) =>
     request<Settlement>(`/reports/settlement${periodQuery(period)}`),
 
-  computerReport: (clubId: string, period: { from?: string; to?: string } = {}) =>
-    request<ComputerPerformance[]>(`/reports/clubs/${clubId}/computers${periodQuery(period)}`),
+  computerReport: (
+    clubId: string,
+    period: { from?: string; to?: string } = {},
+  ) =>
+    request<ComputerPerformance[]>(
+      `/reports/clubs/${clubId}/computers${periodQuery(period)}`,
+    ),
 
   hoursReport: (clubId: string, period: { from?: string; to?: string } = {}) =>
-    request<HourlyPoint[]>(`/reports/clubs/${clubId}/hours${periodQuery(period)}`),
+    request<HourlyPoint[]>(
+      `/reports/clubs/${clubId}/hours${periodQuery(period)}`,
+    ),
 
   // --- Подписка на платформу ---
 
@@ -601,7 +728,10 @@ export const api = {
   platformInvoices: () => request<Invoice[]>("/subscription/invoices"),
 
   changePlan: (plan: string) =>
-    request<unknown>("/subscription/plan", { method: "POST", body: JSON.stringify({ plan }) }),
+    request<unknown>("/subscription/plan", {
+      method: "POST",
+      body: JSON.stringify({ plan }),
+    }),
 
   // --- Касса: онлайн-оплата ---
 
@@ -612,67 +742,113 @@ export const api = {
     }),
 
   confirmPayment: (intentId: string) =>
-    request<{ applied: boolean; reason: string | null }>(`/payments/${intentId}/confirm`, {
-      method: "POST",
-    }),
+    request<{ applied: boolean; reason: string | null }>(
+      `/payments/${intentId}/confirm`,
+      {
+        method: "POST",
+      },
+    ),
 
   payInvoice: (invoiceId: string) =>
-    request<Checkout>(`/subscription/invoices/${invoiceId}/pay`, { method: "POST" }),
+    request<Checkout>(`/subscription/invoices/${invoiceId}/pay`, {
+      method: "POST",
+    }),
 
   // --- WhatsApp и ивенты ---
 
   kaspi: () => request<KaspiChannel>("/network/kaspi"),
 
-  saveKaspi: (body: { apiKey?: string; webhookSecret?: string; enabled?: boolean }) =>
-    request<KaspiChannel>("/network/kaspi", { method: "PUT", body: JSON.stringify(body) }),
+  saveKaspi: (body: {
+    apiKey?: string;
+    webhookSecret?: string;
+    enabled?: boolean;
+  }) =>
+    request<KaspiChannel>("/network/kaspi", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 
-  disconnectKaspi: () => request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
+  disconnectKaspi: () =>
+    request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
   kaspiProvider: () => request<KaspiProvider>("/network/kaspi-provider"),
   saveKaspiProvider: (enabled: boolean) =>
-    request<KaspiProvider>("/network/kaspi-provider", { method: "PUT", body: JSON.stringify({ enabled }) }),
+    request<KaspiProvider>("/network/kaspi-provider", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
 
   whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
 
-  saveWhatsApp: (body: { apiUrl?: string; instanceId: string; apiToken?: string; publicUrl?: string }) =>
+  saveWhatsApp: (body: {
+    apiUrl?: string;
+    instanceId: string;
+    apiToken?: string;
+    publicUrl?: string;
+  }) =>
     request<WhatsAppChannel & { warning: string | null }>("/network/whatsapp", {
       method: "PUT",
       body: JSON.stringify(body),
     }),
 
-  checkWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp/check", { method: "POST" }),
+  checkWhatsApp: () =>
+    request<WhatsAppChannel>("/network/whatsapp/check", { method: "POST" }),
 
   testWhatsApp: (phone: string) =>
-    request<{ ok: true }>("/network/whatsapp/test", { method: "POST", body: JSON.stringify({ phone }) }),
+    request<{ ok: true }>("/network/whatsapp/test", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    }),
 
-  disconnectWhatsApp: () => request<WhatsAppChannel>("/network/whatsapp", { method: "DELETE" }),
+  disconnectWhatsApp: () =>
+    request<WhatsAppChannel>("/network/whatsapp", { method: "DELETE" }),
 
   sendPhoneCode: (clubId: string, guestId: string) =>
-    request<{ sentTo: string; expiresAt: string }>(`/clubs/${clubId}/guests/${guestId}/phone/send-code`, {
-      method: "POST",
-    }),
+    request<{ sentTo: string; expiresAt: string }>(
+      `/clubs/${clubId}/guests/${guestId}/phone/send-code`,
+      {
+        method: "POST",
+      },
+    ),
 
   /** Ошибка ввода приходит ответом, а не статусом: так сервер честно считает попытки. */
   confirmPhoneCode: (clubId: string, guestId: string, code: string) =>
-    request<{ ok: true; phoneVerifiedAt: string } | { ok: false; error: string }>(
-      `/clubs/${clubId}/guests/${guestId}/phone/confirm`,
-      { method: "POST", body: JSON.stringify({ code }) },
-    ),
+    request<
+      { ok: true; phoneVerifiedAt: string } | { ok: false; error: string }
+    >(`/clubs/${clubId}/guests/${guestId}/phone/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
 
   events: (clubId: string) => request<ClubEvent[]>(`/clubs/${clubId}/events`),
 
   eventAudience: (clubId: string, audience: EventAudience) =>
-    request<{ guests: number; unverified: number }>(`/clubs/${clubId}/events/audience?audience=${audience}`),
+    request<{ guests: number; unverified: number }>(
+      `/clubs/${clubId}/events/audience?audience=${audience}`,
+    ),
 
   createEvent: (
     clubId: string,
-    body: { title: string; description?: string; startsAt: string; audience: EventAudience },
-  ) => request<ClubEvent>(`/clubs/${clubId}/events`, { method: "POST", body: JSON.stringify(body) }),
+    body: {
+      title: string;
+      description?: string;
+      startsAt: string;
+      audience: EventAudience;
+    },
+  ) =>
+    request<ClubEvent>(`/clubs/${clubId}/events`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   sendEvent: (clubId: string, eventId: string) =>
-    request<{ queued: number }>(`/clubs/${clubId}/events/${eventId}/send`, { method: "POST" }),
+    request<{ queued: number }>(`/clubs/${clubId}/events/${eventId}/send`, {
+      method: "POST",
+    }),
 
   cancelEvent: (clubId: string, eventId: string) =>
-    request<ClubEvent>(`/clubs/${clubId}/events/${eventId}/cancel`, { method: "POST" }),
+    request<ClubEvent>(`/clubs/${clubId}/events/${eventId}/cancel`, {
+      method: "POST",
+    }),
 
   eventInvites: (clubId: string, eventId: string) =>
     request<EventInvite[]>(`/clubs/${clubId}/events/${eventId}/invites`),
@@ -688,7 +864,12 @@ export const api = {
   tournament: (clubId: string, tournamentId: string) =>
     request<TournamentSummary>(`/clubs/${clubId}/tournaments/${tournamentId}`),
 
-  assignFreeAgent: (clubId: string, tournamentId: string, entryId: string, teamId: string) =>
+  assignFreeAgent: (
+    clubId: string,
+    tournamentId: string,
+    entryId: string,
+    teamId: string,
+  ) =>
     request<void>(`/clubs/${clubId}/tournaments/${tournamentId}/free-agents`, {
       method: "POST",
       body: JSON.stringify({ entryId, teamId }),
@@ -701,11 +882,18 @@ export const api = {
     ),
 
   cancelTournament: (clubId: string, tournamentId: string) =>
-    request<{ refunded: number }>(`/clubs/${clubId}/tournaments/${tournamentId}/cancel`, {
-      method: "POST",
-    }),
+    request<{ refunded: number }>(
+      `/clubs/${clubId}/tournaments/${tournamentId}/cancel`,
+      {
+        method: "POST",
+      },
+    ),
 
-  payTournamentPrizes: (clubId: string, tournamentId: string, teamIds: string[]) =>
+  payTournamentPrizes: (
+    clubId: string,
+    tournamentId: string,
+    teamIds: string[],
+  ) =>
     request<{ paid: number; total: number }>(
       `/clubs/${clubId}/tournaments/${tournamentId}/prizes`,
       { method: "POST", body: JSON.stringify({ teamIds }) },
@@ -713,31 +901,46 @@ export const api = {
 
   // --- Заказы с игровых ПК и пополнения по QR ---
 
-  barOrders: (clubId: string) => request<BarOrder[]>(`/clubs/${clubId}/bar-orders`),
+  barOrders: (clubId: string) =>
+    request<BarOrder[]>(`/clubs/${clubId}/bar-orders`),
 
   completeBarOrder: (clubId: string, orderId: string) =>
-    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/done`, { method: "POST" }),
+    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/done`, {
+      method: "POST",
+    }),
 
   cancelBarOrder: (clubId: string, orderId: string) =>
-    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/cancel`, { method: "POST" }),
+    request<{ ok: boolean }>(`/clubs/${clubId}/bar-orders/${orderId}/cancel`, {
+      method: "POST",
+    }),
 
   pendingQrTopUps: (clubId: string) =>
     request<PendingQrTopUp[]>(`/clubs/${clubId}/payments/qr-pending`),
 
   cancelPayment: (intentId: string) =>
-    request<{ ok: boolean }>(`/payments/${intentId}/cancel`, { method: "POST" }),
+    request<{ ok: boolean }>(`/payments/${intentId}/cancel`, {
+      method: "POST",
+    }),
 
   // --- Отток гостей ---
 
   retention: (clubId: string, days: number, minVisits: number) =>
-    request<RetentionReport>(`/clubs/${clubId}/retention?days=${days}&minVisits=${minVisits}`),
+    request<RetentionReport>(
+      `/clubs/${clubId}/retention?days=${days}&minVisits=${minVisits}`,
+    ),
 
   winbackCampaigns: (clubId: string) =>
     request<WinbackCampaign[]>(`/clubs/${clubId}/retention/campaigns`),
 
   createWinback: (
     clubId: string,
-    body: { guestIds: string[]; kind: PromoKind; amount: number; validDays: number; message?: string },
+    body: {
+      guestIds: string[];
+      kind: PromoKind;
+      amount: number;
+      validDays: number;
+      message?: string;
+    },
   ) =>
     request<{ campaignId: string; queued: number; skipped: number }>(
       `/clubs/${clubId}/retention/campaigns`,
@@ -752,22 +955,41 @@ export const api = {
   slides: (clubId: string) => request<ScreenSlide[]>(`/clubs/${clubId}/slides`),
 
   createSlide: (clubId: string, body: ScreenSlideInput) =>
-    request<ScreenSlide>(`/clubs/${clubId}/slides`, { method: "POST", body: JSON.stringify(body) }),
+    request<ScreenSlide>(`/clubs/${clubId}/slides`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  updateSlide: (clubId: string, slideId: string, body: { isActive?: boolean; sortOrder?: number }) =>
-    request<ScreenSlide>(`/clubs/${clubId}/slides/${slideId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  updateSlide: (
+    clubId: string,
+    slideId: string,
+    body: { isActive?: boolean; sortOrder?: number },
+  ) =>
+    request<ScreenSlide>(`/clubs/${clubId}/slides/${slideId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   deleteSlide: (clubId: string, slideId: string) =>
-    request<{ ok: boolean }>(`/clubs/${clubId}/slides/${slideId}`, { method: "DELETE" }),
+    request<{ ok: boolean }>(`/clubs/${clubId}/slides/${slideId}`, {
+      method: "DELETE",
+    }),
 
   createPromo: (clubId: string, body: PromoInput) =>
-    request<Promo>(`/clubs/${clubId}/promos`, { method: "POST", body: JSON.stringify(body) }),
+    request<Promo>(`/clubs/${clubId}/promos`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   disablePromo: (clubId: string, promoId: string) =>
-    request<Promo>(`/clubs/${clubId}/promos/${promoId}/disable`, { method: "POST" }),
+    request<Promo>(`/clubs/${clubId}/promos/${promoId}/disable`, {
+      method: "POST",
+    }),
 
   promoRedemptions: (clubId: string, promoId: string) =>
-    request<PromoRedemption[]>(`/clubs/${clubId}/promos/${promoId}/redemptions`),
+    request<PromoRedemption[]>(
+      `/clubs/${clubId}/promos/${promoId}/redemptions`,
+    ),
 
   /** Администратор вводит код, который гость назвал на стойке. */
   redeemPromo: (clubId: string, guestId: string, code: string) =>
@@ -778,7 +1000,11 @@ export const api = {
 
   // --- Перенос данных ---
 
-  importCsv: (clubId: string, kind: "guests" | "computers" | "tariffs", csv: string) =>
+  importCsv: (
+    clubId: string,
+    kind: "guests" | "computers" | "tariffs",
+    csv: string,
+  ) =>
     request<ImportResult>(`/clubs/${clubId}/import/${kind}`, {
       method: "POST",
       body: JSON.stringify({ csv }),
@@ -919,7 +1145,12 @@ export interface TournamentSummary {
   prizePool: number;
   prizeBreakdown: number[];
   teams: TournamentTeam[];
-  freeAgents: Array<{ entryId: string; guestId: string; fullName: string; phone: string }>;
+  freeAgents: Array<{
+    entryId: string;
+    guestId: string;
+    fullName: string;
+    phone: string;
+  }>;
 }
 
 export interface ClubEvent {
@@ -949,7 +1180,12 @@ export interface BarOrder {
   computerName: string;
   guestName: string;
   total: number;
-  items: Array<{ productId: string; name: string; quantity: number; price: number }>;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
   createdAt: string;
   handledAt: string | null;
 }
@@ -1165,7 +1401,9 @@ export function formatMoney(tiyn: number): string {
 }
 
 export function formatDuration(fromIso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(fromIso).getTime()) / 60_000);
+  const minutes = Math.floor(
+    (Date.now() - new Date(fromIso).getTime()) / 60_000,
+  );
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return h > 0 ? `${h} ч ${m} мин` : `${m} мин`;

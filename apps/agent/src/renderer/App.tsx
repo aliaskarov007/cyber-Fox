@@ -1,7 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { AgentSettings } from "../shared/settings.js";
-import { AgentClient, type AgentConfig, type GuestScreen, type PairedInfo, type Tick } from "./agent-client.js";
+import {
+  AgentClient,
+  type AgentConfig,
+  type GuestScreen,
+  type PairedInfo,
+  type Tick,
+} from "./agent-client.js";
 import { BrandPanel } from "./BrandPanel.js";
 import type { LibraryApp } from "../shared/library.js";
 import { LockScreen } from "./LockScreen.js";
@@ -20,6 +33,86 @@ import {
 
 /** За сколько минут до конца предупреждать гостя. Значение клуба придёт с сервера позже. */
 const WARN_MINUTES = 10;
+
+/**
+ * Выход в сервисный режим по паролю клуба.
+ *
+ * Секретное сочетание Ctrl+Alt+Shift+S открывает окно пароля — гость о нём не
+ * знает и случайно не наберёт. Пароль проверяет сервер (у каждого клуба свой);
+ * верно — агент снимает блокировку и показывает рабочий стол для обслуживания.
+ */
+function ServiceExit({ client }: { client: AgentClient }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && e.altKey && e.shiftKey && e.code === "KeyS") {
+        e.preventDefault();
+        setError(null);
+        setPassword("");
+        setOpen(true);
+      }
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (!open) return null;
+
+  const submit = async (e: FormEvent): Promise<void> => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await client.shellExit(password);
+      if (result.ok) {
+        // Сервер подтвердил — уводим агента с экрана. Окно спрячется само.
+        await window.cyberfox.serviceMode();
+        setOpen(false);
+      } else {
+        setError(result.reason ?? "Неверный пароль");
+      }
+    } catch {
+      setError("Нет связи с сервером — выход по паролю недоступен");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="service-backdrop" onMouseDown={() => setOpen(false)}>
+      <form
+        className="service-dialog"
+        onMouseDown={(e) => e.stopPropagation()}
+        onSubmit={submit}
+      >
+        <h2>Выход из оболочки</h2>
+        <p>Введите пароль клуба, чтобы снять блокировку для обслуживания.</p>
+        {error && <div className="error">{error}</div>}
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Пароль выхода"
+          autoComplete="off"
+          autoFocus
+        />
+        <div className="service-actions">
+          <button type="button" onClick={() => setOpen(false)} disabled={busy}>
+            Отмена
+          </button>
+          <button type="submit" disabled={busy || password.length === 0}>
+            {busy ? "Проверяем…" : "Выйти"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 /** Монотонные часы: перевод системного времени не должен дарить бесплатные часы. */
 const monotonic = (): number => performance.now();
@@ -72,8 +165,10 @@ export function App() {
 
   /** Досылка накопленного. Очередь чистится только по подтверждению сервера. */
   const flush = useCallback(async () => {
-    journal.current = sealOfflineMinutes(journal.current, new Date().toISOString(), () =>
-      crypto.randomUUID(),
+    journal.current = sealOfflineMinutes(
+      journal.current,
+      new Date().toISOString(),
+      () => crypto.randomUUID(),
     );
     const pending = journal.current.queue;
     setQueued(pending.length);
@@ -127,7 +222,9 @@ export function App() {
          */
         void window.cyberfox
           .scan()
-          .then((items) => (items.length > 0 ? client.reportLibrary(items) : null))
+          .then((items) =>
+            items.length > 0 ? client.reportLibrary(items) : null,
+          )
           .catch(() => null);
       },
       onLibraryChanged: () => void loadLibrary(),
@@ -209,8 +306,12 @@ export function App() {
       ? {
           ...tick,
           // Без связи показываем локальный остаток: серверные числа устарели.
-          packageMinutesLeft: tick.packageMinutesLeft === null ? null : localMinutes,
-          minutesAffordable: tick.packageMinutesLeft === null ? localMinutes : tick.minutesAffordable,
+          packageMinutesLeft:
+            tick.packageMinutesLeft === null ? null : localMinutes,
+          minutesAffordable:
+            tick.packageMinutesLeft === null
+              ? localMinutes
+              : tick.minutesAffordable,
         }
       : tick;
 
@@ -220,7 +321,8 @@ export function App() {
         <div className="failure-title">Cyber-Fox · сбой запуска</div>
         <pre className="failure-reason">{configError}</pre>
         <div className="failure-hint">
-          Покажите этот текст тому, кто ставил систему. Машина в зал в таком виде не выдаётся.
+          Покажите этот текст тому, кто ставил систему. Машина в зал в таком
+          виде не выдаётся.
         </div>
       </div>
     );
@@ -298,7 +400,9 @@ export function App() {
                   // Отметка ставится сразу: ждать ответа сервера ради сердечка
                   // незачем, а сеть в зале иногда думает.
                   setFavourites((current) =>
-                    on ? [...current, app.id] : current.filter((id) => id !== app.id),
+                    on
+                      ? [...current, app.id]
+                      : current.filter((id) => id !== app.id),
                   );
                   void client.favourite(app.id, on);
                 }
@@ -324,7 +428,13 @@ export function App() {
 
   return (
     <div className="lock-layout">
-      <BrandPanel client={client} screen={screen} fallbackName={paired?.clubName ?? null} />
+      {/* Секретный выход в сервисный режим по паролю клуба (Ctrl+Alt+Shift+S). */}
+      <ServiceExit client={client} />
+      <BrandPanel
+        client={client}
+        screen={screen}
+        fallbackName={paired?.clubName ?? null}
+      />
       <div className="screen">
         <div className="pc-id">
           <div className="name">{paired?.computerName ?? "—"}</div>
@@ -337,12 +447,12 @@ export function App() {
 
         {!online && displayTick && (
           <div className="banner warn">
-            Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
-            связь вернётся.
+            Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и
+            будет учтено, когда связь вернётся.
           </div>
         )}
 
-        {(
+        {
           <LockScreen
             client={client}
             perMinutePrice={null}
@@ -352,7 +462,7 @@ export function App() {
               void window.cyberfox.unlock();
             }}
           />
-        )}
+        }
 
         {/* Обрыв связи прятать нельзя: гость должен понимать, почему не проходит вход. */}
         <div className={`status ${online ? "" : "offline"}`}>

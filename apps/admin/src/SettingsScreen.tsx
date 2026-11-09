@@ -1,6 +1,14 @@
 import { type FormEvent, useEffect, useState } from "react";
 
-import { type Club, type Staff, type StaffMember, type Tenant, api, formatMoney, toTiyn } from "./api.js";
+import {
+  type Club,
+  type Staff,
+  type StaffMember,
+  type Tenant,
+  api,
+  formatMoney,
+  toTiyn,
+} from "./api.js";
 import { ComputersSection } from "./ComputersSection.js";
 import { ZonesSection } from "./ZonesSection.js";
 import { GuestScreenSettings } from "./GuestScreenSettings.js";
@@ -35,7 +43,10 @@ export function SettingsScreen({
   const [done, setDone] = useState<string | null>(null);
 
   async function load(): Promise<void> {
-    const [nextTenant, nextPeople] = await Promise.all([api.tenant(), api.staff()]);
+    const [nextTenant, nextPeople] = await Promise.all([
+      api.tenant(),
+      api.staff(),
+    ]);
     setTenant(nextTenant);
     setPeople(nextPeople);
   }
@@ -44,7 +55,10 @@ export function SettingsScreen({
     void load();
   }, []);
 
-  async function run(action: () => Promise<unknown>, message: string): Promise<void> {
+  async function run(
+    action: () => Promise<unknown>,
+    message: string,
+  ): Promise<void> {
     setError(null);
     setDone(null);
     try {
@@ -61,7 +75,10 @@ export function SettingsScreen({
       {error && <div className="error">{error}</div>}
       {done && <div className="notice">{done}</div>}
 
-      <ClubSettings club={club} onSaved={(msg) => void run(async () => onClubsChanged(), msg)} />
+      <ClubSettings
+        club={club}
+        onSaved={(msg) => void run(async () => onClubsChanged(), msg)}
+      />
 
       {/* Деньги гостей: заказ с баланса и QR для оплаты клубу — решения владельца. */}
       {isOwner && (
@@ -89,28 +106,49 @@ export function SettingsScreen({
         <>
           <WhatsAppSettings onSaved={(msg) => void run(async () => {}, msg)} />
           <KaspiSettings onSaved={(msg) => void run(async () => {}, msg)} />
-          <KaspiProviderSettings onSaved={(msg) => void run(async () => {}, msg)} />
+          <KaspiProviderSettings
+            onSaved={(msg) => void run(async () => {}, msg)}
+          />
           <WalletSettings
             tenant={tenant}
             clubs={clubs}
             onSaved={(msg) => void run(async () => {}, msg)}
           />
-          <ClubsSection clubs={clubs} onCreated={() => void run(async () => onClubsChanged(), "Зал добавлен")} />
+          <ClubsSection
+            clubs={clubs}
+            onCreated={() =>
+              void run(async () => onClubsChanged(), "Зал добавлен")
+            }
+          />
         </>
       )}
 
-      <StaffSection people={people} clubs={clubs} isOwner={isOwner} onChanged={() => void load()} />
+      <StaffSection
+        people={people}
+        clubs={clubs}
+        isOwner={isOwner}
+        onChanged={() => void load()}
+      />
     </main>
   );
 }
 
-function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string) => void }) {
+function ClubSettings({
+  club,
+  onSaved,
+}: {
+  club: Club;
+  onSaved: (message: string) => void;
+}) {
   const [name, setName] = useState(club.name);
   const [slogan, setSlogan] = useState(club.slogan ?? "");
-  const [creditLimit, setCreditLimit] = useState(String(club.creditLimit / 100));
+  const [creditLimit, setCreditLimit] = useState(
+    String(club.creditLimit / 100),
+  );
   const [validity, setValidity] = useState(String(club.packageValidityDays));
   const [warn, setWarn] = useState(String(club.lowBalanceWarnMinutes));
   const [bonus, setBonus] = useState(String(club.bonusPercent));
+  const [exitPassword, setExitPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +161,7 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
     setValidity(String(club.packageValidityDays));
     setWarn(String(club.lowBalanceWarnMinutes));
     setBonus(String(club.bonusPercent));
+    setExitPassword("");
   }, [club]);
 
   async function submit(event: FormEvent): Promise<void> {
@@ -137,7 +176,12 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         packageValidityDays: Number(validity),
         lowBalanceWarnMinutes: Number(warn),
         bonusPercent: Number(bonus),
+        // Пусто — пароль выхода не трогаем; заданный непустой — ставим/меняем.
+        ...(exitPassword.trim()
+          ? { shellExitPassword: exitPassword.trim() }
+          : {}),
       });
+      setExitPassword("");
       onSaved("Настройки зала сохранены");
     } catch (cause) {
       setError((cause as Error).message);
@@ -155,7 +199,11 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
       <form className="settings-grid" onSubmit={submit}>
         <label>
           Название клуба
-          <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+          <input
+            value={name}
+            maxLength={60}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         <label>
           Слоган на экране ПК
@@ -168,19 +216,50 @@ function ClubSettings({ club, onSaved }: { club: Club; onSaved: (message: string
         </label>
         <label>
           Лимит игры в долг, ₸
-          <input inputMode="decimal" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+          <input
+            inputMode="decimal"
+            value={creditLimit}
+            onChange={(e) => setCreditLimit(e.target.value)}
+          />
         </label>
         <label>
           Срок жизни пакета, дней
-          <input inputMode="numeric" value={validity} onChange={(e) => setValidity(e.target.value)} />
+          <input
+            inputMode="numeric"
+            value={validity}
+            onChange={(e) => setValidity(e.target.value)}
+          />
         </label>
         <label>
           Предупреждать за, минут
-          <input inputMode="numeric" value={warn} onChange={(e) => setWarn(e.target.value)} />
+          <input
+            inputMode="numeric"
+            value={warn}
+            onChange={(e) => setWarn(e.target.value)}
+          />
         </label>
         <label>
           Бонусы, % от потраченного
-          <input inputMode="numeric" value={bonus} onChange={(e) => setBonus(e.target.value)} />
+          <input
+            inputMode="numeric"
+            value={bonus}
+            onChange={(e) => setBonus(e.target.value)}
+          />
+        </label>
+        <label>
+          Пароль выхода из оболочки
+          <input
+            type="password"
+            value={exitPassword}
+            maxLength={64}
+            placeholder="Оставьте пустым — не менять"
+            autoComplete="new-password"
+            onChange={(e) => setExitPassword(e.target.value)}
+          />
+          <small className="hint">
+            На игровом ПК нажмите Ctrl+Alt+Shift+S и введите этот пароль, чтобы
+            снять блокировку для обслуживания. У каждого зала свой.
+          </small>
         </label>
         <button className="primary" type="submit" disabled={busy}>
           Сохранить
@@ -260,29 +339,42 @@ function SeatPaymentSettings({
           Гости заказывают из бара с игрового ПК и платят с баланса
         </label>
         <p className="hint">
-          Деньги списываются сразу при заказе, заказ появляется на кассе сверху экрана «Зал» и
-          «Бар». Отмена возвращает деньги на счёт и товар на склад.
+          Деньги списываются сразу при заказе, заказ появляется на кассе сверху
+          экрана «Зал» и «Бар». Отмена возвращает деньги на счёт и товар на
+          склад.
         </p>
       </div>
 
       <div className="section">
         <h3>Пополнение по единому QR</h3>
         <p className="hint">
-          Пока банк не подключён напрямую, загрузите картинку статического QR клуба из
-          банковского приложения (Kaspi, Halyk, Freedom и др.). Гость сканирует его на экране
-          игрового ПК и вводит сумму сам, а касса подтверждает поступление кнопкой «Деньги
-          пришли». Когда банк подключат, QR будет приходить уже с суммой и зачисляться сам.
+          Пока банк не подключён напрямую, загрузите картинку статического QR
+          клуба из банковского приложения (Kaspi, Halyk, Freedom и др.). Гость
+          сканирует его на экране игрового ПК и вводит сумму сам, а касса
+          подтверждает поступление кнопкой «Деньги пришли». Когда банк
+          подключат, QR будет приходить уже с суммой и зачисляться сам.
         </p>
         {club.paymentQrImageUrl && (
           <img
             src={club.paymentQrImageUrl}
             alt="QR клуба для оплаты"
-            style={{ width: 160, height: 160, objectFit: "contain", background: "#fff", borderRadius: 8 }}
+            style={{
+              width: 160,
+              height: 160,
+              objectFit: "contain",
+              background: "#fff",
+              borderRadius: 8,
+            }}
           />
         )}
         <div className="actions">
-          <label className="button-link" style={{ cursor: busy ? "default" : "pointer" }}>
-            {club.paymentQrImageUrl ? "Заменить картинку QR" : "Загрузить картинку QR"}
+          <label
+            className="button-link"
+            style={{ cursor: busy ? "default" : "pointer" }}
+          >
+            {club.paymentQrImageUrl
+              ? "Заменить картинку QR"
+              : "Загрузить картинку QR"}
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -299,7 +391,10 @@ function SeatPaymentSettings({
             <button
               disabled={busy}
               onClick={() =>
-                void save({ paymentQrImageUrl: null }, "QR для пополнения убран с игровых ПК")
+                void save(
+                  { paymentQrImageUrl: null },
+                  "QR для пополнения убран с игровых ПК",
+                )
               }
             >
               Убрать
@@ -332,7 +427,9 @@ function WalletSettings({
         sharedBalance: next,
         ...(next ? {} : { moveBalancesToClubId: target }),
       });
-      onSaved(next ? "Кошельки объединены" : "Остатки перенесены в выбранный зал");
+      onSaved(
+        next ? "Кошельки объединены" : "Остатки перенесены в выбранный зал",
+      );
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -361,25 +458,37 @@ function WalletSettings({
       {tenant.sharedBalance ? (
         <>
           <div className="notice warn">
-            Разделить общий остаток по залам корректно нельзя — система не знает, чьи это деньги.
-            Укажите зал, куда перенести остатки.
+            Разделить общий остаток по залам корректно нельзя — система не
+            знает, чьи это деньги. Укажите зал, куда перенести остатки.
           </div>
           <div className="actions">
-            <select style={{ width: 260 }} value={target} onChange={(e) => setTarget(e.target.value)}>
+            <select
+              style={{ width: 260 }}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+            >
               {clubs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
-            <button className="danger" disabled={busy || !target} onClick={() => void toggle(false)}>
+            <button
+              className="danger"
+              disabled={busy || !target}
+              onClick={() => void toggle(false)}
+            >
               Выключить общий кошелёк
             </button>
           </div>
         </>
       ) : (
         <div className="actions">
-          <button className="primary" disabled={busy} onClick={() => void toggle(true)}>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => void toggle(true)}
+          >
             Включить общий кошелёк
           </button>
         </div>
@@ -388,7 +497,13 @@ function WalletSettings({
   );
 }
 
-function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => void }) {
+function ClubsSection({
+  clubs,
+  onCreated,
+}: {
+  clubs: Club[];
+  onCreated: () => void;
+}) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [busy, setBusy] = useState(false);
@@ -445,7 +560,10 @@ function ClubsSection({ clubs, onCreated }: { clubs: Club[]; onCreated: () => vo
             setBusy(true);
             setError(null);
             try {
-              await api.createClub({ name: name.trim(), city: city.trim() || undefined });
+              await api.createClub({
+                name: name.trim(),
+                city: city.trim() || undefined,
+              });
               setName("");
               setCity("");
               onCreated();
@@ -511,7 +629,10 @@ function StaffSection({
           </thead>
           <tbody>
             {people.map((person) => (
-              <tr key={person.id} style={{ opacity: person.isActive ? 1 : 0.5 }}>
+              <tr
+                key={person.id}
+                style={{ opacity: person.isActive ? 1 : 0.5 }}
+              >
                 <td>{person.fullName}</td>
                 <td className="num">{person.email}</td>
                 <td>
@@ -530,7 +651,9 @@ function StaffSection({
                       onClick={async () => {
                         setError(null);
                         try {
-                          await api.updateStaff(person.id, { isActive: !person.isActive });
+                          await api.updateStaff(person.id, {
+                            isActive: !person.isActive,
+                          });
                           onChanged();
                         } catch (cause) {
                           setError((cause as Error).message);
@@ -613,7 +736,13 @@ function StaffSection({
                   ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
                   ...(form.role === "OWNER" ? {} : { clubId: form.clubId }),
                 });
-                setForm({ ...form, email: "", fullName: "", phone: "", password: "" });
+                setForm({
+                  ...form,
+                  email: "",
+                  fullName: "",
+                  phone: "",
+                  password: "",
+                });
                 onChanged();
               } catch (cause) {
                 setError((cause as Error).message);
@@ -652,7 +781,10 @@ function StaffPhone({
   if (!editing) {
     return (
       <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-        <span className="num" style={{ color: person.phone ? undefined : "var(--muted)" }}>
+        <span
+          className="num"
+          style={{ color: person.phone ? undefined : "var(--muted)" }}
+        >
           {person.phone ? `+${person.phone}` : "не указан"}
         </span>
         {canEdit && (
