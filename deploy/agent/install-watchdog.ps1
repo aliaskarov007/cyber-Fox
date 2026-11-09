@@ -72,8 +72,10 @@ $Command = "while (`$true) { try { if ((Get-ScheduledTask -TaskName '$WatchTask'
 $WatchAction = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"$Command`""
 
-# Запуск при старте системы и повтор раз в минуту: если сам сторож сняли, через
-# минуту задача поднимет его снова. Второй экземпляр поверх живого не идёт.
+# Старт и при загрузке системы, и при входе пользователя: без входного триггера
+# свежеустановленный сторож молчал бы до первой перезагрузки. Повтор раз в
+# минуту: если сам сторож сняли, задача поднимет его снова; второй экземпляр
+# поверх живого не идёт.
 $WatchTrigger = New-ScheduledTaskTrigger -AtStartup
 # Срок повтора — 9999 дней, а не [TimeSpan]::MaxValue: «бесконечность» Windows
 # отвергает («value incorrectly formatted or out of range»), и задача не
@@ -81,6 +83,7 @@ $WatchTrigger = New-ScheduledTaskTrigger -AtStartup
 $WatchTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
     -RepetitionDuration (New-TimeSpan -Days 9999)).Repetition
+$WatchLogon = New-ScheduledTaskTrigger -AtLogOn
 
 $WatchSettings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -94,9 +97,13 @@ $WatchPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
     -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask -TaskName $WatchTask `
-    -Action $WatchAction -Trigger $WatchTrigger -Settings $WatchSettings -Principal $WatchPrincipal `
+    -Action $WatchAction -Trigger @($WatchTrigger, $WatchLogon) -Settings $WatchSettings -Principal $WatchPrincipal `
     -Description "Возвращает блокировку Cyber-Fox, если агента сняли. Работает под SYSTEM — игрок снять не может." `
     -Force | Out-Null
 
-Write-Host "Готово: задача запуска агента и сторож (SYSTEM) установлены."
+# Запускаем сторож сразу: установщик уже с правами администратора, и машину не
+# придётся перезагружать, чтобы защита включилась.
+Start-ScheduledTask -TaskName $WatchTask
+
+Write-Host "Готово: задача запуска агента и сторож (SYSTEM) установлены и запущены."
 Write-Host "Проверить: Get-ScheduledTask -TaskName '$AgentTask','$WatchTask'"
