@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { type Club, type Guest, type Product, type Staff, api, formatMoney } from "./api.js";
+import {
+  type Club,
+  type Guest,
+  type Product,
+  type Staff,
+  api,
+  formatMoney,
+} from "./api.js";
 import { ProductsSection } from "./ProductsSection.js";
 import { SeatRequests } from "./SeatRequests.js";
 
@@ -61,7 +68,9 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
         method,
         guestId: guest?.id,
       });
-      setDone(`${selected.name} ×${quantity} — ${formatMoney(selected.price * quantity)}`);
+      setDone(
+        `${selected.name} ×${quantity} — ${formatMoney(selected.price * quantity)}`,
+      );
       setSelected(null);
       setQuantity(1);
       await refresh();
@@ -83,7 +92,11 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
       {/* Правка товаров живёт рядом с продажей: цену меняют у стойки и в смену,
           а не в отдельном разделе настроек, куда администратор не заходит. */}
       {canManage && (
-        <ProductsSection club={club} products={products} onChanged={() => void refresh()} />
+        <ProductsSection
+          club={club}
+          products={products}
+          onChanged={() => void refresh()}
+        />
       )}
 
       {categories.map(([category, items]) => (
@@ -96,7 +109,11 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
               <button
                 key={product.id}
                 className="pc"
-                data-state={product.stock !== null && product.stock === 0 ? "MAINTENANCE" : "IDLE"}
+                data-state={
+                  product.stock !== null && product.stock === 0
+                    ? "MAINTENANCE"
+                    : "IDLE"
+                }
                 disabled={product.stock !== null && product.stock === 0}
                 onClick={() => {
                   setSelected(product);
@@ -108,7 +125,9 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
                   <span className="pc-name">{product.name}</span>
                   {/* Остаток показывается только там, где он ведётся. */}
                   {product.stock !== null && (
-                    <span className={`chip ${product.stock === 0 ? "maintenance" : "idle"}`}>
+                    <span
+                      className={`chip ${product.stock === 0 ? "maintenance" : "idle"}`}
+                    >
                       {product.stock === 0 ? "нет" : `${product.stock} шт`}
                     </span>
                   )}
@@ -124,7 +143,11 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
 
       {selected && (
         <>
-          <button className="backdrop" aria-label="Закрыть" onClick={() => setSelected(null)} />
+          <button
+            className="backdrop"
+            aria-label="Закрыть"
+            onClick={() => setSelected(null)}
+          />
           <aside className="drawer">
             <div className="drawer-head">
               <h2>{selected.name}</h2>
@@ -137,7 +160,11 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
               <h3>Количество</h3>
               <div className="actions">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} aria-pressed={quantity === n} onClick={() => setQuantity(n)}>
+                  <button
+                    key={n}
+                    aria-pressed={quantity === n}
+                    onClick={() => setQuantity(n)}
+                  >
                     {n}
                   </button>
                 ))}
@@ -149,7 +176,7 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
             </div>
 
             <div className="section">
-              <h3>Гость (для оплаты с баланса и бонусов)</h3>
+              <h3>Гость (для бонусов)</h3>
               <input
                 placeholder="Телефон или имя"
                 value={guest ? guest.fullName : query}
@@ -179,14 +206,15 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
             <div className="section">
               <h3>Оплата</h3>
               <div className="actions">
-                <button className="primary" disabled={busy} onClick={() => void sell("CASH")}>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={() => void sell("CASH")}
+                >
                   Наличными
                 </button>
                 <button disabled={busy} onClick={() => void sell("CARD")}>
                   Картой
-                </button>
-                <button disabled={busy || !guest} onClick={() => void sell("BALANCE")}>
-                  С баланса гостя
                 </button>
               </div>
             </div>
