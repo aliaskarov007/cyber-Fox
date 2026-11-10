@@ -833,68 +833,98 @@ main {
 
 .hall-grid {
   display: grid;
-  /* Размер плитки задаёт зум карты (--pc-min, выставляется на <main>). */
-  grid-template-columns: repeat(auto-fill, minmax(var(--pc-min, 144px), 1fr));
-  gap: 8px;
+  /* Мелкие плотные квадраты; размер задаёт зум карты (--pc-min на <main>). */
+  grid-template-columns: repeat(auto-fill, var(--pc-min, 62px));
+  gap: 6px;
 }
 
 .pc {
   position: relative;
+  aspect-ratio: 1 / 1;
   text-align: left;
-  padding: 0;
   overflow: hidden;
+  padding: 5px 6px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--line);
-  border-radius: var(--radius);
-  display: grid;
-  gap: 0;
-  min-height: 80px;
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
 }
 
-/* Цвет всей плитки по состоянию: играет — голубой, свободен — зелёный,
-   100%-скидка — жёлтый, бронь — фиолетовый, ремонт — красный, выключен —
-   серый. Фон приглушённый, левый край — насыщенный, чтобы читалось издалека. */
+/* Цвет квадрата по состоянию: играет — голубой, свободен — зелёный,
+   100%-скидка — жёлтый, бронь — фиолетовый, ремонт — красный, выключен — серый. */
 .pc[data-state="IDLE"] {
   background: #10251a;
-  border-color: #1d4a33;
-  border-left-color: #45c07e;
+  border-color: #255c3c;
 }
 .pc[data-state="IN_USE"] {
   background: #16263c;
-  border-color: #2e527e;
-  border-left-color: #78b4f0;
+  border-color: #35608f;
 }
 .pc[data-state="FREE"] {
   background: #322a0f;
-  border-color: #5a4a16;
-  border-left-color: #f0c850;
+  border-color: #6b571a;
 }
 .pc[data-state="RESERVED"] {
   background: #241a38;
-  border-color: #432f63;
-  border-left-color: #b98fe8;
+  border-color: #4e3773;
 }
 .pc[data-state="PAUSED"] {
   background: #1b2436;
-  border-color: #33415c;
-  border-left-color: #8fb0e8;
+  border-color: #3b4d6e;
 }
 .pc[data-state="MAINTENANCE"] {
   background: #331c1a;
-  border-color: #5e2b27;
-  border-left-color: #ff8a80;
+  border-color: #6e322d;
 }
 .pc[data-state="OFFLINE"] {
-  background: #1a1c22;
-  border-color: #262a33;
-  border-left-color: #4a4e5a;
+  background: #16181d;
+  border-color: #2a2e38;
 }
 
-/* Значок брони/паузы рядом с номером ПК. */
+.pc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.pc-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--ink-2);
+}
+.pc[data-state="OFFLINE"] .pc-num {
+  color: var(--faint);
+}
+
+/* Точка-статус в углу: цвет = состояние. */
+.pc-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.pc[data-state="IDLE"] .pc-dot {
+  background: #45c07e;
+}
+.pc[data-state="IN_USE"] .pc-dot {
+  background: #78b4f0;
+}
+.pc[data-state="FREE"] .pc-dot {
+  background: #f0c850;
+}
+.pc[data-state="MAINTENANCE"] .pc-dot {
+  background: #ff8a80;
+}
+
 .pc-icon {
-  margin-left: 6px;
-  vertical-align: -1px;
+  flex: none;
+  color: var(--muted);
 }
 .pc[data-state="RESERVED"] .pc-icon {
   color: #b98fe8;
@@ -903,45 +933,20 @@ main {
   color: #8fb0e8;
 }
 
-.pc-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px 6px;
-}
-
-.pc-name {
-  font-weight: 650;
+/* Таймер остатка времени внизу квадрата. */
+.pc-timer {
   font-family: var(--mono);
-  font-size: 14px;
-}
-
-.pc-body {
-  padding: 0 12px 12px;
-  display: grid;
-  gap: 3px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.pc-guest {
-  color: var(--ink-2);
-  font-weight: 550;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pc-line {
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #8fc0f5;
 }
-
-.pc-free {
-  color: var(--faint);
+.pc[data-state="FREE"] .pc-timer {
+  color: #f0c850;
   font-size: 13px;
-  padding: 0 12px 12px;
+}
+.pc[data-state="PAUSED"] .pc-timer {
+  color: #8fb0e8;
 }
 
 .chip {

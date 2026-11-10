@@ -20,11 +20,63 @@ import { SeatRequests } from "./SeatRequests.js";
 import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
-/** Размер плитки карты в px: минимум, максимум, шаг зума и значение по умолчанию. */
-const PC_MIN_MIN = 96;
-const PC_MIN_MAX = 288;
-const PC_MIN_STEP = 24;
-const PC_MIN_DEFAULT = 144;
+/** Размер квадрата карты в px: минимум, максимум, шаг зума и значение по умолчанию. */
+const PC_MIN_MIN = 44;
+const PC_MIN_MAX = 108;
+const PC_MIN_STEP = 10;
+const PC_MIN_DEFAULT = 62;
+
+/** Остаток времени у сидящего гостя: пакет — его минуты, поминутно — на сколько хватит. */
+function remainingMinutes(cell: HallCell): number {
+  const session = cell.session;
+  if (!session) return 0;
+  return (
+    (session.mode === "PACKAGE"
+      ? session.packageMinutesLeft
+      : session.minutesAffordable) ?? 0
+  );
+}
+
+/** Ч:ММ для таймера на квадрате, как в клубных картах. */
+function clock(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
+/** Подсказка при наведении: весь контекст ПК без клика. */
+function tileTitle(cell: HallCell, state: string): string {
+  const parts = [cell.computer.name, STATE_LABEL[state]];
+  const session = cell.session;
+  if (session) {
+    parts.push(session.guest?.fullName ?? "Без аккаунта");
+    if (state !== "FREE") parts.push(`${remainingMinutes(cell)} мин`);
+    if (session.balance !== null)
+      parts.push(`баланс ${formatMoney(session.balance)}`);
+  }
+  return parts.join(" · ");
+}
+
+/** Значок «выключен» на квадрате. */
+function PowerIcon() {
+  return (
+    <svg
+      className="pc-icon"
+      aria-hidden="true"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3v9"></path>
+      <path d="M6.3 7.3a8 8 0 1 0 11.4 0"></path>
+    </svg>
+  );
+}
 
 /**
  * Значок на плитке: бронь (замок) или пауза. Декоративный — состояние уже
@@ -93,16 +145,6 @@ const STATE_LABEL: Record<string, string> = {
   MAINTENANCE: "ремонт",
   OFFLINE: "выключен",
   IDLE: "свободен",
-};
-
-const STATE_CLASS: Record<string, string> = {
-  IN_USE: "playing",
-  FREE: "free",
-  PAUSED: "paused",
-  RESERVED: "reserved",
-  MAINTENANCE: "maintenance",
-  OFFLINE: "offline",
-  IDLE: "idle",
 };
 
 export function HallScreen({
@@ -255,48 +297,26 @@ export function HallScreen({
                      зал, а не на полосу вызовов. */
                   className={`pc ${calls[cell.computer.id] ? "calling" : ""}`}
                   data-state={state}
+                  title={tileTitle(cell, state)}
                   onClick={() => setSelectedId(cell.computer.id)}
                 >
-                  <div className="pc-head">
-                    <span className="pc-name">
-                      {/* Номер ПК виден всегда — и в игре, и выключенным. */}
-                      {cell.computer.name}
-                      {state === "RESERVED" && <StateIcon kind="reserved" />}
-                      {state === "PAUSED" && <StateIcon kind="paused" />}
+                  <span className="pc-top">
+                    {/* Номер ПК виден всегда — и в игре, и выключенным. */}
+                    <span className="pc-num">{cell.computer.name}</span>
+                    {state === "OFFLINE" ? (
+                      <PowerIcon />
+                    ) : state === "RESERVED" ? (
+                      <StateIcon kind="reserved" />
+                    ) : state === "PAUSED" ? (
+                      <StateIcon kind="paused" />
+                    ) : (
+                      <span className="pc-dot" />
+                    )}
+                  </span>
+                  {cell.session && (
+                    <span className="pc-timer">
+                      {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
                     </span>
-                    <span className={`chip ${STATE_CLASS[state]}`}>
-                      {STATE_LABEL[state]}
-                    </span>
-                  </div>
-
-                  {cell.session ? (
-                    <div className="pc-body">
-                      <span className="pc-guest">
-                        {cell.session.guest?.fullName ?? "Без аккаунта"}
-                      </span>
-                      <span className="pc-line">
-                        {state === "FREE"
-                          ? "бесплатно · 100%"
-                          : cell.session.mode === "PACKAGE"
-                            ? `осталось ${cell.session.packageMinutesLeft ?? 0} мин`
-                            : `хватит на ${cell.session.minutesAffordable ?? 0} мин`}
-                      </span>
-                      {cell.session.balance !== null && (
-                        <span className="pc-line">
-                          баланс {formatMoney(cell.session.balance)}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="pc-free">
-                      {state === "RESERVED"
-                        ? "Забронирован"
-                        : state === "MAINTENANCE"
-                          ? "На ремонте"
-                          : state === "OFFLINE"
-                            ? "Выключен"
-                            : "Свободен"}
-                    </div>
                   )}
                 </button>
               );
