@@ -1,5 +1,13 @@
 import { PaymentMethod } from "@prisma/client";
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+} from "class-validator";
 
 export class CreateProductDto {
   @IsString()
@@ -26,6 +34,11 @@ export class CreateProductDto {
   @IsInt()
   @Min(0)
   stock?: number;
+
+  /** URL картинки товара (загружается отдельно). */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }
 
 export class UpdateProductDto {
@@ -52,6 +65,11 @@ export class UpdateProductDto {
   @IsInt()
   @Min(0)
   stock?: number;
+
+  /** URL картинки товара. Пустая строка — убрать картинку. */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string | null;
 
   @IsOptional()
   @IsBoolean()

@@ -736,6 +736,9 @@ model Product {
   /// Остаток на складе. Пусто — товар без учёта остатков (например, кофе из зерна).
   stock Int?
 
+  /// Картинка товара для бара (URL загруженного файла). Пусто — без картинки.
+  imageUrl String?
+
   isActive Boolean @default(true)
 
   sales ProductSale[]
