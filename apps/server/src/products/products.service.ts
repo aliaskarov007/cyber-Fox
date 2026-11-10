@@ -44,6 +44,7 @@ export class ProductsService {
         price: dto.price,
         cost: dto.cost ?? 0,
         stock: dto.stock ?? null,
+        imageUrl: dto.imageUrl?.trim() || null,
       },
     });
   }

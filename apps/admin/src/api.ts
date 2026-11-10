@@ -136,6 +136,8 @@ export interface Product {
   price: number;
   cost: number;
   stock: number | null;
+  /** Картинка товара для бара (URL загруженного файла). */
+  imageUrl: string | null;
   isActive: boolean;
 }
 
@@ -184,6 +186,8 @@ export interface ProductInput {
   price: number;
   cost?: number;
   stock?: number;
+  /** URL картинки товара; null — убрать картинку. */
+  imageUrl?: string | null;
 }
 
 export interface Shift {

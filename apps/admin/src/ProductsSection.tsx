@@ -1,6 +1,13 @@
 import { type FormEvent, useState } from "react";
 
-import { type Club, type Product, type ProductInput, api, formatMoney, toTiyn } from "./api.js";
+import {
+  type Club,
+  type Product,
+  type ProductInput,
+  api,
+  formatMoney,
+  toTiyn,
+} from "./api.js";
 
 /**
  * Товары бара: завести, поменять цену, поправить остаток.
@@ -86,11 +93,35 @@ export function ProductsSection({
           <tbody>
             {products.map((product) => (
               <tr key={product.id} className={product.isActive ? "" : "muted"}>
-                <td>{product.name}</td>
+                <td>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    {product.imageUrl && (
+                      <img
+                        src={product.imageUrl}
+                        alt=""
+                        style={{
+                          width: 28,
+                          height: 28,
+                          objectFit: "cover",
+                          borderRadius: 5,
+                        }}
+                      />
+                    )}
+                    {product.name}
+                  </span>
+                </td>
                 <td>{product.category ?? "—"}</td>
                 <td className="num">{formatMoney(product.price)}</td>
                 <td className="num">{formatMoney(product.cost)}</td>
-                <td className="num">{product.stock === null ? "без учёта" : product.stock}</td>
+                <td className="num">
+                  {product.stock === null ? "без учёта" : product.stock}
+                </td>
                 <td className="actions">
                   <button
                     type="button"
@@ -107,7 +138,9 @@ export function ProductsSection({
                     disabled={busy}
                     onClick={() =>
                       void run(() =>
-                        api.updateProduct(club.id, product.id, { isActive: !product.isActive }),
+                        api.updateProduct(club.id, product.id, {
+                          isActive: !product.isActive,
+                        }),
                       )
                     }
                   >
@@ -118,7 +151,9 @@ export function ProductsSection({
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={6}>Товаров нет. Пока их нет, бар в смене продавать нечего.</td>
+                <td colSpan={6}>
+                  Товаров нет. Пока их нет, бар в смене продавать нечего.
+                </td>
               </tr>
             )}
           </tbody>
@@ -141,11 +176,32 @@ function ProductForm({
 }) {
   const [name, setName] = useState(editing?.name ?? "");
   const [category, setCategory] = useState(editing?.category ?? "");
-  const [price, setPrice] = useState(editing ? String(editing.price / 100) : "");
+  const [price, setPrice] = useState(
+    editing ? String(editing.price / 100) : "",
+  );
   const [cost, setCost] = useState(editing ? String(editing.cost / 100) : "");
-  const [stock, setStock] = useState(editing?.stock === null ? "" : String(editing?.stock ?? ""));
+  const [stock, setStock] = useState(
+    editing?.stock === null ? "" : String(editing?.stock ?? ""),
+  );
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    editing?.imageUrl ?? null,
+  );
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function pickImage(file: File): Promise<void> {
+    setUploading(true);
+    setError(null);
+    try {
+      const { url } = await api.uploadCover(club.id, file);
+      setImageUrl(url);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
@@ -158,6 +214,7 @@ function ProductForm({
         ...(category.trim() === "" ? {} : { category: category.trim() }),
         ...(cost.trim() === "" ? {} : { cost: toTiyn(cost) }),
         ...(stock.trim() === "" ? {} : { stock: Number(stock) }),
+        imageUrl,
       };
       if (editing) await api.updateProduct(club.id, editing.id, body);
       else await api.createProduct(club.id, body);
@@ -175,31 +232,84 @@ function ProductForm({
 
       <label>
         Название
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Кола 0,5" />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Кола 0,5"
+        />
       </label>
 
       <label>
         Категория
-        <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Напитки" />
+        <input
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Напитки"
+        />
       </label>
 
       <label>
         Цена, ₸
-        <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <input
+          inputMode="decimal"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
       </label>
 
       <label>
         Себестоимость, ₸ (для маржи в отчёте)
-        <input inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} />
+        <input
+          inputMode="decimal"
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+        />
       </label>
 
       <label>
         Остаток (пусто — без учёта)
-        <input inputMode="numeric" value={stock} onChange={(e) => setStock(e.target.value)} />
+        <input
+          inputMode="numeric"
+          value={stock}
+          onChange={(e) => setStock(e.target.value)}
+        />
+      </label>
+
+      <label>
+        Картинка товара
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt=""
+            style={{
+              width: 72,
+              height: 72,
+              objectFit: "cover",
+              borderRadius: 8,
+              display: "block",
+              margin: "4px 0 8px",
+            }}
+          />
+        )}
+        <input
+          type="file"
+          accept="image/*"
+          disabled={uploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void pickImage(file);
+          }}
+        />
+        {uploading && <span className="note">Загружаем…</span>}
+        {imageUrl && !uploading && (
+          <button type="button" onClick={() => setImageUrl(null)}>
+            Убрать картинку
+          </button>
+        )}
       </label>
 
       <div className="actions">
-        <button className="primary" type="submit" disabled={busy}>
+        <button className="primary" type="submit" disabled={busy || uploading}>
           {editing ? "Сохранить" : "Добавить"}
         </button>
         <button type="button" onClick={onClose}>

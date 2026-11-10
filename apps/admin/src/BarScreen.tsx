@@ -104,39 +104,44 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
           <div className="zone-head">
             <h2>{category}</h2>
           </div>
-          <div className="hall-grid">
-            {items.map((product) => (
-              <button
-                key={product.id}
-                className="pc"
-                data-state={
-                  product.stock !== null && product.stock === 0
-                    ? "MAINTENANCE"
-                    : "IDLE"
-                }
-                disabled={product.stock !== null && product.stock === 0}
-                onClick={() => {
-                  setSelected(product);
-                  setQuantity(1);
-                  setDone(null);
-                }}
-              >
-                <div className="pc-head">
-                  <span className="pc-name">{product.name}</span>
-                  {/* Остаток показывается только там, где он ведётся. */}
-                  {product.stock !== null && (
-                    <span
-                      className={`chip ${product.stock === 0 ? "maintenance" : "idle"}`}
-                    >
-                      {product.stock === 0 ? "нет" : `${product.stock} шт`}
+          <div className="bar-grid">
+            {items.map((product) => {
+              const out = product.stock !== null && product.stock === 0;
+              return (
+                <button
+                  key={product.id}
+                  className="bar-item"
+                  disabled={out}
+                  onClick={() => {
+                    setSelected(product);
+                    setQuantity(1);
+                    setDone(null);
+                  }}
+                >
+                  <div className="bar-thumb">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt="" />
+                    ) : (
+                      <span className="bar-thumb-empty" aria-hidden="true">
+                        {product.name.slice(0, 1)}
+                      </span>
+                    )}
+                    {/* Остаток показывается только там, где он ведётся. */}
+                    {product.stock !== null && (
+                      <span className={`bar-stock ${out ? "out" : ""}`}>
+                        {out ? "нет" : `${product.stock} шт`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="bar-info">
+                    <span className="bar-name">{product.name}</span>
+                    <span className="bar-price">
+                      {formatMoney(product.price)}
                     </span>
-                  )}
-                </div>
-                <div className="pc-body">
-                  <span className="pc-line">{formatMoney(product.price)}</span>
-                </div>
-              </button>
-            ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
       ))}
