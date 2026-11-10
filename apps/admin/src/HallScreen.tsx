@@ -1,48 +1,143 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type { Tab } from "./App.js";
-import { type Club, type HallCell, type Tariff, api, formatMoney } from "./api.js";
+import {
+  type Club,
+  type HallCell,
+  type Tariff,
+  api,
+  formatMoney,
+} from "./api.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
 import { SeatRequests } from "./SeatRequests.js";
 import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
-/** Состояние плитки: то, что админ должен считывать взглядом, не читая текст. */
+/** Размер плитки карты в px: минимум, максимум, шаг зума и значение по умолчанию. */
+const PC_MIN_MIN = 96;
+const PC_MIN_MAX = 288;
+const PC_MIN_STEP = 24;
+const PC_MIN_DEFAULT = 144;
+
+/**
+ * Значок на плитке: бронь (замок) или пауза. Декоративный — состояние уже
+ * подписано чипом и цветом, значок лишь усиливает.
+ */
+function StateIcon({ kind }: { kind: "reserved" | "paused" }) {
+  return (
+    <svg
+      className="pc-icon"
+      aria-hidden="true"
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {kind === "reserved" ? (
+        <>
+          <rect x="4" y="11" width="16" height="9" rx="2"></rect>
+          <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+        </>
+      ) : (
+        <>
+          <rect x="7" y="5" width="3.5" height="14" rx="1"></rect>
+          <rect x="13.5" y="5" width="3.5" height="14" rx="1"></rect>
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * Состояние плитки: то, что админ должен считывать взглядом, по цвету.
+ * Играет — голубой, 100%-скидка — жёлтый, свободен — зелёный, бронь —
+ * фиолетовый, ремонт — красный, выключен — серый. В долг не сажаем (лимит 0),
+ * поэтому состояния «в долг» нет.
+ */
 function cellState(cell: HallCell): string {
-  if (cell.session?.status === "PAUSED") return "PAUSED";
-  if (cell.session?.onCredit) return "CREDIT";
-  if (cell.session) return "IN_USE";
-  if (cell.computer.status === "MAINTENANCE") return "MAINTENANCE";
-  if (cell.computer.status === "OFFLINE") return "OFFLINE";
-  return "IDLE";
+  const session = cell.session;
+  if (session) {
+    if (session.status === "PAUSED") return "PAUSED";
+    // 100% скидка — гость играет бесплатно: отдельный цвет, чтобы было видно.
+    if (session.guest?.discountPercent === 100) return "FREE";
+    return "IN_USE";
+  }
+  switch (cell.computer.status) {
+    case "RESERVED":
+      return "RESERVED";
+    case "MAINTENANCE":
+      return "MAINTENANCE";
+    case "OFFLINE":
+      return "OFFLINE";
+    default:
+      return "IDLE";
+  }
 }
 
 const STATE_LABEL: Record<string, string> = {
-  PAUSED: "пауза",
-  CREDIT: "в долг",
   IN_USE: "играет",
+  FREE: "100% скидка",
+  PAUSED: "пауза",
+  RESERVED: "бронь",
   MAINTENANCE: "ремонт",
-  OFFLINE: "не на связи",
+  OFFLINE: "выключен",
   IDLE: "свободен",
 };
 
 const STATE_CLASS: Record<string, string> = {
+  IN_USE: "playing",
+  FREE: "free",
   PAUSED: "paused",
-  CREDIT: "credit",
-  IN_USE: "in-use",
+  RESERVED: "reserved",
   MAINTENANCE: "maintenance",
   OFFLINE: "offline",
   IDLE: "idle",
 };
 
-export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) => void }) {
+export function HallScreen({
+  club,
+  onGoTo,
+}: {
+  club: Club;
+  onGoTo: (tab: Tab) => void;
+}) {
   const [hall, setHall] = useState<HallCell[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   /** Зал загружен хотя бы раз: до этого пустая карта — не пустой клуб. */
   const [loaded, setLoaded] = useState(false);
+
+  /* Масштаб карты: размер плитки в px. Запоминается на этом устройстве. */
+  const [pcMin, setPcMin] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem("hall-pc-min")) || PC_MIN_DEFAULT;
+    } catch {
+      return PC_MIN_DEFAULT;
+    }
+  });
+  const zoom = (delta: number): void => {
+    setPcMin((current) => {
+      const next = Math.min(PC_MIN_MAX, Math.max(PC_MIN_MIN, current + delta));
+      try {
+        localStorage.setItem("hall-pc-min", String(next));
+      } catch {
+        // Приватный режим — просто не запомним масштаб.
+      }
+      return next;
+    });
+  };
 
   const refresh = useCallback(async () => {
     setHall(await api.hall(club.id));
@@ -65,7 +160,8 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
   // карта зала не должна застыть.
   useRealtime(
     () => void refresh(),
-    (computerId) => setCalls((current) => ({ ...current, [computerId]: Date.now() })),
+    (computerId) =>
+      setCalls((current) => ({ ...current, [computerId]: Date.now() })),
   );
   useEffect(() => {
     const timer = setInterval(() => void refresh(), 20_000);
@@ -94,10 +190,12 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
   }, [hall]);
 
   const selected = hall.find((c) => c.computer.id === selectedId) ?? null;
-  const freeComputers = hall.filter((c) => c.session === null && c.computer.id !== selectedId);
+  const freeComputers = hall.filter(
+    (c) => c.session === null && c.computer.id !== selectedId,
+  );
 
   return (
-    <main>
+    <main style={{ "--pc-min": `${pcMin}px` } as CSSProperties}>
       <div className="summary">
         <div className="stat">
           <div className="value">
@@ -123,7 +221,8 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
             computerId,
             at,
             computerName:
-              hall.find((c) => c.computer.id === computerId)?.computer.name ?? "Машина зала",
+              hall.find((c) => c.computer.id === computerId)?.computer.name ??
+              "Машина зала",
           }))
           .sort((a, b) => b.at - a.at)}
         onAnswer={(computerId) =>
@@ -159,8 +258,15 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
                   onClick={() => setSelectedId(cell.computer.id)}
                 >
                   <div className="pc-head">
-                    <span className="pc-name">{cell.computer.name}</span>
-                    <span className={`chip ${STATE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+                    <span className="pc-name">
+                      {/* Номер ПК виден всегда — и в игре, и выключенным. */}
+                      {cell.computer.name}
+                      {state === "RESERVED" && <StateIcon kind="reserved" />}
+                      {state === "PAUSED" && <StateIcon kind="paused" />}
+                    </span>
+                    <span className={`chip ${STATE_CLASS[state]}`}>
+                      {STATE_LABEL[state]}
+                    </span>
                   </div>
 
                   {cell.session ? (
@@ -169,14 +275,28 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
                         {cell.session.guest?.fullName ?? "Без аккаунта"}
                       </span>
                       <span className="pc-line">
-                        {cell.session.mode === "PACKAGE"
-                          ? `пакет · ${cell.session.packageMinutesLeft ?? 0} мин`
-                          : `поминутно · ${cell.session.minutesAffordable ?? 0} мин хватит`}
+                        {state === "FREE"
+                          ? "бесплатно · 100%"
+                          : cell.session.mode === "PACKAGE"
+                            ? `осталось ${cell.session.packageMinutesLeft ?? 0} мин`
+                            : `хватит на ${cell.session.minutesAffordable ?? 0} мин`}
                       </span>
-                      <span className="pc-line">{formatMoney(cell.session.totalCharged)}</span>
+                      {cell.session.balance !== null && (
+                        <span className="pc-line">
+                          баланс {formatMoney(cell.session.balance)}
+                        </span>
+                      )}
                     </div>
                   ) : (
-                    <div className="pc-free">Свободен</div>
+                    <div className="pc-free">
+                      {state === "RESERVED"
+                        ? "Забронирован"
+                        : state === "MAINTENANCE"
+                          ? "На ремонте"
+                          : state === "OFFLINE"
+                            ? "Выключен"
+                            : "Свободен"}
+                    </div>
                   )}
                 </button>
               );
@@ -185,9 +305,33 @@ export function HallScreen({ club, onGoTo }: { club: Club; onGoTo: (tab: Tab) =>
         </section>
       ))}
 
+      {hall.length > 0 && (
+        <div className="hall-zoom" role="group" aria-label="Масштаб карты зала">
+          <button
+            aria-label="Мельче"
+            disabled={pcMin <= PC_MIN_MIN}
+            onClick={() => zoom(-PC_MIN_STEP)}
+          >
+            −
+          </button>
+          <span className="hall-zoom-label">Карта зала</span>
+          <button
+            aria-label="Крупнее"
+            disabled={pcMin >= PC_MIN_MAX}
+            onClick={() => zoom(PC_MIN_STEP)}
+          >
+            +
+          </button>
+        </div>
+      )}
+
       {selected && (
         <>
-          <button className="backdrop" aria-label="Закрыть" onClick={() => setSelectedId(null)} />
+          <button
+            className="backdrop"
+            aria-label="Закрыть"
+            onClick={() => setSelectedId(null)}
+          />
           <aside className="drawer">
             {selected.session ? (
               <SessionPanel
@@ -231,7 +375,12 @@ function FirstSteps({ onGoTo }: { onGoTo: (tab: Tab) => void }) {
    * зону «Основной зал» и поминутный тариф-заготовку, так что галочка по факту
    * их существования сказала бы «готово» про то, чего владелец даже не видел.
    */
-  const steps: Array<{ title: string; hint: string; tab: Tab; action: string }> = [
+  const steps: Array<{
+    title: string;
+    hint: string;
+    tab: Tab;
+    action: string;
+  }> = [
     {
       title: "Заведите машины зала",
       hint: "Зона «Основной зал» уже создана — переименуйте её или добавьте вторую, например VIP, и заведите машины.",
@@ -259,8 +408,8 @@ function FirstSteps({ onGoTo }: { onGoTo: (tab: Tab) => void }) {
       </div>
 
       <div className="notice">
-        В клубе пока нет ни одной машины. Три шага ниже — всё, что нужно, чтобы посадить
-        первого гостя.
+        В клубе пока нет ни одной машины. Три шага ниже — всё, что нужно, чтобы
+        посадить первого гостя.
       </div>
 
       <div className="rows">

@@ -282,7 +282,12 @@ export interface HallCell {
     startedAt: string;
     startedBy: "GUEST" | "STAFF";
     totalCharged: number;
-    guest: { id: string; fullName: string; phone: string } | null;
+    guest: {
+      id: string;
+      fullName: string;
+      phone: string;
+      discountPercent: number;
+    } | null;
     mode: "PACKAGE" | "PER_MINUTE" | null;
     packageMinutesLeft: number | null;
     balance: number | null;

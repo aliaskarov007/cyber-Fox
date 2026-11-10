@@ -58,7 +58,9 @@ button:not(.backdrop) {
   color: var(--ink);
   border-radius: var(--radius);
   padding: 9px 14px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 button:not(.backdrop):hover:not(:disabled) {
@@ -175,9 +177,24 @@ label {
   -webkit-text-stroke: 1.5px #2e3240;
 }
 
-.fx-login-bg .w1 { left: -12%; top: -8%; font-size: clamp(110px, 24vw, 380px); transform: rotate(-7deg); }
-.fx-login-bg .w2 { right: -52%; top: 30%; font-size: clamp(100px, 22vw, 340px); transform: rotate(6deg); }
-.fx-login-bg .w3 { left: 6%; bottom: -16%; font-size: clamp(120px, 27vw, 420px); transform: rotate(4deg); }
+.fx-login-bg .w1 {
+  left: -12%;
+  top: -8%;
+  font-size: clamp(110px, 24vw, 380px);
+  transform: rotate(-7deg);
+}
+.fx-login-bg .w2 {
+  right: -52%;
+  top: 30%;
+  font-size: clamp(100px, 22vw, 340px);
+  transform: rotate(6deg);
+}
+.fx-login-bg .w3 {
+  left: 6%;
+  bottom: -16%;
+  font-size: clamp(120px, 27vw, 420px);
+  transform: rotate(4deg);
+}
 
 .fx-login-main {
   position: relative;
@@ -209,7 +226,9 @@ label {
   margin-bottom: 8px;
 }
 
-.fx-login-logo span { color: var(--accent); }
+.fx-login-logo span {
+  color: var(--accent);
+}
 
 .fx-login-title {
   margin: 0 0 4px;
@@ -241,9 +260,16 @@ label {
   font-size: 15px;
 }
 
-.fx-password { position: relative; margin-top: -10px; }
-.fx-field .fx-password { margin-top: 0; }
-.fx-password input { padding-right: 50px; }
+.fx-password {
+  position: relative;
+  margin-top: -10px;
+}
+.fx-field .fx-password {
+  margin-top: 0;
+}
+.fx-password input {
+  padding-right: 50px;
+}
 
 .fx-login-card .fx-eye {
   position: absolute;
@@ -260,7 +286,10 @@ label {
   justify-content: center;
 }
 
-.fx-login-card .fx-eye:hover:not(:disabled) { background: transparent; color: var(--ink); }
+.fx-login-card .fx-eye:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
 
 /* «Забыли пароль?» — ссылка под полем пароля, справа. */
 .fx-login-card .fx-forgot {
@@ -276,9 +305,16 @@ label {
   font-weight: 500;
 }
 
-.fx-login-card .fx-forgot:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.fx-login-card .fx-forgot:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+}
 
-.fx-field-hint { margin: -8px 0 0; font-size: 12px; color: var(--muted); }
+.fx-field-hint {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 
 .fx-notice {
   padding: 10px 12px;
@@ -302,7 +338,9 @@ label {
   padding: 0;
 }
 
-.fx-login-card .fx-login-go:hover:not(:disabled) { background: var(--accent-hover); }
+.fx-login-card .fx-login-go:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
 
 .fx-login-join {
   margin-top: 4px;
@@ -327,8 +365,15 @@ label {
   padding: 0;
 }
 
-.fx-login-card .fx-login-join button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); background: transparent; }
-.fx-login-join small { font-size: 13px; color: var(--muted); }
+.fx-login-card .fx-login-join button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: transparent;
+}
+.fx-login-join small {
+  font-size: 13px;
+  color: var(--muted);
+}
 
 /* Кнопка «О нас» и окно с рассказом о программе. */
 .fx-login .fx-about-open {
@@ -346,7 +391,11 @@ label {
   font-weight: 600;
 }
 
-.fx-login .fx-about-open:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); background: rgba(15, 16, 20, 0.7); }
+.fx-login .fx-about-open:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: rgba(15, 16, 20, 0.7);
+}
 
 .fx-about-backdrop {
   position: fixed;
@@ -389,7 +438,10 @@ label {
   justify-content: center;
 }
 
-.fx-about .fx-about-close:hover:not(:disabled) { background: transparent; color: var(--ink); }
+.fx-about .fx-about-close:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ink);
+}
 
 .fx-about-kicker {
   margin: 0 0 8px;
@@ -409,11 +461,24 @@ label {
   color: #fff;
 }
 
-.fx-intro-title span { color: var(--accent); }
+.fx-intro-title span {
+  color: var(--accent);
+}
 
-.fx-intro-lead { margin: 0 0 26px; font-size: 16px; line-height: 1.55; color: var(--ink-2); }
+.fx-intro-lead {
+  margin: 0 0 26px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
 
-.fx-intro-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.fx-intro-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
 
 .fx-intro-list li {
   padding-left: 18px;
@@ -423,10 +488,17 @@ label {
   color: var(--muted);
 }
 
-.fx-intro-list b { display: block; margin-bottom: 2px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.fx-intro-list b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
 
-
-.fx-signup-card { max-width: 520px; }
+.fx-signup-card {
+  max-width: 520px;
+}
 
 .fx-row {
   display: grid;
@@ -435,7 +507,10 @@ label {
 }
 
 @media (max-width: 600px) {
-  .fx-row { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .fx-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
 }
 
 .fx-signup-note {
@@ -463,11 +538,22 @@ label {
   padding: 0 16px 16px;
   font-size: 13px;
 }
-.fx-legal a { color: #8a92a5; text-decoration: none; }
-.fx-legal a:hover { color: #fff; }
+.fx-legal a {
+  color: #8a92a5;
+  text-decoration: none;
+}
+.fx-legal a:hover {
+  color: #fff;
+}
 
 @media (min-width: 900px) {
-  .fx-legal { position: fixed; left: 40px; bottom: 28px; justify-content: flex-start; padding: 0; }
+  .fx-legal {
+    position: fixed;
+    left: 40px;
+    bottom: 28px;
+    justify-content: flex-start;
+    padding: 0;
+  }
 }
 
 .fx-support {
@@ -476,10 +562,18 @@ label {
   padding: 0;
 }
 
+.fx-support-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
 
-.fx-support-title { margin: 0 0 10px; font-size: 20px; font-weight: 700; color: #fff; }
-
-.fx-support-list { list-style: none; margin: 0; padding: 0; }
+.fx-support-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 
 .fx-support-list li {
   display: flex;
@@ -489,9 +583,19 @@ label {
   border-top: 1px solid #2a2d38;
 }
 
-.fx-support-list svg { flex: none; color: var(--accent); }
-.fx-support-list div { display: flex; flex-direction: column; min-width: 0; }
-.fx-support-list span { font-size: 12px; color: var(--muted); }
+.fx-support-list svg {
+  flex: none;
+  color: var(--accent);
+}
+.fx-support-list div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fx-support-list span {
+  font-size: 12px;
+  color: var(--muted);
+}
 
 .fx-support-list a {
   color: var(--ink);
@@ -501,13 +605,16 @@ label {
   overflow-wrap: anywhere;
 }
 
-.fx-support-list a:hover { color: var(--accent-ink); }
-
+.fx-support-list a:hover {
+  color: var(--accent-ink);
+}
 
 /* На компьютере поддержка прибита к правому нижнему углу окна и не
    занимает места под формой: всё видно сразу, без прокрутки. */
 @media (min-width: 900px) {
-  .fx-login-main { padding: 24px 16px; }
+  .fx-login-main {
+    padding: 24px 16px;
+  }
   .fx-login-footer {
     position: fixed;
     right: 0;
@@ -519,26 +626,73 @@ label {
 
 /* Невысокий экран ноутбука: форма плотнее, чтобы влезла целиком. */
 @media (max-height: 820px) {
-  .fx-login-main { padding: 16px; }
-  .fx-login-card { padding: 24px 32px; gap: 12px; }
-  .fx-login-logo { font-size: 26px; margin-bottom: 0; }
-  .fx-login-title { font-size: 18px; margin: 0; }
-  .fx-login-card input { height: 42px; }
-  .fx-login-card .fx-eye { width: 40px; height: 40px; }
-  .fx-login-card .fx-login-go { height: 44px; margin-top: 2px; }
-  .fx-login-join { padding-top: 12px; margin-top: 0; }
-  .fx-login-card .fx-login-join button { height: 42px; }
+  .fx-login-main {
+    padding: 16px;
+  }
+  .fx-login-card {
+    padding: 24px 32px;
+    gap: 12px;
+  }
+  .fx-login-logo {
+    font-size: 26px;
+    margin-bottom: 0;
+  }
+  .fx-login-title {
+    font-size: 18px;
+    margin: 0;
+  }
+  .fx-login-card input {
+    height: 42px;
+  }
+  .fx-login-card .fx-eye {
+    width: 40px;
+    height: 40px;
+  }
+  .fx-login-card .fx-login-go {
+    height: 44px;
+    margin-top: 2px;
+  }
+  .fx-login-join {
+    padding-top: 12px;
+    margin-top: 0;
+  }
+  .fx-login-card .fx-login-join button {
+    height: 42px;
+  }
 }
 
 @media (max-width: 600px) {
-  .fx-login-card { padding: 28px 20px; }
-  .fx-about { padding: 28px 22px 24px; }
-  .fx-login-main { padding-top: 76px; }
-  .fx-login-footer { padding: 0 16px 20px; justify-content: center; }
-  .fx-support { width: 100%; max-width: 340px; }
-  .fx-login-bg .w1 { font-size: 150px; top: -2%; }
-  .fx-login-bg .w2 { font-size: 140px; top: 40%; right: -120%; }
-  .fx-login-bg .w3 { font-size: 160px; bottom: -6%; left: -20%; }
+  .fx-login-card {
+    padding: 28px 20px;
+  }
+  .fx-about {
+    padding: 28px 22px 24px;
+  }
+  .fx-login-main {
+    padding-top: 76px;
+  }
+  .fx-login-footer {
+    padding: 0 16px 20px;
+    justify-content: center;
+  }
+  .fx-support {
+    width: 100%;
+    max-width: 340px;
+  }
+  .fx-login-bg .w1 {
+    font-size: 150px;
+    top: -2%;
+  }
+  .fx-login-bg .w2 {
+    font-size: 140px;
+    top: 40%;
+    right: -120%;
+  }
+  .fx-login-bg .w3 {
+    font-size: 160px;
+    bottom: -6%;
+    left: -20%;
+  }
 }
 
 /* --- Каркас --- */
@@ -679,8 +833,9 @@ main {
 
 .hall-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 10px;
+  /* Размер плитки задаёт зум карты (--pc-min, выставляется на <main>). */
+  grid-template-columns: repeat(auto-fill, minmax(var(--pc-min, 144px), 1fr));
+  gap: 8px;
 }
 
 .pc {
@@ -690,35 +845,62 @@ main {
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
   border-radius: var(--radius);
   display: grid;
   gap: 0;
-  min-height: 104px;
+  min-height: 80px;
 }
 
-/* Полоса состояния: занятость читается до чтения текста. */
-.pc::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--idle);
+/* Цвет всей плитки по состоянию: играет — голубой, свободен — зелёный,
+   100%-скидка — жёлтый, бронь — фиолетовый, ремонт — красный, выключен —
+   серый. Фон приглушённый, левый край — насыщенный, чтобы читалось издалека. */
+.pc[data-state="IDLE"] {
+  background: #10251a;
+  border-color: #1d4a33;
+  border-left-color: #45c07e;
+}
+.pc[data-state="IN_USE"] {
+  background: #16263c;
+  border-color: #2e527e;
+  border-left-color: #78b4f0;
+}
+.pc[data-state="FREE"] {
+  background: #322a0f;
+  border-color: #5a4a16;
+  border-left-color: #f0c850;
+}
+.pc[data-state="RESERVED"] {
+  background: #241a38;
+  border-color: #432f63;
+  border-left-color: #b98fe8;
+}
+.pc[data-state="PAUSED"] {
+  background: #1b2436;
+  border-color: #33415c;
+  border-left-color: #8fb0e8;
+}
+.pc[data-state="MAINTENANCE"] {
+  background: #331c1a;
+  border-color: #5e2b27;
+  border-left-color: #ff8a80;
+}
+.pc[data-state="OFFLINE"] {
+  background: #1a1c22;
+  border-color: #262a33;
+  border-left-color: #4a4e5a;
 }
 
-.pc[data-state="IN_USE"]::before {
-  background: var(--in-use);
+/* Значок брони/паузы рядом с номером ПК. */
+.pc-icon {
+  margin-left: 6px;
+  vertical-align: -1px;
 }
-.pc[data-state="CREDIT"]::before {
-  background: var(--credit);
+.pc[data-state="RESERVED"] .pc-icon {
+  color: #b98fe8;
 }
-.pc[data-state="PAUSED"]::before {
-  background: var(--paused);
-}
-.pc[data-state="OFFLINE"]::before {
-  background: var(--faint);
-}
-.pc[data-state="MAINTENANCE"]::before {
-  background: var(--stopped);
+.pc[data-state="PAUSED"] .pc-icon {
+  color: #8fb0e8;
 }
 
 .pc-head {
@@ -773,16 +955,20 @@ main {
 }
 
 .chip.idle {
-  background: #232833;
-  color: var(--muted);
+  background: #12331f;
+  color: #67d79a;
 }
-.chip.in-use {
-  background: #12332c;
-  color: #5fd6b6;
+.chip.playing {
+  background: #16263c;
+  color: #8fc0f5;
 }
-.chip.credit {
-  background: #362b10;
-  color: #f0c04d;
+.chip.free {
+  background: #332a0f;
+  color: #f0c850;
+}
+.chip.reserved {
+  background: #241a38;
+  color: #c3a2ee;
 }
 .chip.paused {
   background: #1c2739;
@@ -795,6 +981,34 @@ main {
 .chip.maintenance {
   background: #35201e;
   color: #ff9a92;
+}
+
+/* Зум карты зала. */
+.hall-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 16px 2px 4px;
+}
+.hall-zoom-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.hall-zoom button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.hall-zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* --- Панель справа --- */
@@ -1362,5 +1576,10 @@ button.link {
   font-size: 14px;
 }
 
-.phone-banner input { width: 200px; }
-.phone-banner-error { color: var(--stopped); font-size: 13px; }
+.phone-banner input {
+  width: 200px;
+}
+.phone-banner-error {
+  color: var(--stopped);
+  font-size: 13px;
+}

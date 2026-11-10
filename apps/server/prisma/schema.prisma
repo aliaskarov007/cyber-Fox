@@ -216,7 +216,7 @@ model Club {
   timezone String @default("Asia/Almaty")
 
   /// Лимит игры в долг, в тиын. Действует одинаково онлайн и офлайн.
-  creditLimit Int @default(10000)
+  creditLimit Int @default(0)
   /// Срок жизни пакета по умолчанию; задаёт владелец клуба.
   packageValidityDays Int @default(30)
   /// За сколько минут до конца пакета предупреждать гостя.
