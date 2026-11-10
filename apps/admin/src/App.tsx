@@ -194,7 +194,7 @@ function ClubApp() {
 
           <span className="spacer" />
 
-          {club && <ShiftBar club={club} />}
+          {club && <ShiftBar club={club} staff={staff} />}
 
           <span className="who">
             {staff.fullName}

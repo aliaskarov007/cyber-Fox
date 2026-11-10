@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { type Club, type Shift, type ShiftReport, api, formatMoney, toTiyn } from "./api.js";
+import {
+  type Club,
+  type Shift,
+  type ShiftReport,
+  type Staff,
+  api,
+  formatMoney,
+  toTiyn,
+} from "./api.js";
 
 /**
  * Панель смены в шапке. Открыта смена или нет — первое, что должен видеть
  * администратор: без открытой смены платежи не привяжутся к кассе и сверка
  * на закрытии не сойдётся.
  */
-export function ShiftBar({ club }: { club: Club }) {
+export function ShiftBar({ club, staff }: { club: Club; staff: Staff }) {
+  // Маржу (а значит себестоимость) видят только владелец и управляющий.
+  const canSeeMargin = staff.role === "OWNER" || staff.role === "ADMIN";
   const [shift, setShift] = useState<Shift | null>(null);
   const [report, setReport] = useState<ShiftReport | null>(null);
   const [open, setOpen] = useState(false);
@@ -43,12 +53,17 @@ export function ShiftBar({ club }: { club: Club }) {
 
       {open && (
         <>
-          <button className="backdrop" aria-label="Закрыть" onClick={() => setOpen(false)} />
+          <button
+            className="backdrop"
+            aria-label="Закрыть"
+            onClick={() => setOpen(false)}
+          />
           <aside className="drawer">
             <ShiftPanel
               club={club}
               shift={shift}
               report={report}
+              canSeeMargin={canSeeMargin}
               onChanged={() => {
                 void refresh();
               }}
@@ -65,12 +80,14 @@ function ShiftPanel({
   club,
   shift,
   report,
+  canSeeMargin,
   onChanged,
   onClose,
 }: {
   club: Club;
   shift: Shift | null;
   report: ShiftReport | null;
+  canSeeMargin: boolean;
   onChanged: () => void;
   onClose: () => void;
 }) {
@@ -95,7 +112,12 @@ function ShiftPanel({
   }
 
   if (result?.reconciliation) {
-    const { difference, status, expected, counted: got } = result.reconciliation;
+    const {
+      difference,
+      status,
+      expected,
+      counted: got,
+    } = result.reconciliation;
     return (
       <>
         <div className="drawer-head">
@@ -104,7 +126,11 @@ function ShiftPanel({
 
         <div
           className={
-            status === "MATCH" ? "notice" : status === "SHORTAGE" ? "error" : "notice warn"
+            status === "MATCH"
+              ? "notice"
+              : status === "SHORTAGE"
+                ? "error"
+                : "notice warn"
           }
         >
           {status === "MATCH"
@@ -128,7 +154,7 @@ function ShiftPanel({
           </div>
         </div>
 
-        <ReportRows report={result} />
+        <ReportRows report={result} canSeeMargin={canSeeMargin} />
         <button onClick={onClose}>Закрыть</button>
       </>
     );
@@ -144,7 +170,8 @@ function ShiftPanel({
         {error && <div className="error">{error}</div>}
 
         <div className="notice">
-          Пока смена не открыта, платежи не привяжутся к кассе, и сверить её на закрытии не выйдет.
+          Пока смена не открыта, платежи не привяжутся к кассе, и сверить её на
+          закрытии не выйдет.
         </div>
 
         <div className="section">
@@ -158,7 +185,9 @@ function ShiftPanel({
           <button
             className="primary"
             disabled={busy}
-            onClick={() => void run(() => api.openShift(club.id, toTiyn(float)))}
+            onClick={() =>
+              void run(() => api.openShift(club.id, toTiyn(float)))
+            }
           >
             Открыть смену
           </button>
@@ -178,13 +207,13 @@ function ShiftPanel({
 
       {error && <div className="error">{error}</div>}
 
-      {report && <ReportRows report={report} />}
+      {report && <ReportRows report={report} canSeeMargin={canSeeMargin} />}
 
       <div className="section">
         <h3>Закрыть смену</h3>
         <div className="notice">
-          Пересчитайте наличные в ящике и введите сумму. Расхождение останется в истории — его
-          фиксируют, а не исправляют.
+          Пересчитайте наличные в ящике и введите сумму. Расхождение останется в
+          истории — его фиксируют, а не исправляют.
         </div>
         <label>
           Пересчитано наличных, ₸
@@ -204,7 +233,12 @@ function ShiftPanel({
           disabled={busy || counted.trim() === ""}
           onClick={() =>
             void run(async () => {
-              const closed = await api.closeShift(club.id, shift.id, toTiyn(counted), note);
+              const closed = await api.closeShift(
+                club.id,
+                shift.id,
+                toTiyn(counted),
+                note,
+              );
               setResult(closed);
             })
           }
@@ -218,7 +252,13 @@ function ShiftPanel({
   );
 }
 
-function ReportRows({ report }: { report: ShiftReport }) {
+function ReportRows({
+  report,
+  canSeeMargin,
+}: {
+  report: ShiftReport;
+  canSeeMargin: boolean;
+}) {
   return (
     <div className="section">
       <h3>Итоги смены</h3>
@@ -250,10 +290,15 @@ function ReportRows({ report }: { report: ShiftReport }) {
           <span className="k">Выручка бара</span>
           <span>{formatMoney(report.productsRevenue)}</span>
         </div>
-        <div className="row">
-          <span className="k">Маржа бара</span>
-          <span>{formatMoney(report.productsRevenue - report.productsCost)}</span>
-        </div>
+        {/* Маржа = себестоимость наружу. Её видят только владелец и управляющий. */}
+        {canSeeMargin && (
+          <div className="row">
+            <span className="k">Маржа бара</span>
+            <span>
+              {formatMoney(report.productsRevenue - report.productsCost)}
+            </span>
+          </div>
+        )}
         {report.tournamentNet !== 0 && (
           <div className="row">
             {/* Отрицательный итог — обычное дело: клуб доложил в фонд своих. */}
@@ -271,8 +316,8 @@ function ReportRows({ report }: { report: ShiftReport }) {
 
       {/* Выручка и наличные — разные числа: гость мог пополнить счёт в прошлую смену. */}
       <div className="notice">
-        Выручка смены — {formatMoney(report.revenue)}. Она не равна наличным в кассе: время могло
-        оплачиваться с баланса, пополненного раньше.
+        Выручка смены — {formatMoney(report.revenue)}. Она не равна наличным в
+        кассе: время могло оплачиваться с баланса, пополненного раньше.
       </div>
     </div>
   );
