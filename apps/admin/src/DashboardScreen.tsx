@@ -112,15 +112,12 @@ export function DashboardScreen({ club }: { club: Club }) {
         </section>
 
         <section className="dash-card">
-          <div className="dash-title">Время и бар</div>
+          <div className="dash-title">Игровое время</div>
           <div className="dash-rows">
             <div className="row">
-              <span className="k">Выручка за время</span>
+              {/* Наиграно времени за смену — списано с балансов, не живые деньги смены. */}
+              <span className="k">Наиграно на сумму</span>
               <span>{formatMoney(report.sessionsRevenue)}</span>
-            </div>
-            <div className="row">
-              <span className="k">Маржа бара</span>
-              <span>{formatMoney(report.barSales - report.productsCost)}</span>
             </div>
             <div className="row">
               <span className="k">Сессий за смену</span>
