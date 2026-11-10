@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { BarScreen } from "./BarScreen.js";
+import { DashboardScreen } from "./DashboardScreen.js";
 import { EventsScreen } from "./EventsScreen.js";
 import { PlatformLogin, PlatformScreen } from "./PlatformScreen.js";
 import { getPlatformToken } from "./platform-api.js";
@@ -23,6 +24,7 @@ import { TariffsScreen } from "./TariffsScreen.js";
 /** Вкладки верхнего меню. Экспортируется, чтобы экраны могли отправить админа
  *  туда, где продолжается начатое: «заведите машины» → «Настройки». */
 export type Tab =
+  | "dashboard"
   | "hall"
   | "bar"
   | "guests"
@@ -35,7 +37,13 @@ export type Tab =
   | "onboarding"
   | "settings";
 
-const TABS: Array<{ id: Tab; label: string; ownerOnly?: boolean; manageOnly?: boolean }> = [
+const TABS: Array<{
+  id: Tab;
+  label: string;
+  ownerOnly?: boolean;
+  manageOnly?: boolean;
+}> = [
+  { id: "dashboard", label: "Смена" },
   { id: "hall", label: "Зал" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
@@ -62,7 +70,9 @@ export function App() {
 }
 
 function PlatformApp() {
-  const [name, setName] = useState<string | null>(getPlatformToken() ? "Платформа" : null);
+  const [name, setName] = useState<string | null>(
+    getPlatformToken() ? "Платформа" : null,
+  );
   if (!name) return <PlatformLogin onIn={setName} />;
   return <PlatformScreen name={name} onLogout={() => setName(null)} />;
 }
@@ -71,7 +81,7 @@ function ClubApp() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [clubId, setClubId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("hall");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(true);
   const [signingUp, setSigningUp] = useState(false);
   const [forgot, setForgot] = useState(false);
@@ -103,7 +113,12 @@ function ClubApp() {
   if (loading) return <div className="login-wrap">Загружаем…</div>;
   if (!staff) {
     if (signingUp) {
-      return <SignupScreen onDone={() => void load()} onBack={() => setSigningUp(false)} />;
+      return (
+        <SignupScreen
+          onDone={() => void load()}
+          onBack={() => setSigningUp(false)}
+        />
+      );
     }
     if (forgot) {
       return (
@@ -132,38 +147,23 @@ function ClubApp() {
   const club = clubs.find((c) => c.id === clubId) ?? null;
 
   return (
-    <>
-      <header className="topbar">
+    <div className="shell">
+      <aside className="sidebar">
         <span className="brand">
           Cyber-<span>Fox</span>
         </span>
-
-        {/* Владелец сети переключается между залами; у остальных зал один. */}
-        {clubs.length > 1 ? (
-          <select
-            style={{ width: 220 }}
-            value={clubId ?? ""}
-            onChange={(e) => setClubId(e.target.value)}
-          >
-            {clubs.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span style={{ color: "var(--muted)" }}>{club?.name}</span>
-        )}
-
-        <nav className="link-tabs">
+        <nav className="side-nav">
           {/* Сводка по сети — забота владельца; управляющему она не нужна. */}
           {TABS.filter(
             (item) =>
               (!item.ownerOnly || staff.role === "OWNER") &&
-              (!item.manageOnly || staff.role === "OWNER" || staff.role === "ADMIN"),
+              (!item.manageOnly ||
+                staff.role === "OWNER" ||
+                staff.role === "ADMIN"),
           ).map((item) => (
             <button
               key={item.id}
+              className="side-link"
               aria-current={tab === item.id}
               onClick={() => setTab(item.id)}
             >
@@ -171,62 +171,85 @@ function ClubApp() {
             </button>
           ))}
         </nav>
+      </aside>
 
-        <span className="spacer" />
+      <div className="shell-main">
+        <header className="topbar">
+          {/* Владелец сети переключается между залами; у остальных зал один. */}
+          {clubs.length > 1 ? (
+            <select
+              style={{ width: 220 }}
+              value={clubId ?? ""}
+              onChange={(e) => setClubId(e.target.value)}
+            >
+              {clubs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="club-name">{club?.name}</span>
+          )}
 
-        {club && <ShiftBar club={club} />}
+          <span className="spacer" />
 
-        <span className="who">
-          {staff.fullName}
-          <br />
-          {staff.tenant.name}
-        </span>
-        <button
-          onClick={() => {
-            setToken(null);
-            setStaff(null);
-          }}
-        >
-          Выйти
-        </button>
-      </header>
+          {club && <ShiftBar club={club} />}
 
-      {!staff.phone && (
-        <MyPhoneBanner onSaved={(phone) => setStaff({ ...staff, phone })} />
-      )}
+          <span className="who">
+            {staff.fullName}
+            <br />
+            {staff.tenant.name}
+          </span>
+          <button
+            onClick={() => {
+              setToken(null);
+              setStaff(null);
+            }}
+          >
+            Выйти
+          </button>
+        </header>
 
-      {club === null ? (
-        <main>
-          <div className="notice">Нет доступных клубов.</div>
-        </main>
-      ) : tab === "hall" ? (
-        <HallScreen club={club} onGoTo={setTab} />
-      ) : tab === "bar" ? (
-        <BarScreen club={club} staff={staff} />
-      ) : tab === "guests" ? (
-        <GuestsScreen club={club} />
-      ) : tab === "events" ? (
-        <EventsScreen club={club} staff={staff} />
-      ) : tab === "retention" ? (
-        <RetentionScreen club={club} onGoTo={setTab} />
-      ) : tab === "promos" ? (
-        <PromosScreen club={club} staff={staff} />
-      ) : tab === "library" ? (
-        <LibraryScreen club={club} />
-      ) : tab === "network" ? (
-        <NetworkScreen clubs={clubs} />
-      ) : tab === "onboarding" ? (
-        <OnboardingScreen club={club} isOwner={staff.role === "OWNER"} />
-      ) : tab === "settings" ? (
-        <SettingsScreen
-          club={club}
-          staff={staff}
-          clubs={clubs}
-          onClubsChanged={() => void load()}
-        />
-      ) : (
-        <TariffsScreen club={club} />
-      )}
-    </>
+        {!staff.phone && (
+          <MyPhoneBanner onSaved={(phone) => setStaff({ ...staff, phone })} />
+        )}
+
+        {club === null ? (
+          <main>
+            <div className="notice">Нет доступных клубов.</div>
+          </main>
+        ) : tab === "dashboard" ? (
+          <DashboardScreen club={club} />
+        ) : tab === "hall" ? (
+          <HallScreen club={club} onGoTo={setTab} />
+        ) : tab === "bar" ? (
+          <BarScreen club={club} staff={staff} />
+        ) : tab === "guests" ? (
+          <GuestsScreen club={club} />
+        ) : tab === "events" ? (
+          <EventsScreen club={club} staff={staff} />
+        ) : tab === "retention" ? (
+          <RetentionScreen club={club} onGoTo={setTab} />
+        ) : tab === "promos" ? (
+          <PromosScreen club={club} staff={staff} />
+        ) : tab === "library" ? (
+          <LibraryScreen club={club} />
+        ) : tab === "network" ? (
+          <NetworkScreen clubs={clubs} />
+        ) : tab === "onboarding" ? (
+          <OnboardingScreen club={club} isOwner={staff.role === "OWNER"} />
+        ) : tab === "settings" ? (
+          <SettingsScreen
+            club={club}
+            staff={staff}
+            clubs={clubs}
+            onClubsChanged={() => void load()}
+          />
+        ) : (
+          <TariffsScreen club={club} />
+        )}
+      </div>
+    </div>
   );
 }

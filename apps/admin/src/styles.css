@@ -1668,3 +1668,168 @@ button.link {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
+
+/* --- Левый сайдбар и каркас --- */
+.shell {
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+}
+.sidebar {
+  flex: none;
+  width: 212px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+}
+.sidebar .brand {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding: 0 8px;
+}
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.side-link {
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.side-link:hover {
+  background: var(--surface-2);
+}
+.side-link[aria-current="true"] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.shell-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.club-name {
+  color: var(--muted);
+}
+
+/* Узкий экран: сайдбар сверху, горизонтально прокручиваемый. */
+@media (max-width: 760px) {
+  .shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: auto;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    overflow-x: auto;
+  }
+  .side-nav {
+    flex-direction: row;
+    gap: 4px;
+  }
+  .side-link {
+    white-space: nowrap;
+  }
+}
+
+/* --- Дашборд «Смена» --- */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.dash-wide {
+  grid-column: 1 / -1;
+}
+.dash-title {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.dash-big {
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.dash-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin-top: 14px;
+}
+.dash-pay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.dash-pay b {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.dash-pay i {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 12px;
+}
+.dash-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.dash-dot.cash {
+  background: #45c07e;
+}
+.dash-dot.card {
+  background: #78b4f0;
+}
+.dash-dot.online {
+  background: #b98fe8;
+}
+.dash-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dash-rows .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.dash-rows .row b {
+  font-variant-numeric: tabular-nums;
+}
