@@ -221,6 +221,19 @@ export interface ShiftReport {
     difference: number;
     status: "MATCH" | "SHORTAGE" | "SURPLUS";
   } | null;
+  // --- Модель «Смены»: Клуб + Бар = Итог, разбивка по оплате ---
+  /** Размен на начало смены. */
+  openingFloat: number;
+  /** Клуб: все пополнения и пакеты за смену. */
+  clubTopUps: number;
+  /** Бар: все продажи бара за смену. */
+  barSales: number;
+  /** Итог = Клуб + Бар. */
+  grandTotal: number;
+  /** Из Итога — наличными. */
+  cashTotal: number;
+  /** Из Итога — онлайн. */
+  onlineTotal: number;
 }
 
 export interface GuestHistory {
