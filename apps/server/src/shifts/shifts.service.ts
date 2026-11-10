@@ -1,10 +1,19 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PaymentMethod, type Shift, TransactionType } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { type Reconciliation, computeShiftTotals, reconcile, tournamentNet } from "./shift.rules.js";
+import {
+  type Reconciliation,
+  computeShiftTotals,
+  reconcile,
+  tournamentNet,
+} from "./shift.rules.js";
 
 /** Движения турниров: считаются только вместе — см. tournamentNet. */
 const TOURNAMENT_TYPES = [
@@ -28,6 +37,19 @@ export interface ShiftReport {
   topUpsTotal: number;
   sessionsCount: number;
   reconciliation: Reconciliation | null;
+  // --- Модель Z-отчёта кассира ---
+  /** Размен на начало смены. Наличные смены прибавляются к нему. */
+  openingFloat: number;
+  /** Клуб: все пополнения и пакеты за смену (любым способом). */
+  clubTopUps: number;
+  /** Бар: все продажи бара за смену. */
+  barSales: number;
+  /** Итог смены = Клуб + Бар. */
+  grandTotal: number;
+  /** Из Итога — наличными (пополнения + бар). */
+  cashTotal: number;
+  /** Из Итога — онлайн (пополнения + бар). Заработает с подключением Kaspi. */
+  onlineTotal: number;
 }
 
 @Injectable()
@@ -38,7 +60,10 @@ export class ShiftsService {
   ) {}
 
   /** Открытая смена клуба, если она есть. Кассовый экран показывает её в шапке. */
-  async current(staff: AuthenticatedStaff, clubId: string): Promise<Shift | null> {
+  async current(
+    staff: AuthenticatedStaff,
+    clubId: string,
+  ): Promise<Shift | null> {
     await this.access.requireClub(staff, clubId);
     return this.prisma.shift.findFirst({
       where: { clubId, closedAt: null },
@@ -112,7 +137,10 @@ export class ShiftsService {
       ...report,
       reconciliation:
         shift.closedAt && shift.cashCounted !== null
-          ? reconcile(shift.cashExpected ?? report.cashExpected, shift.cashCounted)
+          ? reconcile(
+              shift.cashExpected ?? report.cashExpected,
+              shift.cashCounted,
+            )
           : null,
     };
   }
@@ -126,7 +154,9 @@ export class ShiftsService {
     });
   }
 
-  private async buildReport(shift: Shift): Promise<Omit<ShiftReport, "reconciliation">> {
+  private async buildReport(
+    shift: Shift,
+  ): Promise<Omit<ShiftReport, "reconciliation">> {
     const until = shift.closedAt ?? new Date();
     const window = { gte: shift.openedAt, lte: until };
 
@@ -152,21 +182,32 @@ export class ShiftsService {
     // Турнирные движения — тем же окном: взнос мог быть принят в эту смену,
     // а возврат за несобравшуюся команду уйти уже в следующую.
     const tournamentMoves = await this.prisma.transaction.findMany({
-      where: { clubId: shift.clubId, type: { in: TOURNAMENT_TYPES }, createdAt: window },
+      where: {
+        clubId: shift.clubId,
+        type: { in: TOURNAMENT_TYPES },
+        createdAt: window,
+      },
       select: { amount: true },
     });
 
     const sumBy = (method: PaymentMethod): number =>
-      payments.filter((p) => p.method === method).reduce((sum, p) => sum + p.amount, 0);
+      payments
+        .filter((p) => p.method === method)
+        .reduce((sum, p) => sum + p.amount, 0);
 
     const salesBy = (method: PaymentMethod): number =>
-      sales.filter((s) => s.method === method).reduce((sum, s) => sum + s.total, 0);
+      sales
+        .filter((s) => s.method === method)
+        .reduce((sum, s) => sum + s.total, 0);
 
     // Списания хранятся отрицательными: расход по кошельку.
     const sessionsRevenue = charges.reduce((sum, t) => sum - t.amount, 0);
     const tournaments = tournamentNet(tournamentMoves);
     const productsRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-    const productsCost = sales.reduce((sum, s) => sum + s.costAtSale * s.quantity, 0);
+    const productsCost = sales.reduce(
+      (sum, s) => sum + s.costAtSale * s.quantity,
+      0,
+    );
 
     const totals = computeShiftTotals({
       cash: {
@@ -183,6 +224,17 @@ export class ShiftsService {
       tournamentNet: tournaments,
     });
 
+    // Z-отчёт кассира: Клуб (пополнения и пакеты) + Бар = Итог, и тот же Итог
+    // в разбивке по способу оплаты. Наличные + размен = ожидаемая касса.
+    const clubTopUps = payments
+      .filter((p) => p.method !== PaymentMethod.BONUS)
+      .reduce((sum, p) => sum + p.amount, 0);
+    const barSales = productsRevenue;
+    const grandTotal = clubTopUps + barSales;
+    const cashTotal = sumBy(PaymentMethod.CASH) + salesBy(PaymentMethod.CASH);
+    const onlineTotal =
+      sumBy(PaymentMethod.ONLINE) + salesBy(PaymentMethod.ONLINE);
+
     return {
       shift,
       staffName: staffRecord?.fullName ?? "—",
@@ -194,16 +246,25 @@ export class ShiftsService {
       sessionsRevenue,
       productsRevenue,
       productsCost,
-      topUpsTotal: payments
-        .filter((p) => p.method !== PaymentMethod.BONUS)
-        .reduce((sum, p) => sum + p.amount, 0),
-      sessionsCount: new Set(charges.map((t) => t.sessionId).filter(Boolean)).size,
+      topUpsTotal: clubTopUps,
+      sessionsCount: new Set(charges.map((t) => t.sessionId).filter(Boolean))
+        .size,
+      // Поля модели кассира.
+      openingFloat: shift.openingFloat,
+      clubTopUps,
+      barSales,
+      grandTotal,
+      cashTotal,
+      onlineTotal,
     };
   }
 
   private async requireShift(clubId: string, shiftId: string): Promise<Shift> {
-    const shift = await this.prisma.shift.findUnique({ where: { id: shiftId } });
-    if (!shift || shift.clubId !== clubId) throw new NotFoundException("Смена не найдена");
+    const shift = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+    });
+    if (!shift || shift.clubId !== clubId)
+      throw new NotFoundException("Смена не найдена");
     return shift;
   }
 }
