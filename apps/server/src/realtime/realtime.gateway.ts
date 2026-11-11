@@ -100,7 +100,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     });
     // Экран блокировки поменялся — тот же приём, что и с каталогом: только сигнал.
     this.bus.on("screen.changed", (e) => {
-      for (const clubId of e.clubIds) this.server.to(clubAgentsRoom(clubId)).emit("screen.changed", {});
+      for (const clubId of e.clubIds)
+        this.server.to(clubAgentsRoom(clubId)).emit("screen.changed", {});
     });
     this.bus.on("bar.order.placed", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("bar.order.placed", e);
@@ -112,12 +113,31 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         status: e.status,
       });
     });
+    this.bus.on("bar.order.paid", (e) => {
+      if (e.computerId) {
+        this.server.to(agentRoom(e.computerId)).emit("bar.order.paid", {
+          orderId: e.orderId,
+          intentId: e.intentId,
+        });
+      }
+    });
+    this.bus.on("bar.order.failed", (e) => {
+      if (e.computerId) {
+        this.server.to(agentRoom(e.computerId)).emit("bar.order.failed", {
+          orderId: e.orderId,
+          intentId: e.intentId,
+          reason: e.reason,
+        });
+      }
+    });
     this.bus.on("topup.pending", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("topup.pending", e);
     });
     this.bus.on("topup.failed", (e) => {
       if (e.computerId) {
-        this.server.to(agentRoom(e.computerId)).emit("topup.failed", { intentId: e.intentId, reason: e.reason });
+        this.server
+          .to(agentRoom(e.computerId))
+          .emit("topup.failed", { intentId: e.intentId, reason: e.reason });
       }
     });
     this.bus.on("topup.paid", (e) => {
@@ -133,9 +153,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         .activeSessionFor(computerId)
         .then((id) => (id ? this.sessions.sessionSnapshot(id) : null))
         .then((snapshot) => {
-          if (snapshot) this.server.to(agentRoom(computerId)).emit("session.tick", snapshot);
+          if (snapshot)
+            this.server
+              .to(agentRoom(computerId))
+              .emit("session.tick", snapshot);
         })
-        .catch((error: Error) => this.logger.warn(`Баланс после пополнения: ${error.message}`));
+        .catch((error: Error) =>
+          this.logger.warn(`Баланс после пополнения: ${error.message}`),
+        );
     });
     this.bus.on("signup.confirmed", (e) => {
       this.server.to(agentRoom(e.computerId)).emit("signup.confirmed", {
@@ -150,7 +175,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
    * агент — по коду привязки машины.
    */
   async handleConnection(client: Socket): Promise<void> {
-    const { token, pairingToken, enrollmentKey, macAddress, hostname } = client.handshake.auth as {
+    const { token, pairingToken, enrollmentKey, macAddress, hostname } = client
+      .handshake.auth as {
       token?: string;
       pairingToken?: string;
       enrollmentKey?: string;
@@ -280,7 +306,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
-    const result = await this.agents.guestLogin(computerId, body.phone, body.pin);
+    const result = await this.agents.guestLogin(
+      computerId,
+      body.phone,
+      body.pin,
+    );
     // Гость опознан, даже если начать ему пока нечем: промокод это исправит.
     if (result.guest) {
       client.data.loginGuestId = result.guest.id;
@@ -312,9 +342,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
 
     const { guestId, playing } = await this.resolveGuest(client);
-    if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
+    if (!guestId)
+      return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
 
-    const result = await this.promos.redeemAtComputer(computerId, guestId, body.code ?? "");
+    const result = await this.promos.redeemAtComputer(
+      computerId,
+      guestId,
+      body.code ?? "",
+    );
     if (!result.ok) return result;
 
     if (playing) {
@@ -340,10 +375,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     const { guestId } = await this.resolveGuest(client);
-    if (!guestId) return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
+    if (!guestId)
+      return { ok: false, reason: "Сначала войдите по номеру телефона и PIN" };
     try {
       const method: TopUpMethod = body.method === "phone" ? "phone" : "qr";
-      return await this.kaspi.createForComputer(computerId, guestId, Number(body.amount), method);
+      return await this.kaspi.createForComputer(
+        computerId,
+        guestId,
+        Number(body.amount),
+        method,
+      );
     } catch (error) {
       this.logger.error("Пополнение по QR не создалось", error as Error);
       return { ok: false, reason: "Не удалось создать платёж" };
@@ -363,7 +404,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   async guestCard(@ConnectedSocket() client: Socket) {
     const computerId = client.data.computerId as string | undefined;
     const guestId = this.loggedInGuest(client);
-    if (!computerId || !guestId) return { ok: false, reason: "Войдите заново", guest: null };
+    if (!computerId || !guestId)
+      return { ok: false, reason: "Войдите заново", guest: null };
     return this.agents.guestCard(computerId, guestId);
   }
 
@@ -375,20 +417,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     return this.barOrders.menuFor(computerId);
   }
 
-  /** Заказ из бара: платит гость сессии этой машины, со своего баланса. */
+  /** Заказ из бара: гость сессии этой машины оплачивает картой онлайн. */
   @SubscribeMessage("bar.order")
   async barOrder(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { items?: unknown },
+    @MessageBody() body: { items?: unknown; method?: string },
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     const guestId = await this.currentGuest(client);
-    if (!guestId) return { ok: false, reason: "Заказать с баланса можно во время игры по своему аккаунту" };
-    return this.barOrders.place(computerId, guestId, body.items);
+    if (!guestId)
+      return {
+        ok: false,
+        reason: "Заказать можно во время игры по своему аккаунту",
+      };
+    const method: TopUpMethod = body.method === "phone" ? "phone" : "qr";
+    return this.barOrders.place(computerId, guestId, body.items, method);
   }
 
-  private async resolveGuest(client: Socket): Promise<{ guestId: string | null; playing: boolean }> {
+  private async resolveGuest(
+    client: Socket,
+  ): Promise<{ guestId: string | null; playing: boolean }> {
     const playing = await this.currentGuest(client);
     if (playing) return { guestId: playing, playing: true };
     const guestId = this.loggedInGuest(client);
@@ -431,7 +480,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     try {
-      return await this.signups.complete(computerId, body.code ?? "", body.nickname ?? "", body.pin ?? "");
+      return await this.signups.complete(
+        computerId,
+        body.code ?? "",
+        body.nickname ?? "",
+        body.pin ?? "",
+      );
     } catch (error) {
       this.logger.error("Регистрация не завершилась", error as Error);
       return { ok: false, reason: "Не удалось завершить регистрацию" };
@@ -446,7 +500,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     try {
-      const session = await this.agents.startByGuest(computerId, body.guestId, body.tariffId ?? null);
+      const session = await this.agents.startByGuest(
+        computerId,
+        body.guestId,
+        body.tariffId ?? null,
+      );
       // Дальше гостя определяет сессия; после неё машина снова ничья.
       this.forgetLogin(client);
       return { ok: true, sessionId: session.id };
@@ -484,7 +542,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     try {
-      const result = await this.offline.ingest(computerId, body.operations ?? []);
+      const result = await this.offline.ingest(
+        computerId,
+        body.operations ?? [],
+      );
       return { ok: true, ...result };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };
@@ -510,10 +571,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
 
   /** Слайд был на экране — счётчик показов для партнёра. */
   @SubscribeMessage("screen.impression")
-  async screenImpression(@ConnectedSocket() client: Socket, @MessageBody() body: { slideId?: string }) {
+  async screenImpression(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { slideId?: string },
+  ) {
     const computerId = client.data.computerId as string | undefined;
     const clubId = client.data.clubId as string | undefined;
-    if (!computerId || !clubId || typeof body?.slideId !== "string") return { ok: false };
+    if (!computerId || !clubId || typeof body?.slideId !== "string")
+      return { ok: false };
     await this.screen.impression(computerId, clubId, body.slideId);
     return { ok: true };
   }
@@ -560,13 +625,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("library.scan")
   async recordScan(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { items?: Array<{ name: string; target: string; coverUrl?: string | null }> },
+    @MessageBody()
+    body: {
+      items?: Array<{ name: string; target: string; coverUrl?: string | null }>;
+    },
   ) {
     const clubId = client.data.clubId as string | undefined;
     const computerId = client.data.computerId as string | undefined;
     if (!clubId || !computerId) return { ok: false, saved: 0 };
 
-    const result = await this.library.recordScan(clubId, computerId, body.items ?? []);
+    const result = await this.library.recordScan(
+      clubId,
+      computerId,
+      body.items ?? [],
+    );
     return { ok: true, ...result };
   }
 
@@ -606,7 +678,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       where: { computerId, status: "ACTIVE" },
       select: { id: true },
     });
-    this.bus.emit("staff.called", { clubId, computerId, sessionId: session?.id ?? null });
+    this.bus.emit("staff.called", {
+      clubId,
+      computerId,
+      sessionId: session?.id ?? null,
+    });
     return { ok: true };
   }
 }

@@ -8,6 +8,7 @@ import {
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { randomUUID } from "node:crypto";
 import {
+  BarOrderStatus,
   InvoiceStatus,
   type PaymentIntent,
   PaymentIntentStatus,
@@ -20,8 +21,10 @@ import {
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { WalletService } from "../guests/wallet.service.js";
+import type { OrderItemSnapshot } from "../products/bar-order.rules.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RealtimeBus } from "../realtime/realtime.bus.js";
+import { bonusFor } from "../shifts/shift.rules.js";
 import { HmacPaymentProvider } from "./payment.provider.js";
 import {
   ApplyDecision,
@@ -94,7 +97,11 @@ export class PaymentsService {
     guestId: string,
     amount: number,
   ): Promise<ComputerTopUp> {
-    if (!Number.isInteger(amount) || amount < COMPUTER_TOPUP_MIN || amount > COMPUTER_TOPUP_MAX) {
+    if (
+      !Number.isInteger(amount) ||
+      amount < COMPUTER_TOPUP_MIN ||
+      amount > COMPUTER_TOPUP_MAX
+    ) {
       return { ok: false, reason: "Сумма пополнения — от 100 до 200 000 ₸" };
     }
 
@@ -109,11 +116,14 @@ export class PaymentsService {
     if (!dynamic && !staticImage) {
       return {
         ok: false,
-        reason: "Оплата по QR в клубе пока не подключена. Пополните счёт у администратора.",
+        reason:
+          "Оплата по QR в клубе пока не подключена. Пополните счёт у администратора.",
       };
     }
 
-    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
     if (!guest || guest.tenantId !== computer.club.tenantId) {
       return { ok: false, reason: "Гость не найден" };
     }
@@ -130,7 +140,10 @@ export class PaymentsService {
 
     if (!dynamic) {
       // Банк о платеже не сообщит — кассе нужно знать, чей перевод ждать.
-      this.bus.emit("topup.pending", { clubId: computer.clubId, intentId: result.intentId });
+      this.bus.emit("topup.pending", {
+        clubId: computer.clubId,
+        intentId: result.intentId,
+      });
     }
 
     return {
@@ -154,10 +167,14 @@ export class PaymentsService {
     amount: number,
   ): Promise<CheckoutResult> {
     await this.access.requireClub(staff, clubId);
-    if (amount <= 0) throw new BadRequestException("Сумма должна быть больше нуля");
+    if (amount <= 0)
+      throw new BadRequestException("Сумма должна быть больше нуля");
 
-    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
-    if (!guest || guest.tenantId !== staff.tenantId) throw new NotFoundException("Гость не найден");
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest || guest.tenantId !== staff.tenantId)
+      throw new NotFoundException("Гость не найден");
 
     return this.createIntent({
       tenantId: staff.tenantId,
@@ -174,7 +191,9 @@ export class PaymentsService {
     staff: AuthenticatedStaff,
     invoiceId: string,
   ): Promise<CheckoutResult> {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+    });
     if (!invoice || invoice.tenantId !== staff.tenantId) {
       throw new NotFoundException("Счёт не найден");
     }
@@ -298,7 +317,12 @@ export class PaymentsService {
     }
 
     const applied = await this.applySuccess(intent);
-    if (applied && intent.purpose === PaymentPurpose.GUEST_TOPUP && intent.guestId && intent.clubId) {
+    if (
+      applied &&
+      intent.purpose === PaymentPurpose.GUEST_TOPUP &&
+      intent.guestId &&
+      intent.clubId
+    ) {
       this.bus.emit("topup.paid", {
         clubId: intent.clubId,
         computerId: intent.computerId,
@@ -306,6 +330,31 @@ export class PaymentsService {
         guestId: intent.guestId,
         amount: intent.amount,
       });
+    }
+    if (
+      applied &&
+      intent.purpose === PaymentPurpose.BAR_ORDER &&
+      intent.barOrderId &&
+      intent.clubId
+    ) {
+      const order = await this.prisma.barOrder.findUnique({
+        where: { id: intent.barOrderId },
+      });
+      if (order) {
+        // Касса видит заказ только теперь — когда он оплачен.
+        this.bus.emit("bar.order.placed", {
+          clubId: intent.clubId,
+          orderId: order.id,
+          computerName: order.computerName,
+        });
+        // Экран гостя, где висел QR, закрывает его и показывает «оплачено».
+        this.bus.emit("bar.order.paid", {
+          clubId: intent.clubId,
+          computerId: intent.computerId,
+          orderId: order.id,
+          intentId: intent.id,
+        });
+      }
     }
     if (reason) this.logger.warn(`Платёж ${intent.id}: ${reason}`);
     return { applied: true, reason };
@@ -323,14 +372,24 @@ export class PaymentsService {
       const claimed = await tx.paymentIntent.updateMany({
         where: {
           id: intent.id,
-          status: { in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED] },
+          status: {
+            in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED],
+          },
         },
         data: { status: PaymentIntentStatus.SUCCEEDED, paidAt: new Date() },
       });
       if (claimed.count === 0) return false;
 
-      if (intent.purpose === PaymentPurpose.GUEST_TOPUP && intent.guestId && intent.clubId) {
-        const wallet = await this.wallets.resolveWallet(intent.guestId, intent.clubId, tx);
+      if (
+        intent.purpose === PaymentPurpose.GUEST_TOPUP &&
+        intent.guestId &&
+        intent.clubId
+      ) {
+        const wallet = await this.wallets.resolveWallet(
+          intent.guestId,
+          intent.clubId,
+          tx,
+        );
         await this.wallets.record(tx, {
           walletId: wallet.id,
           clubId: intent.clubId,
@@ -357,7 +416,76 @@ export class PaymentsService {
         return true;
       }
 
-      if (intent.purpose === PaymentPurpose.SUBSCRIPTION_INVOICE && intent.invoiceId) {
+      if (
+        intent.purpose === PaymentPurpose.BAR_ORDER &&
+        intent.barOrderId &&
+        intent.clubId
+      ) {
+        // Заказ становится оплаченным и продажами бара — одной транзакцией со
+        // статусом платежа. Повторный вебхук сюда уже не войдёт: заказ не NEW.
+        const claimed = await tx.barOrder.updateMany({
+          where: {
+            id: intent.barOrderId,
+            status: BarOrderStatus.AWAITING_PAYMENT,
+          },
+          data: { status: BarOrderStatus.NEW },
+        });
+        if (claimed.count === 0) return true;
+
+        const order = await tx.barOrder.findUnique({
+          where: { id: intent.barOrderId },
+        });
+        if (!order) return true;
+        const items = order.items as unknown as OrderItemSnapshot[];
+
+        const shift = await tx.shift.findFirst({
+          where: { clubId: intent.clubId, closedAt: null },
+          orderBy: { openedAt: "desc" },
+        });
+        const products = await tx.product.findMany({
+          where: { id: { in: items.map((i) => i.productId) } },
+          select: { id: true, cost: true },
+        });
+        const costById = new Map(products.map((p) => [p.id, p.cost]));
+
+        for (const item of items) {
+          await tx.productSale.create({
+            data: {
+              clubId: intent.clubId,
+              productId: item.productId,
+              guestId: order.guestId,
+              sessionId: order.sessionId,
+              shiftId: shift?.id ?? null,
+              staffId: null,
+              quantity: item.quantity,
+              priceAtSale: item.price,
+              costAtSale: costById.get(item.productId) ?? 0,
+              total: item.price * item.quantity,
+              method: PaymentMethod.ONLINE,
+              orderId: order.id,
+            },
+          });
+        }
+
+        const club = await tx.club.findUnique({ where: { id: intent.clubId } });
+        const bonus = bonusFor(order.total, club?.bonusPercent ?? 0);
+        if (bonus > 0) {
+          await tx.guest.update({
+            where: { id: order.guestId },
+            data: { bonusPoints: { increment: bonus } },
+          });
+          await tx.barOrder.update({
+            where: { id: order.id },
+            data: { bonusAccrued: bonus },
+          });
+        }
+        return true;
+      }
+
+      if (
+        intent.purpose === PaymentPurpose.SUBSCRIPTION_INVOICE &&
+        intent.invoiceId
+      ) {
         const invoice = await tx.invoice.update({
           where: { id: intent.invoiceId },
           data: { status: InvoiceStatus.PAID, paidAt: new Date() },
@@ -386,7 +514,9 @@ export class PaymentsService {
     staff: AuthenticatedStaff,
     intentId: string,
   ): Promise<{ applied: boolean; reason: string | null }> {
-    const intent = await this.prisma.paymentIntent.findUnique({ where: { id: intentId } });
+    const intent = await this.prisma.paymentIntent.findUnique({
+      where: { id: intentId },
+    });
     if (!intent || intent.tenantId !== staff.tenantId) {
       throw new NotFoundException("Платёж не найден");
     }
@@ -395,12 +525,18 @@ export class PaymentsService {
     // подтверждение провайдера. Иначе кнопка «оплата поступила» превращается
     // в бесплатную подписку.
     if (intent.purpose === PaymentPurpose.SUBSCRIPTION_INVOICE) {
-      throw new ForbiddenException("Счёт за подписку закрывается только платежом");
+      throw new ForbiddenException(
+        "Счёт за подписку закрывается только платежом",
+      );
     }
     if (intent.clubId) await this.access.requireClub(staff, intent.clubId);
-    if (!intent.providerRef) throw new BadRequestException("У платежа нет идентификатора");
+    if (!intent.providerRef)
+      throw new BadRequestException("У платежа нет идентификатора");
 
-    return this.confirm(intent.providerRef, { paid: true, amount: intent.amount });
+    return this.confirm(intent.providerRef, {
+      paid: true,
+      amount: intent.amount,
+    });
   }
 
   /**
@@ -415,7 +551,9 @@ export class PaymentsService {
         clubId,
         purpose: PaymentPurpose.GUEST_TOPUP,
         computerId: { not: null },
-        status: { in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED] },
+        status: {
+          in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED],
+        },
         checkoutUrl: null,
         // Счета Kaspi через ApiPay подтверждаются сами — кассе их ждать незачем.
         provider: { not: "apipay" },
@@ -445,8 +583,13 @@ export class PaymentsService {
   }
 
   /** Перевод не пришёл — убрать платёж из ожидающих. */
-  async cancelManually(staff: AuthenticatedStaff, intentId: string): Promise<{ ok: boolean }> {
-    const intent = await this.prisma.paymentIntent.findUnique({ where: { id: intentId } });
+  async cancelManually(
+    staff: AuthenticatedStaff,
+    intentId: string,
+  ): Promise<{ ok: boolean }> {
+    const intent = await this.prisma.paymentIntent.findUnique({
+      where: { id: intentId },
+    });
     if (!intent || intent.tenantId !== staff.tenantId || !intent.clubId) {
       throw new NotFoundException("Платёж не найден");
     }
@@ -454,7 +597,9 @@ export class PaymentsService {
     const changed = await this.prisma.paymentIntent.updateMany({
       where: {
         id: intent.id,
-        status: { in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED] },
+        status: {
+          in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED],
+        },
       },
       data: { status: PaymentIntentStatus.CANCELED },
     });
@@ -475,7 +620,10 @@ export class PaymentsService {
   @Cron(CronExpression.EVERY_10_MINUTES)
   async expireStale(): Promise<void> {
     const result = await this.prisma.paymentIntent.updateMany({
-      where: { status: PaymentIntentStatus.PENDING, expiresAt: { lt: new Date() } },
+      where: {
+        status: PaymentIntentStatus.PENDING,
+        expiresAt: { lt: new Date() },
+      },
       data: { status: PaymentIntentStatus.EXPIRED },
     });
     if (result.count > 0) {

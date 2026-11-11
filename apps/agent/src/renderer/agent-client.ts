@@ -107,8 +107,19 @@ export interface BarMenu {
   }>;
 }
 
+/** Ответ на заказ из бара: счёт на оплату картой, как у пополнения. */
 export type BarOrderResult =
-  | { ok: true; orderId: string; total: number; balance: number }
+  | {
+      ok: true;
+      orderId: string;
+      total: number;
+      intentId: string;
+      mode: "dynamic" | "static" | "kaspi_qr" | "kaspi_phone";
+      qrPayload: string | null;
+      qrImageUrl: string | null;
+      phoneMasked: string | null;
+      expiresAt: string;
+    }
   | { ok: false; reason: string };
 
 export type TopUpStart =
@@ -278,11 +289,12 @@ export class AgentClient {
     return this.request("bar.menu", {});
   }
 
-  /** Заказ из бара с оплатой с баланса гостя этой сессии. */
+  /** Заказ из бара: гость оплачивает картой онлайн (QR или счёт в Kaspi на номер). */
   barOrder(
     items: Array<{ productId: string; quantity: number }>,
+    method: "qr" | "phone" = "qr",
   ): Promise<BarOrderResult> {
-    return this.request("bar.order", { items });
+    return this.request("bar.order", { items, method });
   }
 
   /** Пополнение. Сумма в тиын; способ — QR или счёт в Kaspi на номер гостя. */
@@ -330,6 +342,30 @@ export class AgentClient {
     this.socket?.on("bar.order.updated", listener);
     return () => {
       this.socket?.off("bar.order.updated", listener);
+    };
+  }
+
+  /** Заказ оплачен картой — экран закрывает QR и показывает «оплачено». */
+  onBarOrderPaid(
+    listener: (event: { orderId: string; intentId: string }) => void,
+  ): () => void {
+    this.socket?.on("bar.order.paid", listener);
+    return () => {
+      this.socket?.off("bar.order.paid", listener);
+    };
+  }
+
+  /** Оплата заказа не прошла — экран показывает причину. */
+  onBarOrderFailed(
+    listener: (event: {
+      orderId: string;
+      intentId: string;
+      reason: string;
+    }) => void,
+  ): () => void {
+    this.socket?.on("bar.order.failed", listener);
+    return () => {
+      this.socket?.off("bar.order.failed", listener);
     };
   }
 

@@ -35,7 +35,11 @@ export interface RealtimeEvents {
     minutesLeft: number | null;
   };
   "computer.status": { clubId: string; computerId: string; status: string };
-  "staff.called": { clubId: string; computerId: string; sessionId: string | null };
+  "staff.called": {
+    clubId: string;
+    computerId: string;
+    sessionId: string | null;
+  };
   /*
    * Каталог игр клуба изменился. Машины забирают его заново сами: пересылать
    * список всем сорока при каждой правке дороже, чем сказать «обнови».
@@ -50,7 +54,11 @@ export interface RealtimeEvents {
    * Гость отправил код регистрации со своего WhatsApp. Экран машины, на
    * которой висит QR, переходит к вводу ника и PIN.
    */
-  "signup.confirmed": { computerId: string; code: string; existingName: string | null };
+  "signup.confirmed": {
+    computerId: string;
+    code: string;
+    existingName: string | null;
+  };
   /* Гость заказал из бара с игрового ПК — кассе нужно отнести. */
   "bar.order.placed": { clubId: string; orderId: string; computerName: string };
   /* Заказ отнесли или отменили — гость видит это у себя на экране. */
@@ -60,10 +68,30 @@ export interface RealtimeEvents {
     orderId: string;
     status: "DONE" | "CANCELED";
   };
+  /* Заказ оплачен картой — экран гостя закрывает QR, касса видит, что нести. */
+  "bar.order.paid": {
+    clubId: string;
+    computerId: string | null;
+    orderId: string;
+    intentId: string;
+  };
+  /* Оплата заказа не прошла (истекла, отклонена) — экран гостя говорит почему. */
+  "bar.order.failed": {
+    clubId: string;
+    computerId: string | null;
+    orderId: string;
+    intentId: string;
+    reason: string;
+  };
   /* Гость открыл QR на игровом ПК: без подключённого банка кассе ждать перевода. */
   "topup.pending": { clubId: string; intentId: string };
   /* Счёт Kaspi не состоялся (истёк, отменён, Kaspi отказал) — экран гостя говорит почему. */
-  "topup.failed": { clubId: string; computerId: string | null; intentId: string; reason: string };
+  "topup.failed": {
+    clubId: string;
+    computerId: string | null;
+    intentId: string;
+    reason: string;
+  };
   /* Пополнение зачислено — экран, где висел QR, закрывает его сам. */
   "topup.paid": {
     clubId: string;
@@ -83,7 +111,10 @@ export class RealtimeBus {
     this.emitter.setMaxListeners(50);
   }
 
-  emit<K extends keyof RealtimeEvents>(event: K, payload: RealtimeEvents[K]): void {
+  emit<K extends keyof RealtimeEvents>(
+    event: K,
+    payload: RealtimeEvents[K],
+  ): void {
     this.emitter.emit(event, payload);
   }
 

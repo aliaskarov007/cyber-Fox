@@ -11,7 +11,10 @@ import {
 } from "./api.js";
 
 function clock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ru-KZ", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("ru-KZ", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /**
@@ -41,7 +44,12 @@ export function SeatRequests({ club }: { club: Club }) {
     const token = getToken();
     if (!token) return;
     const socket: Socket = io({ auth: { token }, transports: ["websocket"] });
-    for (const event of ["bar.order.placed", "bar.order.updated", "topup.pending", "topup.paid"]) {
+    for (const event of [
+      "bar.order.placed",
+      "bar.order.updated",
+      "topup.pending",
+      "topup.paid",
+    ]) {
       socket.on(event, () => void load());
     }
     // Сокет мог переподключиться, пропустив события, — догоняем раз в минуту.
@@ -52,7 +60,10 @@ export function SeatRequests({ club }: { club: Club }) {
     };
   }, [load]);
 
-  async function act(id: string, action: () => Promise<unknown>): Promise<void> {
+  async function act(
+    id: string,
+    action: () => Promise<unknown>,
+  ): Promise<void> {
     setBusy(id);
     setError(null);
     try {
@@ -77,14 +88,20 @@ export function SeatRequests({ club }: { club: Club }) {
           <span className="call-time">{clock(order.createdAt)}</span>
           <span className="call-text">
             Бар · {order.guestName}:{" "}
-            {order.items.map((i) => (i.quantity > 1 ? `${i.name} ×${i.quantity}` : i.name)).join(", ")}{" "}
-            — {formatMoney(order.total)}, оплачено с баланса
+            {order.items
+              .map((i) =>
+                i.quantity > 1 ? `${i.name} ×${i.quantity}` : i.name,
+              )
+              .join(", ")}{" "}
+            — {formatMoney(order.total)}, оплачено картой
           </span>
           <button
             type="button"
             className="primary"
             disabled={busy === order.id}
-            onClick={() => void act(order.id, () => api.completeBarOrder(club.id, order.id))}
+            onClick={() =>
+              void act(order.id, () => api.completeBarOrder(club.id, order.id))
+            }
           >
             Отнёс
           </button>
@@ -92,7 +109,12 @@ export function SeatRequests({ club }: { club: Club }) {
             type="button"
             disabled={busy === order.id}
             onClick={() => {
-              if (!window.confirm("Отменить заказ? Деньги вернутся гостю на счёт, товар — на склад.")) return;
+              if (
+                !window.confirm(
+                  "Отменить заказ? Товар вернётся на склад, оплату по карте верните гостю вручную.",
+                )
+              )
+                return;
               void act(order.id, () => api.cancelBarOrder(club.id, order.id));
             }}
           >
@@ -106,8 +128,8 @@ export function SeatRequests({ club }: { club: Club }) {
           <span className="call-name">{topUp.computerName}</span>
           <span className="call-time">{clock(topUp.createdAt)}</span>
           <span className="call-text">
-            Пополнение по QR · {topUp.guestName}: {formatMoney(topUp.amount)} — проверьте поступление
-            в банковском приложении
+            Пополнение по QR · {topUp.guestName}: {formatMoney(topUp.amount)} —
+            проверьте поступление в банковском приложении
           </span>
           <button
             type="button"
@@ -116,7 +138,8 @@ export function SeatRequests({ club }: { club: Club }) {
             onClick={() =>
               void act(topUp.id, async () => {
                 const result = await api.confirmPayment(topUp.id);
-                if (!result.applied && result.reason) throw new Error(result.reason);
+                if (!result.applied && result.reason)
+                  throw new Error(result.reason);
               })
             }
           >
@@ -125,7 +148,9 @@ export function SeatRequests({ club }: { club: Club }) {
           <button
             type="button"
             disabled={busy === topUp.id}
-            onClick={() => void act(topUp.id, () => api.cancelPayment(topUp.id))}
+            onClick={() =>
+              void act(topUp.id, () => api.cancelPayment(topUp.id))
+            }
           >
             Не пришли
           </button>

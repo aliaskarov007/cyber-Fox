@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 
-import { type AgentClient, type Tick, formatMoney, formatRemaining } from "./agent-client.js";
+import {
+  type AgentClient,
+  type Tick,
+  formatMoney,
+  formatRemaining,
+} from "./agent-client.js";
 import { BarPanel } from "./BarPanel.js";
 import { PromoField } from "./PromoField.js";
 import { TopUpPanel } from "./TopUpPanel.js";
@@ -66,7 +71,7 @@ export function SessionBar({
         setPromoNote(
           event.status === "DONE"
             ? "Заказ из бара отмечен как выданный. Приятного аппетита!"
-            : "Заказ из бара отменён администратором — деньги вернулись на счёт.",
+            : "Заказ из бара отменён администратором — оплату по карте он вернёт.",
         ),
       ),
     [client],
@@ -84,7 +89,9 @@ export function SessionBar({
   }, [called]);
 
   const onPackage = tick.packageMinutesLeft !== null;
-  const left = onPackage ? tick.packageMinutesLeft! : (tick.minutesAffordable ?? 0);
+  const left = onPackage
+    ? tick.packageMinutesLeft!
+    : (tick.minutesAffordable ?? 0);
   const inDebt = tick.balance < 0;
   const tone = inDebt ? "debt" : left <= warnMinutes ? "warn" : "ok";
   const remaining = formatRemaining(left);
@@ -101,9 +108,9 @@ export function SessionBar({
         </div>
 
         {/*
-          * Кто сидит и по какому тарифу. У анонимной посадки имени нет — тогда
-          * и показывать нечего, кроме денег.
-          */}
+         * Кто сидит и по какому тарифу. У анонимной посадки имени нет — тогда
+         * и показывать нечего, кроме денег.
+         */}
         {tick.guestName && (
           <div className="session-guest">
             <span className="session-guest-name">{tick.guestName}</span>
@@ -140,7 +147,11 @@ export function SessionBar({
             </button>
           )}
           {hasAccount && panel !== "promo" && (
-            <button className="ghost" disabled={offline} onClick={() => setPanel("promo")}>
+            <button
+              className="ghost"
+              disabled={offline}
+              onClick={() => setPanel("promo")}
+            >
               Промокод
             </button>
           )}
@@ -159,7 +170,9 @@ export function SessionBar({
           <button
             className="ghost"
             disabled={offline}
-            onClick={() => void client.stopSession(tick.sessionId).then(onStopped)}
+            onClick={() =>
+              void client.stopSession(tick.sessionId).then(onStopped)
+            }
           >
             {offline ? "Нет связи" : "Завершить"}
           </button>
@@ -170,7 +183,6 @@ export function SessionBar({
         <div className="promo-panel">
           <BarPanel
             client={client}
-            balance={tick.balance}
             offline={offline}
             onOrdered={setPromoNote}
             onClose={() => setPanel(null)}
@@ -183,7 +195,9 @@ export function SessionBar({
           <TopUpPanel
             client={client}
             disabled={offline}
-            onPaid={(amount) => setPromoNote(`Счёт пополнен на ${formatMoney(amount)}`)}
+            onPaid={(amount) =>
+              setPromoNote(`Счёт пополнен на ${formatMoney(amount)}`)
+            }
             onClose={() => setPanel(null)}
           />
         </div>
@@ -211,8 +225,9 @@ export function SessionBar({
 
       {inDebt && (
         <div className="banner debt">
-          Баланс исчерпан, вы играете в долг. Осталось {formatMoney(tick.creditLeft ?? 0)} — после
-          этого экран заблокируется. Подойдите к администратору.
+          Баланс исчерпан, вы играете в долг. Осталось{" "}
+          {formatMoney(tick.creditLeft ?? 0)} — после этого экран заблокируется.
+          Подойдите к администратору.
         </div>
       )}
 
@@ -226,8 +241,8 @@ export function SessionBar({
 
       {offline && (
         <div className="banner warn">
-          Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и будет учтено, когда
-          связь вернётся.
+          Нет связи с сервером. Оплаченное время идёт по таймеру этого ПК и
+          будет учтено, когда связь вернётся.
         </div>
       )}
 

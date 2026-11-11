@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { PaymentIntentStatus, PaymentPurpose } from "@prisma/client";
 import { randomUUID } from "node:crypto";
@@ -16,7 +21,12 @@ import {
   toKaspiPhone,
   verifyApiPaySignature,
 } from "./apipay.rules.js";
-import { COMPUTER_TOPUP_MAX, COMPUTER_TOPUP_MIN, type ComputerTopUp, PaymentsService } from "./payments.service.js";
+import {
+  COMPUTER_TOPUP_MAX,
+  COMPUTER_TOPUP_MIN,
+  type ComputerTopUp,
+  PaymentsService,
+} from "./payments.service.js";
 
 /** QR живёт у Kaspi своё время; у нас неоплаченный платёж висит не дольше получаса. */
 const INTENT_TTL_MS = 30 * 60_000;
@@ -56,11 +66,15 @@ export class KaspiService {
   // --- Настройки (владелец сети) ---
 
   async get(staff: AuthenticatedStaff): Promise<PublicKaspiChannel> {
-    const channel = await this.prisma.kaspiChannel.findUnique({ where: { tenantId: staff.tenantId } });
+    const channel = await this.prisma.kaspiChannel.findUnique({
+      where: { tenantId: staff.tenantId },
+    });
     return {
       connected: channel !== null,
       enabled: channel?.enabled ?? false,
-      webhookPath: channel ? `/api/payments/apipay/${channel.webhookToken}` : null,
+      webhookPath: channel
+        ? `/api/payments/apipay/${channel.webhookToken}`
+        : null,
       lastState: channel?.lastState ?? null,
       lastCheckAt: channel?.lastCheckAt ?? null,
     };
@@ -74,14 +88,21 @@ export class KaspiService {
     staff: AuthenticatedStaff,
     dto: { apiKey?: string; webhookSecret?: string; enabled?: boolean },
   ): Promise<PublicKaspiChannel> {
-    const existing = await this.prisma.kaspiChannel.findUnique({ where: { tenantId: staff.tenantId } });
+    const existing = await this.prisma.kaspiChannel.findUnique({
+      where: { tenantId: staff.tenantId },
+    });
     const apiKey = dto.apiKey?.trim() || existing?.apiKey;
     const webhookSecret = dto.webhookSecret?.trim() || existing?.webhookSecret;
-    if (!apiKey) throw new BadRequestException("Укажите ключ API из кабинета ApiPay");
-    if (!webhookSecret) throw new BadRequestException("Укажите секрет уведомлений из кабинета ApiPay");
+    if (!apiKey)
+      throw new BadRequestException("Укажите ключ API из кабинета ApiPay");
+    if (!webhookSecret)
+      throw new BadRequestException(
+        "Укажите секрет уведомлений из кабинета ApiPay",
+      );
 
     const health = await this.apipay.health(apiKey);
-    if (!health.ok && health.code !== "kyc_required") throw new BadRequestException(health.error);
+    if (!health.ok && health.code !== "kyc_required")
+      throw new BadRequestException(health.error);
     const lastState = health.ok ? "ok" : health.error;
 
     await this.prisma.kaspiChannel.upsert({
@@ -106,21 +127,30 @@ export class KaspiService {
   }
 
   async disconnect(staff: AuthenticatedStaff): Promise<PublicKaspiChannel> {
-    await this.prisma.kaspiChannel.deleteMany({ where: { tenantId: staff.tenantId } });
+    await this.prisma.kaspiChannel.deleteMany({
+      where: { tenantId: staff.tenantId },
+    });
     return this.get(staff);
   }
 
   // --- Пополнение с игрового ПК ---
 
   /** Что показать гостю: можно ли платить через Kaspi и есть ли запасной QR клуба. */
-  async options(computerId: string): Promise<{ kaspi: boolean; staticQr: boolean }> {
+  async options(
+    computerId: string,
+  ): Promise<{ kaspi: boolean; staticQr: boolean }> {
     const computer = await this.prisma.computer.findUnique({
       where: { id: computerId },
       select: { club: { select: { tenantId: true, paymentQrImageUrl: true } } },
     });
     if (!computer) return { kaspi: false, staticQr: false };
-    const channel = await this.prisma.kaspiChannel.findUnique({ where: { tenantId: computer.club.tenantId } });
-    return { kaspi: Boolean(channel?.enabled), staticQr: Boolean(computer.club.paymentQrImageUrl) };
+    const channel = await this.prisma.kaspiChannel.findUnique({
+      where: { tenantId: computer.club.tenantId },
+    });
+    return {
+      kaspi: Boolean(channel?.enabled),
+      staticQr: Boolean(computer.club.paymentQrImageUrl),
+    };
   }
 
   /**
@@ -139,21 +169,34 @@ export class KaspiService {
     });
     if (!computer) return { ok: false, reason: "ПК не опознан" };
 
-    const channel = await this.prisma.kaspiChannel.findUnique({ where: { tenantId: computer.club.tenantId } });
-    if (!channel?.enabled) return this.payments.createTopUpForComputer(computerId, guestId, amount);
+    const channel = await this.prisma.kaspiChannel.findUnique({
+      where: { tenantId: computer.club.tenantId },
+    });
+    if (!channel?.enabled)
+      return this.payments.createTopUpForComputer(computerId, guestId, amount);
 
-    if (!Number.isInteger(amount) || amount < COMPUTER_TOPUP_MIN || amount > COMPUTER_TOPUP_MAX) {
+    if (
+      !Number.isInteger(amount) ||
+      amount < COMPUTER_TOPUP_MIN ||
+      amount > COMPUTER_TOPUP_MAX
+    ) {
       return { ok: false, reason: "Сумма пополнения — от 100 до 200 000 ₸" };
     }
     const tenge = tiynToTenge(amount);
     if (tenge === null) return { ok: false, reason: "Сумма — в целых тенге" };
 
-    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
-    if (!guest || guest.tenantId !== computer.club.tenantId) return { ok: false, reason: "Гость не найден" };
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest || guest.tenantId !== computer.club.tenantId)
+      return { ok: false, reason: "Гость не найден" };
 
     const phone = method === "phone" ? toKaspiPhone(guest.phone) : null;
     if (method === "phone" && !phone) {
-      return { ok: false, reason: "Номер в аккаунте не похож на казахстанский — оплатите по QR" };
+      return {
+        ok: false,
+        reason: "Номер в аккаунте не похож на казахстанский — оплатите по QR",
+      };
     }
 
     const intent = await this.prisma.paymentIntent.create({
@@ -166,7 +209,9 @@ export class KaspiService {
         computerId,
         provider: "apipay",
         idempotencyKey: `apipay:${randomUUID()}`,
-        expiresAt: new Date(Date.now() + (method === "phone" ? PHONE_TTL_MS : INTENT_TTL_MS)),
+        expiresAt: new Date(
+          Date.now() + (method === "phone" ? PHONE_TTL_MS : INTENT_TTL_MS),
+        ),
       },
     });
 
@@ -190,7 +235,9 @@ export class KaspiService {
         where: { id: intent.id },
         data: { status: PaymentIntentStatus.FAILED },
       });
-      this.logger.warn(`ApiPay не выставил счёт ${intent.id}: ${created.error}`);
+      this.logger.warn(
+        `ApiPay не выставил счёт ${intent.id}: ${created.error}`,
+      );
       return { ok: false, reason: created.error };
     }
 
@@ -199,13 +246,139 @@ export class KaspiService {
       qr_token_url?: string | null;
       qr_expires_at?: string | null;
     };
-    const qrExpires = invoice.qr_expires_at ? new Date(invoice.qr_expires_at) : null;
+    const qrExpires = invoice.qr_expires_at
+      ? new Date(invoice.qr_expires_at)
+      : null;
     const updated = await this.prisma.paymentIntent.update({
       where: { id: intent.id },
       data: {
         providerRef: apipayRef(invoice.id),
         checkoutUrl: invoice.qr_token_url ?? null,
-        ...(qrExpires && !Number.isNaN(qrExpires.getTime()) ? { expiresAt: qrExpires } : {}),
+        ...(qrExpires && !Number.isNaN(qrExpires.getTime())
+          ? { expiresAt: qrExpires }
+          : {}),
+      },
+    });
+
+    return {
+      ok: true,
+      reason: null,
+      intentId: updated.id,
+      amount: updated.amount,
+      mode: method === "phone" ? "kaspi_phone" : "kaspi_qr",
+      qrPayload: method === "qr" ? (invoice.qr_token_url ?? null) : null,
+      qrImageUrl: method === "qr" ? (invoice.qr_image_url ?? null) : null,
+      phoneMasked: phone ? maskPhone(phone) : null,
+      expiresAt: updated.expiresAt,
+    };
+  }
+
+  /**
+   * Счёт на оплату заказа из бара картой онлайн. В отличие от пополнения,
+   * запасного пути со статическим QR нет: заказ должен подтвердиться сам, без
+   * кассира у терминала. Канал Kaspi выключен — заказать картой нельзя.
+   */
+  async createForBarOrder(
+    computerId: string,
+    guestId: string,
+    barOrderId: string,
+    amount: number,
+    method: TopUpMethod,
+  ): Promise<ComputerTopUp> {
+    const computer = await this.prisma.computer.findUnique({
+      where: { id: computerId },
+      include: { club: true },
+    });
+    if (!computer) return { ok: false, reason: "ПК не опознан" };
+
+    const channel = await this.prisma.kaspiChannel.findUnique({
+      where: { tenantId: computer.club.tenantId },
+    });
+    if (!channel?.enabled) {
+      return { ok: false, reason: "Оплата картой в клубе ещё не подключена" };
+    }
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { ok: false, reason: "Сумма заказа неверна" };
+    }
+    const tenge = tiynToTenge(amount);
+    if (tenge === null)
+      return { ok: false, reason: "Сумма заказа — не в целых тенге" };
+
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest || guest.tenantId !== computer.club.tenantId) {
+      return { ok: false, reason: "Гость не найден" };
+    }
+
+    const phone = method === "phone" ? toKaspiPhone(guest.phone) : null;
+    if (method === "phone" && !phone) {
+      return {
+        ok: false,
+        reason: "Номер в аккаунте не похож на казахстанский — оплатите по QR",
+      };
+    }
+
+    const intent = await this.prisma.paymentIntent.create({
+      data: {
+        tenantId: computer.club.tenantId,
+        clubId: computer.clubId,
+        purpose: PaymentPurpose.BAR_ORDER,
+        amount,
+        guestId,
+        computerId,
+        barOrderId,
+        provider: "apipay",
+        idempotencyKey: `apipay:${randomUUID()}`,
+        expiresAt: new Date(
+          Date.now() + (method === "phone" ? PHONE_TTL_MS : INTENT_TTL_MS),
+        ),
+      },
+    });
+
+    const description = `Бар в ${computer.club.name}`;
+    const created =
+      method === "phone"
+        ? await this.apipay.createPhoneInvoice(channel.apiKey, {
+            phone: phone!,
+            amountTenge: tenge,
+            description,
+            externalId: intent.id,
+          })
+        : await this.apipay.createQrInvoice(channel.apiKey, {
+            amountTenge: tenge,
+            description,
+            externalId: intent.id,
+          });
+
+    if (!created.ok) {
+      await this.prisma.paymentIntent.update({
+        where: { id: intent.id },
+        data: { status: PaymentIntentStatus.FAILED },
+      });
+      this.logger.warn(
+        `ApiPay не выставил счёт заказа ${intent.id}: ${created.error}`,
+      );
+      return { ok: false, reason: created.error };
+    }
+
+    const invoice = created.data as typeof created.data & {
+      qr_image_url?: string | null;
+      qr_token_url?: string | null;
+      qr_expires_at?: string | null;
+    };
+    const qrExpires = invoice.qr_expires_at
+      ? new Date(invoice.qr_expires_at)
+      : null;
+    const updated = await this.prisma.paymentIntent.update({
+      where: { id: intent.id },
+      data: {
+        providerRef: apipayRef(invoice.id),
+        checkoutUrl: invoice.qr_token_url ?? null,
+        ...(qrExpires && !Number.isNaN(qrExpires.getTime())
+          ? { expiresAt: qrExpires }
+          : {}),
       },
     });
 
@@ -233,7 +406,9 @@ export class KaspiService {
     rawBody: string,
     signature: string | undefined,
   ): Promise<{ accepted: boolean; reason?: string }> {
-    const channel = await this.prisma.kaspiChannel.findUnique({ where: { webhookToken: token } });
+    const channel = await this.prisma.kaspiChannel.findUnique({
+      where: { webhookToken: token },
+    });
     if (!channel) throw new NotFoundException("Неизвестный адрес уведомлений");
     if (!verifyApiPaySignature(rawBody, signature, channel.webhookSecret)) {
       throw new BadRequestException("Неверная подпись");
@@ -248,7 +423,8 @@ export class KaspiService {
 
     // Проверка из кабинета ApiPay — отвечаем «принято», чтобы владелец увидел, что адрес верный.
     if (payload.event === "webhook.test") return { accepted: true };
-    if (payload.event !== "invoice.status_changed") return { accepted: true, reason: "Событие не нужно" };
+    if (payload.event !== "invoice.status_changed")
+      return { accepted: true, reason: "Событие не нужно" };
 
     await this.apply(channel.tenantId, payload.invoice);
     return { accepted: true };
@@ -265,28 +441,49 @@ export class KaspiService {
     // Чужой счёт или счёт не из Cyber-Fox (выставлен руками в кабинете) — не наш.
     if (!intent || intent.tenantId !== tenantId) return;
     if (action.externalId && action.externalId !== intent.id) {
-      this.logger.error(`Счёт ApiPay ${action.invoiceId}: номер платежа не совпал с ${intent.id}`);
+      this.logger.error(
+        `Счёт ApiPay ${action.invoiceId}: номер платежа не совпал с ${intent.id}`,
+      );
       return;
     }
 
     if (action.kind === "paid") {
       // Те же правила, что у любого провайдера: сумма сверяется, дубль не зачисляется.
-      const result = await this.payments.confirm(intent.providerRef!, { paid: true, amount: action.amount });
-      if (!result.applied && result.reason) this.logger.warn(`Платёж ${intent.id}: ${result.reason}`);
+      const result = await this.payments.confirm(intent.providerRef!, {
+        paid: true,
+        amount: action.amount,
+      });
+      if (!result.applied && result.reason)
+        this.logger.warn(`Платёж ${intent.id}: ${result.reason}`);
       return;
     }
 
     const changed = await this.prisma.paymentIntent.updateMany({
       where: { id: intent.id, status: PaymentIntentStatus.PENDING },
-      data: { status: action.expired ? PaymentIntentStatus.EXPIRED : PaymentIntentStatus.FAILED },
+      data: {
+        status: action.expired
+          ? PaymentIntentStatus.EXPIRED
+          : PaymentIntentStatus.FAILED,
+      },
     });
     if (changed.count > 0 && intent.clubId) {
-      this.bus.emit("topup.failed", {
-        clubId: intent.clubId,
-        computerId: intent.computerId,
-        intentId: intent.id,
-        reason: action.reason,
-      });
+      if (intent.purpose === PaymentPurpose.BAR_ORDER) {
+        // Склад освободит фоновая задача заказов; экран гостя узнаёт сразу.
+        this.bus.emit("bar.order.failed", {
+          clubId: intent.clubId,
+          computerId: intent.computerId,
+          orderId: intent.barOrderId ?? "",
+          intentId: intent.id,
+          reason: action.reason,
+        });
+      } else {
+        this.bus.emit("topup.failed", {
+          clubId: intent.clubId,
+          computerId: intent.computerId,
+          intentId: intent.id,
+          reason: action.reason,
+        });
+      }
     }
   }
 
@@ -302,7 +499,9 @@ export class KaspiService {
     const intents = await this.prisma.paymentIntent.findMany({
       where: {
         provider: "apipay",
-        status: { in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED] },
+        status: {
+          in: [PaymentIntentStatus.PENDING, PaymentIntentStatus.EXPIRED],
+        },
         providerRef: { startsWith: APIPAY_REF_PREFIX },
         createdAt: { gte: since, lte: stale },
       },
@@ -319,10 +518,17 @@ export class KaspiService {
     for (const intent of intents) {
       const apiKey = keyByTenant.get(intent.tenantId);
       if (!apiKey) continue;
-      const result = await this.apipay.getInvoice(apiKey, intent.providerRef!.slice(APIPAY_REF_PREFIX.length));
+      const result = await this.apipay.getInvoice(
+        apiKey,
+        intent.providerRef!.slice(APIPAY_REF_PREFIX.length),
+      );
       if (!result.ok) continue;
       // Просроченный у нас, но всё ещё ждущий у Kaspi — не трогаем: вдруг оплатят.
-      if (intent.status === PaymentIntentStatus.EXPIRED && result.data.status !== "paid") continue;
+      if (
+        intent.status === PaymentIntentStatus.EXPIRED &&
+        result.data.status !== "paid"
+      )
+        continue;
       await this.apply(intent.tenantId, result.data).catch((error: Error) =>
         this.logger.warn(`Сверка ${intent.id}: ${error.message}`),
       );
