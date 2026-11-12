@@ -846,12 +846,33 @@ main {
   display: grid;
   /* Мелкие плотные квадраты; размер задаёт зум карты (--pc-min на <main>). */
   grid-template-columns: repeat(auto-fill, var(--pc-min, 62px));
-  gap: 8px;
+  gap: 8px 8px;
+  align-items: start;
+}
+
+/* Ячейка карты: кружок ПК и под ним — имя играющего гостя. */
+.pc-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.pc-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.1;
+  font-size: clamp(9px, calc(var(--pc-min, 62px) * 0.19), 15px);
+  color: var(--ink-2);
 }
 
 /* Круглая плитка: кольцо несёт статус, в центре — только номер. */
 .pc {
   position: relative;
+  width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
   padding: 2px;
