@@ -1002,6 +1002,13 @@ main {
   border-radius: 8px;
   opacity: 0.3;
   z-index: 1;
+  cursor: pointer;
+}
+/* Когда ПК или объект выбран — клетки подсвечиваются как «поставить сюда». */
+.map-slot.ready {
+  opacity: 0.9;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 .map-obj {
   z-index: 0;

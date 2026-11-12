@@ -443,17 +443,34 @@ export function HallScreen({
   }
 
   async function addObject(kind: "LABEL" | "WALL"): Promise<void> {
+    let text: string | undefined;
+    if (kind === "LABEL") {
+      // Сразу спрашиваем, что за место — иначе непонятно, что делать с «Подписью».
+      const entered = window.prompt(
+        "Что за место? Например: Ресепшн, Уборная, Диваны, Зона отдыха, Бар, Вход",
+        "Ресепшн",
+      );
+      if (entered === null) return;
+      text = entered.trim() || "Подпись";
+    }
+    // Ставим под сеткой ПК, а не в угол поверх машин — иначе объект закрывает ПК.
+    const objBottom = objects.reduce(
+      (m, o) => Math.max(m, o.posY + o.height),
+      0,
+    );
+    const posY = Math.max(pcLayout.rows, objBottom);
     setArrError(null);
     try {
       const created = await api.createMapObject(club.id, {
         kind,
-        text: kind === "LABEL" ? "Подпись" : undefined,
+        text,
         posX: 0,
-        posY: 0,
+        posY,
         width: kind === "WALL" ? 1 : 3,
         height: kind === "WALL" ? 4 : 2,
       });
       await refresh();
+      // Выбираем созданное — дальше тапом по пустой клетке его можно поставить куда нужно.
       setSel({ kind: "obj", id: created.id });
     } catch (error) {
       setArrError((error as Error).message);
@@ -583,8 +600,10 @@ export function HallScreen({
                 + Перегородка
               </button>
               <span className="hall-arrange-hint">
-                Перетащите ПК, подписи и перегородки по плану. Нажмите на объект
-                — сменить зал, размер или удалить.
+                Нажмите на ПК или объект — он выделится; затем нажмите на пустую
+                клетку, чтобы перенести. На компьютере можно перетаскивать
+                мышью. Нажатый объект можно переименовать, изменить размер или
+                удалить.
               </span>
             </>
           )}
@@ -733,16 +752,23 @@ export function HallScreen({
             </div>
           ))}
 
-          {/* Пустые клетки — цель для переноса (только в правке). */}
+          {/* Пустые клетки — цель для переноса. Работает и перетаскиванием
+             (мышь), и тапом: выбрал объект → нажал на клетку (нужно для
+             сенсорных экранов, где перетаскивание не срабатывает). */}
           {slots.map(({ col, row }) => (
             <div
               key={`slot-${col}-${row}`}
-              className="map-slot"
+              className={`map-slot ${sel ? "ready" : ""}`}
               style={{ gridColumn: col + 1, gridRow: row + 1 }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
                 onDropCell(col, row);
+              }}
+              onClick={() => {
+                if (sel?.kind === "pc") void movePC(sel.id, col, row);
+                else if (sel?.kind === "obj") void moveObj(sel.id, col, row);
+                setSel(null);
               }}
             />
           ))}
