@@ -6,6 +6,7 @@ import { CurrentStaff } from "../auth/current-staff.decorator.js";
 import { Roles } from "../auth/guards.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import {
+  ArrangeComputersDto,
   CreateComputerDto,
   CreateTariffDto,
   CreateZoneDto,
@@ -28,7 +29,10 @@ export class CatalogController {
   }
 
   @Get("clubs/:clubId/zones")
-  listZones(@CurrentStaff() staff: AuthenticatedStaff, @Param("clubId") clubId: string) {
+  listZones(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
     return this.catalog.listZones(staff, clubId);
   }
 
@@ -54,7 +58,10 @@ export class CatalogController {
   }
 
   @Get("clubs/:clubId/computers")
-  listComputers(@CurrentStaff() staff: AuthenticatedStaff, @Param("clubId") clubId: string) {
+  listComputers(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
     return this.catalog.listComputers(staff, clubId);
   }
 
@@ -79,8 +86,22 @@ export class CatalogController {
     return this.catalog.updateComputer(staff, clubId, computerId, dto);
   }
 
+  /** Пакетная расстановка машин по залам — один запрос вместо десятков. */
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Patch("clubs/:clubId/computers-arrange")
+  arrangeComputers(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Body() dto: ArrangeComputersDto,
+  ) {
+    return this.catalog.arrangeComputers(staff, clubId, dto);
+  }
+
   @Get("clubs/:clubId/tariffs")
-  listTariffs(@CurrentStaff() staff: AuthenticatedStaff, @Param("clubId") clubId: string) {
+  listTariffs(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
     return this.catalog.listTariffs(staff, clubId);
   }
 

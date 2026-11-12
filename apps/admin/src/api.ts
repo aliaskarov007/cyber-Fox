@@ -450,6 +450,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Расставить несколько машин по залам одним запросом (редактор зала). */
+  arrangeComputers: (
+    clubId: string,
+    moves: Array<{ id: string; zoneId: string; posX: number }>,
+  ) =>
+    request<{ ok: true }>(`/clubs/${clubId}/computers-arrange`, {
+      method: "PATCH",
+      body: JSON.stringify({ moves }),
+    }),
+
   hall: (clubId: string) => request<HallCell[]>(`/clubs/${clubId}/hall`),
 
   searchGuests: (clubId: string, query: string) =>

@@ -323,15 +323,8 @@ export function HallScreen({
 
     setArrError(null);
     try {
-      await Promise.all(
-        updates.map((u) =>
-          api.updateComputer(club.id, u.id, {
-            zoneId: u.zoneId,
-            posX: u.posX,
-            posY: 0,
-          }),
-        ),
-      );
+      // Один пакетный запрос, а не десятки — иначе упираемся в защиту от перебора.
+      await api.arrangeComputers(club.id, updates);
     } catch (error) {
       setArrError((error as Error).message);
     }

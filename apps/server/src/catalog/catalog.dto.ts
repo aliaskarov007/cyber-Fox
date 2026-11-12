@@ -12,6 +12,7 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 
 export class CreateZoneDto {
@@ -69,6 +70,32 @@ export class UpdateComputerDto {
   @IsInt()
   @Min(0)
   posY?: number | null;
+}
+
+/** Одна позиция в пакетной расстановке: куда и на какое место встаёт машина. */
+export class ComputerPlacementDto {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  zoneId!: string;
+
+  @IsInt()
+  @Min(0)
+  posX!: number;
+}
+
+/**
+ * Перенос и перестановка машин одним запросом. Так правка расположения зала
+ * не превращается в десятки отдельных PATCH — иначе они упираются в защиту от
+ * перебора. Всё применяется атомарно: половинчатой расстановки не бывает.
+ */
+export class ArrangeComputersDto {
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => ComputerPlacementDto)
+  moves!: ComputerPlacementDto[];
 }
 
 export class CreateTariffDto {

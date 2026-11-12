@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { type Computer, type Tariff, TariffKind, type Zone } from "@prisma/client";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  type Computer,
+  type Tariff,
+  TariffKind,
+  type Zone,
+} from "@prisma/client";
 import { randomBytes } from "node:crypto";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -7,6 +16,7 @@ import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import type {
+  ArrangeComputersDto,
   CreateComputerDto,
   CreateTariffDto,
   CreateZoneDto,
@@ -33,7 +43,11 @@ export class CatalogService {
     });
   }
 
-  async createZone(staff: AuthenticatedStaff, clubId: string, dto: CreateZoneDto): Promise<Zone> {
+  async createZone(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    dto: CreateZoneDto,
+  ): Promise<Zone> {
     await this.access.requireClub(staff, clubId);
     return this.prisma.zone.create({
       data: { clubId, name: dto.name, sortOrder: dto.sortOrder ?? 0 },
@@ -59,7 +73,9 @@ export class CatalogService {
       // Зона переключается на поминутку именно этим тарифом, поэтому пакет тут
       // бессмысленен: сессия ушла бы в тупик вместо продолжения игры.
       if (tariff.kind !== TariffKind.PER_MINUTE) {
-        throw new BadRequestException("Тариф по умолчанию должен быть поминутным");
+        throw new BadRequestException(
+          "Тариф по умолчанию должен быть поминутным",
+        );
       }
       if (tariff.zoneId !== zoneId) {
         throw new BadRequestException("Тариф принадлежит другой зоне");
@@ -71,7 +87,10 @@ export class CatalogService {
 
   // --- Компьютеры ---
 
-  async listComputers(staff: AuthenticatedStaff, clubId: string): Promise<Computer[]> {
+  async listComputers(
+    staff: AuthenticatedStaff,
+    clubId: string,
+  ): Promise<Computer[]> {
     await this.access.requireClub(staff, clubId);
     return this.prisma.computer.findMany({
       where: { clubId },
@@ -107,16 +126,75 @@ export class CatalogService {
     dto: UpdateComputerDto,
   ): Promise<Computer> {
     await this.access.requireClub(staff, clubId);
-    const computer = await this.prisma.computer.findUnique({ where: { id: computerId } });
-    if (!computer || computer.clubId !== clubId) throw new NotFoundException("ПК не найден");
+    const computer = await this.prisma.computer.findUnique({
+      where: { id: computerId },
+    });
+    if (!computer || computer.clubId !== clubId)
+      throw new NotFoundException("ПК не найден");
     if (dto.zoneId) await this.requireZone(clubId, dto.zoneId);
 
-    return this.prisma.computer.update({ where: { id: computerId }, data: dto });
+    return this.prisma.computer.update({
+      where: { id: computerId },
+      data: dto,
+    });
+  }
+
+  /**
+   * Пакетная расстановка: перенести/переставить несколько машин одним запросом,
+   * атомарно. Все машины и залы должны принадлежать этому клубу. Используется
+   * редактором расположения зала, чтобы один перенос был одним обращением.
+   */
+  async arrangeComputers(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    dto: ArrangeComputersDto,
+  ): Promise<{ ok: true }> {
+    await this.access.requireClub(staff, clubId);
+    if (dto.moves.length === 0) return { ok: true };
+
+    const ids = [...new Set(dto.moves.map((m) => m.id))];
+    const zoneIds = [...new Set(dto.moves.map((m) => m.zoneId))];
+
+    const [computers, zones] = await Promise.all([
+      this.prisma.computer.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, clubId: true },
+      }),
+      this.prisma.zone.findMany({
+        where: { id: { in: zoneIds } },
+        select: { id: true, clubId: true },
+      }),
+    ]);
+    if (
+      computers.length !== ids.length ||
+      computers.some((c) => c.clubId !== clubId)
+    ) {
+      throw new NotFoundException("Одна из машин не из этого клуба");
+    }
+    if (
+      zones.length !== zoneIds.length ||
+      zones.some((z) => z.clubId !== clubId)
+    ) {
+      throw new NotFoundException("Один из залов не из этого клуба");
+    }
+
+    await this.prisma.$transaction(
+      dto.moves.map((m) =>
+        this.prisma.computer.update({
+          where: { id: m.id },
+          data: { zoneId: m.zoneId, posX: m.posX, posY: 0 },
+        }),
+      ),
+    );
+    return { ok: true };
   }
 
   // --- Тарифы ---
 
-  async listTariffs(staff: AuthenticatedStaff, clubId: string): Promise<Tariff[]> {
+  async listTariffs(
+    staff: AuthenticatedStaff,
+    clubId: string,
+  ): Promise<Tariff[]> {
     await this.access.requireClub(staff, clubId);
     return this.prisma.tariff.findMany({
       where: { clubId },
@@ -158,8 +236,11 @@ export class CatalogService {
     dto: UpdateTariffDto,
   ): Promise<Tariff> {
     const club = await this.access.requireClub(staff, clubId);
-    const tariff = await this.prisma.tariff.findUnique({ where: { id: tariffId } });
-    if (!tariff || tariff.clubId !== clubId) throw new NotFoundException("Тариф не найден");
+    const tariff = await this.prisma.tariff.findUnique({
+      where: { id: tariffId },
+    });
+    if (!tariff || tariff.clubId !== clubId)
+      throw new NotFoundException("Тариф не найден");
     this.validateTariff(dto, club.creditLimit);
 
     return this.prisma.tariff.update({ where: { id: tariffId }, data: dto });
@@ -168,10 +249,15 @@ export class CatalogService {
   /**
    * Предупреждения, которые дешевле выдать при настройке, чем разбирать потом на стойке.
    */
-  private validateTariff(dto: Partial<CreateTariffDto>, creditLimit: number): void {
+  private validateTariff(
+    dto: Partial<CreateTariffDto>,
+    creditLimit: number,
+  ): void {
     if (dto.kind === TariffKind.PER_MINUTE) {
       if (!dto.pricePerMinute) {
-        throw new BadRequestException("Для поминутного тарифа нужна цена минуты");
+        throw new BadRequestException(
+          "Для поминутного тарифа нужна цена минуты",
+        );
       }
       // Если минута дороже кредита, режим долга не даёт ни одной минуты и сессия
       // закрывается сразу по исчерпании баланса (docs/billing.md, раздел 6).
@@ -189,16 +275,21 @@ export class CatalogService {
       }
     }
 
-    const hasFrom = dto.activeFromMinute !== undefined && dto.activeFromMinute !== null;
-    const hasTo = dto.activeToMinute !== undefined && dto.activeToMinute !== null;
+    const hasFrom =
+      dto.activeFromMinute !== undefined && dto.activeFromMinute !== null;
+    const hasTo =
+      dto.activeToMinute !== undefined && dto.activeToMinute !== null;
     if (hasFrom !== hasTo) {
-      throw new BadRequestException("Окно действия задаётся началом и концом сразу");
+      throw new BadRequestException(
+        "Окно действия задаётся началом и концом сразу",
+      );
     }
   }
 
   private async requireZone(clubId: string, zoneId: string): Promise<Zone> {
     const zone = await this.prisma.zone.findUnique({ where: { id: zoneId } });
-    if (!zone || zone.clubId !== clubId) throw new NotFoundException("Зона не найдена");
+    if (!zone || zone.clubId !== clubId)
+      throw new NotFoundException("Зона не найдена");
     return zone;
   }
 }
