@@ -406,6 +406,25 @@ export function HallScreen({
     }
   }
 
+  async function addComputer(zoneId: string): Promise<void> {
+    // Подсказываем следующий номер: ПК-<максимальный + 1>.
+    const nums = hall.map((c) => {
+      const m = c.computer.name.match(/(\d+)\s*$/);
+      return m ? Number(m[1]) : 0;
+    });
+    const next = (nums.length ? Math.max(...nums) : 0) + 1;
+    const suggested = `ПК-${String(next).padStart(2, "0")}`;
+    const name = window.prompt("Название нового ПК", suggested);
+    if (!name || !name.trim()) return;
+    setArrError(null);
+    try {
+      await api.createComputer(club.id, { name: name.trim(), zoneId });
+      await refresh();
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+  }
+
   return (
     <main style={{ "--pc-min": `${pcMin}px` } as CSSProperties}>
       <div className="summary">
@@ -516,6 +535,15 @@ export function HallScreen({
                   {zone.cells.filter((c) => c.session).length}/
                   {zone.cells.length}
                 </span>
+                {edit && (
+                  <button
+                    className="zone-add-pc"
+                    title="Добавить ПК в этот зал"
+                    onClick={() => void addComputer(zone.id)}
+                  >
+                    + ПК
+                  </button>
+                )}
               </div>
 
               <div

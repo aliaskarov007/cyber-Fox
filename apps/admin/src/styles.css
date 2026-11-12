@@ -959,6 +959,12 @@ main {
 .zone-area .zone-head {
   margin-bottom: 10px;
 }
+.zone-add-pc {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 13px;
+  border-radius: 7px;
+}
 .zone-grid {
   display: grid;
   gap: 8px;

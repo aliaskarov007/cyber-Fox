@@ -43,7 +43,7 @@ const TABS: Array<{
   manageOnly?: boolean;
 }> = [
   { id: "dashboard", label: "Смена" },
-  { id: "hall", label: "Зал" },
+  { id: "hall", label: "Карта клуба" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
   { id: "events", label: "Ивенты" },
