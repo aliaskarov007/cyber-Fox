@@ -1004,11 +1004,20 @@ main {
   z-index: 1;
   cursor: pointer;
 }
-/* Когда ПК или объект выбран — клетки подсвечиваются как «поставить сюда». */
+/* Когда что-то «в руке» — клетки подсвечиваются как «поставить сюда». */
 .map-slot.ready {
   opacity: 0.9;
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+.carry-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.carry-bar button {
+  margin-left: auto;
 }
 .map-obj {
   z-index: 0;
