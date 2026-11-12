@@ -453,11 +453,17 @@ export const api = {
   /** Расставить несколько машин по залам одним запросом (редактор зала). */
   arrangeComputers: (
     clubId: string,
-    moves: Array<{ id: string; zoneId: string; posX: number }>,
+    moves: Array<{ id: string; zoneId: string; posX: number; posY?: number }>,
   ) =>
     request<{ ok: true }>(`/clubs/${clubId}/computers-arrange`, {
       method: "PATCH",
       body: JSON.stringify({ moves }),
+    }),
+
+  /** Убрать машину из клуба (владелец/управляющий). */
+  deleteComputer: (clubId: string, computerId: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/computers/${computerId}`, {
+      method: "DELETE",
     }),
 
   hall: (clubId: string) => request<HallCell[]>(`/clubs/${clubId}/hall`),

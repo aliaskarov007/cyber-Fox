@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   type Computer,
+  SessionStatus,
   type Tariff,
   TariffKind,
   type Zone,
@@ -182,10 +183,49 @@ export class CatalogService {
       dto.moves.map((m) =>
         this.prisma.computer.update({
           where: { id: m.id },
-          data: { zoneId: m.zoneId, posX: m.posX, posY: 0 },
+          data: { zoneId: m.zoneId, posX: m.posX, posY: m.posY ?? 0 },
         }),
       ),
     );
+    return { ok: true };
+  }
+
+  /**
+   * Убрать машину из клуба. Нельзя, пока на ней идёт сессия. Если по машине
+   * есть история сессий — её не удаляем (иначе поедут отчёты), а предлагаем
+   * перенести в другой зал: касса объяснит это сообщением.
+   */
+  async deleteComputer(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    computerId: string,
+  ): Promise<{ ok: true }> {
+    await this.access.requireClub(staff, clubId);
+    const computer = await this.prisma.computer.findUnique({
+      where: { id: computerId },
+    });
+    if (!computer || computer.clubId !== clubId) {
+      throw new NotFoundException("ПК не найден");
+    }
+
+    const active = await this.prisma.session.count({
+      where: {
+        computerId,
+        status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] },
+      },
+    });
+    if (active > 0) {
+      throw new BadRequestException("Сначала завершите сессию на этом ПК");
+    }
+
+    const played = await this.prisma.session.count({ where: { computerId } });
+    if (played > 0) {
+      throw new BadRequestException(
+        "По этому ПК есть история сессий — удалить нельзя. Перенесите его в другой зал.",
+      );
+    }
+
+    await this.prisma.computer.delete({ where: { id: computerId } });
     return { ok: true };
   }
 

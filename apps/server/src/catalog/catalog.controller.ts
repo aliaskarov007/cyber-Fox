@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import { StaffRole } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -95,6 +103,16 @@ export class CatalogController {
     @Body() dto: ArrangeComputersDto,
   ) {
     return this.catalog.arrangeComputers(staff, clubId, dto);
+  }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Delete("clubs/:clubId/computers/:computerId")
+  deleteComputer(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("computerId") computerId: string,
+  ) {
+    return this.catalog.deleteComputer(staff, clubId, computerId);
   }
 
   @Get("clubs/:clubId/tariffs")

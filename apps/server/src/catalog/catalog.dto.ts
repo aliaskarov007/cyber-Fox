@@ -83,6 +83,12 @@ export class ComputerPlacementDto {
   @IsInt()
   @Min(0)
   posX!: number;
+
+  /** Ряд на плане зала. Пусто — ставим в нулевой ряд. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  posY?: number;
 }
 
 /**
