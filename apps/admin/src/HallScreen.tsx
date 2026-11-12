@@ -866,6 +866,25 @@ export function HallScreen({
               </button>
             );
           })}
+
+          {/* После «Переставить» вся сетка — крупные цели: тап в любую клетку
+             переносит выбранное туда (занято — поменять местами, пусто — встать). */}
+          {carry &&
+            Array.from({ length: rows * cols }, (_, i) => {
+              const col = i % cols;
+              const row = Math.floor(i / cols);
+              const pcHere = pcLayout.placed.find(
+                (p) => p.col === col && p.row === row,
+              );
+              return (
+                <div
+                  key={`target-${col}-${row}`}
+                  className="map-target"
+                  style={{ gridColumn: col + 1, gridRow: row + 1 }}
+                  onClick={() => place(col, row, pcHere?.cell.computer.id)}
+                />
+              );
+            })}
         </div>
       )}
 

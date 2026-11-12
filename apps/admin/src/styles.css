@@ -1010,6 +1010,17 @@ main {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+/* Накладка после «Переставить»: вся сетка — крупные цели поверх плиток. */
+.map-target {
+  z-index: 5;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(225, 82, 28, 0.12);
+}
+.map-target:hover {
+  background: rgba(225, 82, 28, 0.3);
+}
 .carry-bar {
   display: flex;
   align-items: center;
