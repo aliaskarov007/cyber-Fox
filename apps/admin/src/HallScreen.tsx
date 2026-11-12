@@ -372,13 +372,6 @@ export function HallScreen({
     setDrag(null);
   }
 
-  /** Сдвинуть ПК на одну клетку кнопкой — работает всегда, даже на сенсоре. */
-  async function nudgePC(id: string, dx: number, dy: number): Promise<void> {
-    const p = pcLayout.placed.find((x) => x.cell.computer.id === id);
-    if (!p) return;
-    await movePC(id, Math.max(0, p.col + dx), Math.max(0, p.row + dy));
-  }
-
   /** Поменять местами две машины — чтобы переставлять в плотной сетке без пустых клеток. */
   async function swapPC(aId: string, bId: string): Promise<void> {
     const a = pcLayout.placed.find((x) => x.cell.computer.id === aId);
@@ -396,10 +389,6 @@ export function HallScreen({
       setArrError((error as Error).message);
     }
     await refresh();
-  }
-
-  async function nudgeObj(o: MapObject, dx: number, dy: number): Promise<void> {
-    await moveObj(o.id, Math.max(0, o.posX + dx), Math.max(0, o.posY + dy));
   }
 
   async function changeZone(pcId: string, zoneId: string): Promise<void> {
@@ -630,10 +619,9 @@ export function HallScreen({
                 + Перегородка
               </button>
               <span className="hall-arrange-hint">
-                Нажмите на ПК — откроются стрелки (двигать), выбор зала и
-                удаление. Чтобы поменять два ПК местами — нажмите один, потом
-                другой. Подпись/перегородку так же двигают стрелки или пустая
-                клетка.
+                Зажмите ПК мышкой и перетащите: на пустое место — встанет туда,
+                на другой ПК — поменяются местами. Клик по ПК — выбрать зал или
+                удалить. Подписи и перегородки тоже перетаскиваются.
               </span>
             </>
           )}
@@ -700,20 +688,6 @@ export function HallScreen({
       {edit && selPc && (
         <div className="map-sel">
           <b>{selPc.computer.name}</b>
-          <span className="map-move" aria-label="Передвинуть">
-            <button onClick={() => void nudgePC(selPc.computer.id, 0, -1)}>
-              ↑
-            </button>
-            <button onClick={() => void nudgePC(selPc.computer.id, -1, 0)}>
-              ←
-            </button>
-            <button onClick={() => void nudgePC(selPc.computer.id, 1, 0)}>
-              →
-            </button>
-            <button onClick={() => void nudgePC(selPc.computer.id, 0, 1)}>
-              ↓
-            </button>
-          </span>
           <label>
             Зал
             <select
@@ -750,12 +724,6 @@ export function HallScreen({
           ) : (
             <b>Перегородка</b>
           )}
-          <span className="map-move" aria-label="Передвинуть">
-            <button onClick={() => void nudgeObj(selObj, 0, -1)}>↑</button>
-            <button onClick={() => void nudgeObj(selObj, -1, 0)}>←</button>
-            <button onClick={() => void nudgeObj(selObj, 1, 0)}>→</button>
-            <button onClick={() => void nudgeObj(selObj, 0, 1)}>↓</button>
-          </span>
           <span className="map-size">
             Ш<button onClick={() => void resizeObj(selObj, -1, 0)}>−</button>
             {selObj.width}
@@ -841,19 +809,26 @@ export function HallScreen({
                     ? () => setDrag({ kind: "pc", id: cell.computer.id })
                     : undefined
                 }
-                onClick={() => {
-                  if (!edit) {
-                    setSelectedId(cell.computer.id);
-                    return;
-                  }
-                  // Уже выбран другой ПК — меняем их местами (удобно в плотной сетке).
-                  if (sel?.kind === "pc" && sel.id !== cell.computer.id) {
-                    void swapPC(sel.id, cell.computer.id);
-                    setSel(null);
-                  } else {
-                    setSel({ kind: "pc", id: cell.computer.id });
-                  }
-                }}
+                onDragOver={edit ? (e) => e.preventDefault() : undefined}
+                onDrop={
+                  edit
+                    ? (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Бросок одного ПК на другой — меняет их местами.
+                        if (drag?.kind === "pc" && drag.id !== cell.computer.id)
+                          void swapPC(drag.id, cell.computer.id);
+                        else if (drag?.kind === "obj")
+                          void moveObj(drag.id, col, row);
+                        setDrag(null);
+                      }
+                    : undefined
+                }
+                onClick={() =>
+                  edit
+                    ? setSel({ kind: "pc", id: cell.computer.id })
+                    : setSelectedId(cell.computer.id)
+                }
               >
                 <span
                   className="pc-zone"
