@@ -182,14 +182,15 @@ export class CatalogService {
       throw new NotFoundException("Один из залов не из этого клуба");
     }
 
-    await this.prisma.$transaction(
-      dto.moves.map((m) =>
-        this.prisma.computer.update({
-          where: { id: m.id },
-          data: { zoneId: m.zoneId, posX: m.posX, posY: m.posY ?? 0 },
-        }),
-      ),
-    );
+    // Важно: не открываем свой $transaction — он идёт мимо tenant-контекста
+    // запроса (RLS), и обновления молча не проходят. Весь запрос и так в одной
+    // транзакции, поэтому просто обновляем по очереди через scoped-модель.
+    for (const m of dto.moves) {
+      await this.prisma.computer.update({
+        where: { id: m.id },
+        data: { zoneId: m.zoneId, posX: m.posX, posY: m.posY ?? 0 },
+      });
+    }
     return { ok: true };
   }
 
