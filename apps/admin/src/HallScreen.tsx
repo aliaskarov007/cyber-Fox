@@ -145,77 +145,6 @@ function cellState(cell: HallCell): string {
   }
 }
 
-interface PlacedPC {
-  cell: HallCell;
-  col: number;
-  row: number;
-}
-
-/**
- * Раскладка машин на едином плане клуба: столбец/ряд из posX/posY. Нерасставленные
- * (их позиция пуста) сами встают в опрятную сетку, сгруппированные по залам, —
- * старый клуб сразу выглядит прилично, дальше владелец двигает как в помещении.
- */
-function layoutPCs(
-  cells: HallCell[],
-  zones: Zone[],
-): { cols: number; rows: number; placed: PlacedPC[] } {
-  const total = Math.max(cells.length, 1);
-  let cols = Math.min(16, Math.max(6, Math.ceil(Math.sqrt(total) * 1.5)));
-
-  const explicit: HallCell[] = [];
-  const rest: HallCell[] = [];
-  for (const c of cells) {
-    if (c.computer.posX !== null && c.computer.posY !== null) explicit.push(c);
-    else rest.push(c);
-  }
-  const zoneOrder = new Map(zones.map((z, i) => [z.id, i]));
-  rest.sort((a, b) => {
-    const za = zoneOrder.get(a.computer.zone.id) ?? 99;
-    const zb = zoneOrder.get(b.computer.zone.id) ?? 99;
-    if (za !== zb) return za - zb;
-    return a.computer.name.localeCompare(b.computer.name, "ru", {
-      numeric: true,
-    });
-  });
-  const maxCol = explicit.reduce(
-    (m, c) => Math.max(m, c.computer.posX as number),
-    -1,
-  );
-  cols = Math.max(cols, maxCol + 1);
-
-  const occupied = new Set<string>();
-  const placed: PlacedPC[] = [];
-  const deferred: HallCell[] = [];
-  for (const c of explicit) {
-    const key = `${c.computer.posX},${c.computer.posY}`;
-    if (occupied.has(key)) deferred.push(c);
-    else {
-      occupied.add(key);
-      placed.push({
-        cell: c,
-        col: c.computer.posX as number,
-        row: c.computer.posY as number,
-      });
-    }
-  }
-  let scan = 0;
-  for (const c of [...deferred, ...rest]) {
-    let col = scan % cols;
-    let row = Math.floor(scan / cols);
-    while (occupied.has(`${col},${row}`)) {
-      scan++;
-      col = scan % cols;
-      row = Math.floor(scan / cols);
-    }
-    occupied.add(`${col},${row}`);
-    placed.push({ cell: c, col, row });
-    scan++;
-  }
-  const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
-  return { cols, rows: maxRow + 1, placed };
-}
-
 export function HallScreen({
   club,
   staff,
@@ -235,10 +164,6 @@ export function HallScreen({
   // Правка плана — только владельцу и управляющему.
   const canArrange = staff.role === "OWNER" || staff.role === "ADMIN";
   const [edit, setEdit] = useState(false);
-  // Что сейчас «в руке» для перестановки (нажали «Переставить»).
-  const [carry, setCarry] = useState<{ kind: "pc" | "obj"; id: string } | null>(
-    null,
-  );
   const [sel, setSel] = useState<{ kind: "pc" | "obj"; id: string } | null>(
     null,
   );
@@ -301,26 +226,6 @@ export function HallScreen({
     [zoneList],
   );
 
-  const pcLayout = useMemo(() => layoutPCs(hall, zoneList), [hall, zoneList]);
-
-  // В правке поле делаем заметно больше содержимого — целый холст пустых клеток,
-  // чтобы можно было свободно переносить ПК и подписи в любой угол, как в зале.
-  const cols = useMemo(() => {
-    let c = pcLayout.cols;
-    for (const o of objects) c = Math.max(c, o.posX + o.width);
-    return edit ? Math.max(c + 4, 16) : c;
-  }, [pcLayout.cols, objects, edit]);
-  const rows = useMemo(() => {
-    let r = pcLayout.rows;
-    for (const o of objects) r = Math.max(r, o.posY + o.height);
-    return edit ? Math.max(r + 4, 10) : r;
-  }, [pcLayout.rows, objects, edit]);
-
-  const pcCells = useMemo(
-    () => new Set(pcLayout.placed.map((p) => `${p.col},${p.row}`)),
-    [pcLayout.placed],
-  );
-
   const summary = useMemo(() => {
     const busy = hall.filter((c) => c.session !== null);
     return {
@@ -335,76 +240,7 @@ export function HallScreen({
     (c) => c.session === null && c.computer.id !== selectedId,
   );
 
-  // --- Правка: перенос, залы, объекты карты ---
-
-  async function movePC(id: string, col: number, row: number): Promise<void> {
-    const pc = hall.find((c) => c.computer.id === id);
-    if (!pc) return;
-    // На клетку, занятую другой машиной, не ставим.
-    if (
-      pcLayout.placed.some(
-        (p) => p.col === col && p.row === row && p.cell.computer.id !== id,
-      )
-    )
-      return;
-    setArrError(null);
-    try {
-      await api.arrangeComputers(club.id, [
-        { id, zoneId: pc.computer.zone.id, posX: col, posY: row },
-      ]);
-    } catch (error) {
-      setArrError((error as Error).message);
-    }
-    await refresh();
-  }
-
-  async function moveObj(id: string, col: number, row: number): Promise<void> {
-    setArrError(null);
-    try {
-      await api.updateMapObject(club.id, id, { posX: col, posY: row });
-    } catch (error) {
-      setArrError((error as Error).message);
-    }
-    await refresh();
-  }
-
-  /**
-   * Перестановка без перетаскивания: нажал «Переставить» у выбранного объекта,
-   * потом нажал на клетку или другой ПК — туда и встанет. Работает везде, где
-   * работает обычное нажатие (и мышь, и сенсор), в отличие от перетаскивания.
-   * carry — что сейчас «в руке».
-   */
-  function place(col: number, row: number, targetPcId?: string): void {
-    if (!carry) return;
-    if (carry.kind === "pc") {
-      if (targetPcId && targetPcId !== carry.id)
-        void swapPC(carry.id, targetPcId);
-      else void movePC(carry.id, col, row);
-    } else {
-      void moveObj(carry.id, col, row);
-    }
-    setCarry(null);
-    setSel(null);
-  }
-
-  /** Поменять местами две машины — чтобы переставлять в плотной сетке без пустых клеток. */
-  async function swapPC(aId: string, bId: string): Promise<void> {
-    const a = pcLayout.placed.find((x) => x.cell.computer.id === aId);
-    const b = pcLayout.placed.find((x) => x.cell.computer.id === bId);
-    const aPc = hall.find((c) => c.computer.id === aId);
-    const bPc = hall.find((c) => c.computer.id === bId);
-    if (!a || !b || !aPc || !bPc) return;
-    setArrError(null);
-    try {
-      await api.arrangeComputers(club.id, [
-        { id: aId, zoneId: aPc.computer.zone.id, posX: b.col, posY: b.row },
-        { id: bId, zoneId: bPc.computer.zone.id, posX: a.col, posY: a.row },
-      ]);
-    } catch (error) {
-      setArrError((error as Error).message);
-    }
-    await refresh();
-  }
+  // --- Правка: залы, объекты карты ---
 
   async function changeZone(pcId: string, zoneId: string): Promise<void> {
     setArrError(null);
@@ -477,9 +313,9 @@ export function HallScreen({
   }
 
   /**
-   * Добавить объект на план. Готовые подписи (Reception, Lounge, WC, Entrance)
-   * приходят сразу с текстом; пустой text у LABEL — спросим название. Ставим под
-   * сеткой ПК, чтобы не закрывать машины; дальше пользователь перетащит куда надо.
+   * Добавить элемент обстановки. Готовые подписи (Reception, Lounge, WC,
+   * Entrance) приходят сразу с текстом; пустой text у LABEL — спросим название.
+   * Показываются отдельной строкой «Обстановка» под залами.
    */
   async function addObject(
     kind: "LABEL" | "WALL",
@@ -487,22 +323,17 @@ export function HallScreen({
   ): Promise<void> {
     let text: string | undefined = presetText;
     if (kind === "LABEL" && presetText === undefined) {
-      const entered = window.prompt("Название места", "Подпись");
+      const entered = window.prompt("Название места", "Ресепшн");
       if (entered === null) return;
-      text = entered.trim() || "Подпись";
+      text = entered.trim() || "Ресепшн";
     }
-    const objBottom = objects.reduce(
-      (m, o) => Math.max(m, o.posY + o.height),
-      0,
-    );
-    const posY = Math.max(pcLayout.rows, objBottom);
     setArrError(null);
     try {
       const created = await api.createMapObject(club.id, {
         kind,
         text,
         posX: 0,
-        posY,
+        posY: 0,
         width: kind === "WALL" ? 1 : 3,
         height: kind === "WALL" ? 4 : 2,
       });
@@ -511,23 +342,6 @@ export function HallScreen({
     } catch (error) {
       setArrError((error as Error).message);
     }
-  }
-
-  async function resizeObj(
-    o: MapObject,
-    dw: number,
-    dh: number,
-  ): Promise<void> {
-    const width = Math.max(1, o.width + dw);
-    const height = Math.max(1, o.height + dh);
-    if (width === o.width && height === o.height) return;
-    setArrError(null);
-    try {
-      await api.updateMapObject(club.id, o.id, { width, height });
-    } catch (error) {
-      setArrError((error as Error).message);
-    }
-    await refresh();
   }
 
   async function renameObj(id: string, text: string): Promise<void> {
@@ -557,24 +371,6 @@ export function HallScreen({
     sel?.kind === "pc"
       ? (hall.find((c) => c.computer.id === sel.id) ?? null)
       : null;
-
-  const slots: Array<{ col: number; row: number }> = [];
-  if (edit) {
-    // Клетки под машинами и под декором не предлагаем как цель — чтобы план
-    // не был зарисован пунктиром поверх подписей.
-    const blocked = new Set(pcCells);
-    for (const o of objects) {
-      for (let c = o.posX; c < o.posX + o.width; c++) {
-        for (let r = o.posY; r < o.posY + o.height; r++)
-          blocked.add(`${c},${r}`);
-      }
-    }
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (!blocked.has(`${c},${r}`)) slots.push({ col: c, row: r });
-      }
-    }
-  }
 
   return (
     <main style={{ "--pc-min": `${pcMin}px` } as CSSProperties}>
@@ -644,87 +440,21 @@ export function HallScreen({
                 + Перегородка
               </button>
               <span className="hall-arrange-hint">
-                Нажмите на ПК или подпись → кнопка «Переставить» → нажмите, куда
-                поставить (на пустое место — встанет туда, на другой ПК —
-                поменяются местами). Зал и удаление — в той же панели.
+                Чтобы раскидать ПК по залам: нажмите на ПК → в панели выберите
+                «Зал» — компьютер перейдёт в эту группу (тариф зала применится
+                сам). Там же — удаление ПК. «+ ПК» добавляет машину в зал, «+
+                Зал» — новый зал.
               </span>
             </>
           )}
         </div>
       )}
-      {edit && carry && (
-        <div className="notice carry-bar">
-          Выберите, куда поставить — нажмите на пустую клетку или другой ПК.
-          <button onClick={() => setCarry(null)}>Отмена</button>
-        </div>
-      )}
       {edit && arrError && <div className="error">{arrError}</div>}
 
-      {/* Залы: цвет на карте, переименование и добавление ПК/зала. */}
-      {(hall.length > 0 || edit) && (
-        <div className="map-legend">
-          {zoneList.map((z) => (
-            <span className="zone-chip" key={z.id}>
-              <span
-                className="zone-dot"
-                style={{ background: zoneColor(z.id) }}
-              />
-              {edit ? (
-                <input
-                  className="zone-rename"
-                  defaultValue={z.name}
-                  key={z.name}
-                  aria-label="Название зала"
-                  onBlur={(e) => void renameZone(z.id, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                />
-              ) : (
-                <span>{z.name}</span>
-              )}
-              {edit && (
-                <button
-                  className="zone-add-pc"
-                  title="Добавить ПК в этот зал"
-                  onClick={() => void addComputer(z.id)}
-                >
-                  + ПК
-                </button>
-              )}
-            </span>
-          ))}
-          {edit && (
-            <span className="hall-arrange-add">
-              <input
-                value={newZone}
-                placeholder="Новый зал"
-                onChange={(e) => setNewZone(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void addZone();
-                }}
-              />
-              <button
-                disabled={newZone.trim() === ""}
-                onClick={() => void addZone()}
-              >
-                + Зал
-              </button>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Панель выбранного объекта. */}
+      {/* Панель выбранного ПК: в какой зал относится и удаление. */}
       {edit && selPc && (
         <div className="map-sel">
           <b>{selPc.computer.name}</b>
-          <button
-            className="primary"
-            onClick={() => setCarry({ kind: "pc", id: selPc.computer.id })}
-          >
-            Переставить
-          </button>
           <label>
             Зал
             <select
@@ -755,26 +485,12 @@ export function HallScreen({
             <input
               className="zone-rename"
               defaultValue={selObj.text ?? ""}
-              placeholder="Подпись (ресепшн, уборная, диваны…)"
+              placeholder="Название (ресепшн, уборная, диваны…)"
               onBlur={(e) => void renameObj(selObj.id, e.target.value)}
             />
           ) : (
             <b>Перегородка</b>
           )}
-          <button
-            className="primary"
-            onClick={() => setCarry({ kind: "obj", id: selObj.id })}
-          >
-            Переставить
-          </button>
-          <span className="map-size">
-            Ш<button onClick={() => void resizeObj(selObj, -1, 0)}>−</button>
-            {selObj.width}
-            <button onClick={() => void resizeObj(selObj, 1, 0)}>+</button>В
-            <button onClick={() => void resizeObj(selObj, 0, -1)}>−</button>
-            {selObj.height}
-            <button onClick={() => void resizeObj(selObj, 0, 1)}>+</button>
-          </span>
           <button className="danger" onClick={() => void deleteObj(selObj.id)}>
             Удалить
           </button>
@@ -782,109 +498,143 @@ export function HallScreen({
         </div>
       )}
 
-      {(hall.length > 0 || objects.length > 0) && (
-        <div
-          className={`club-map ${edit ? "editing" : ""}`}
-          style={{
-            gridTemplateColumns: `repeat(${cols}, var(--pc-min, 74px))`,
-            gridTemplateRows: `repeat(${rows}, var(--pc-min, 74px))`,
-          }}
-        >
-          {/* Декор плана: подписи и перегородки — под машинами. */}
-          {objects.map((o) => (
-            <div
-              key={o.id}
-              className={`map-obj ${o.kind.toLowerCase()} ${
-                sel?.id === o.id ? "sel" : ""
-              }`}
-              style={{
-                gridColumn: `${o.posX + 1} / span ${o.width}`,
-                gridRow: `${o.posY + 1} / span ${o.height}`,
-              }}
-              onClick={
-                edit
-                  ? () => {
-                      if (carry) place(o.posX, o.posY);
-                      else setSel({ kind: "obj", id: o.id });
-                    }
-                  : undefined
-              }
-            >
-              {o.text}
-            </div>
-          ))}
-
-          {/* Пустые клетки — цель, куда можно поставить ПК или объект. */}
-          {slots.map(({ col, row }) => (
-            <div
-              key={`slot-${col}-${row}`}
-              className={`map-slot ${carry ? "ready" : ""}`}
-              style={{ gridColumn: col + 1, gridRow: row + 1 }}
-              onClick={carry ? () => place(col, row) : undefined}
-            />
-          ))}
-
-          {pcLayout.placed.map(({ cell, col, row }) => {
-            const state = cellState(cell);
-            const guestName = cell.session?.guest?.fullName ?? null;
+      {/* Залы — отдельными группами. Чтобы раскидать ПК по залам: нажми на ПК
+         → выбери «Зал» — компьютер сразу перейдёт в эту группу. */}
+      {(hall.length > 0 || edit) && (
+        <div className="hall-areas">
+          {zoneList.map((zone) => {
+            const pcs = hall
+              .filter((c) => c.computer.zone.id === zone.id)
+              .sort((a, b) =>
+                a.computer.name.localeCompare(b.computer.name, "ru", {
+                  numeric: true,
+                }),
+              );
             return (
-              <button
-                key={cell.computer.id}
-                className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
-                  edit ? "editing" : ""
-                } ${sel?.id === cell.computer.id ? "sel" : ""}`}
-                style={{ gridColumn: col + 1, gridRow: row + 1 }}
-                data-state={state}
-                data-col={col}
-                data-row={row}
-                data-pc-id={cell.computer.id}
-                title={tileTitle(cell, state)}
-                onClick={() => {
-                  if (!edit) {
-                    setSelectedId(cell.computer.id);
-                    return;
-                  }
-                  if (carry) place(col, row, cell.computer.id);
-                  else setSel({ kind: "pc", id: cell.computer.id });
-                }}
-              >
-                <span
-                  className="pc-zone"
-                  style={{ background: zoneColor(cell.computer.zone.id) }}
-                />
-                <span className="pc-num">{pcLabel(cell.computer.name)}</span>
-                {guestName && <span className="pc-name">{guestName}</span>}
-                {cell.session ? (
-                  <span className="pc-timer">
-                    {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
+              <section className="zone-area" key={zone.id}>
+                <div className="zone-head">
+                  <span
+                    className="zone-dot"
+                    style={{ background: zoneColor(zone.id) }}
+                  />
+                  {edit ? (
+                    <input
+                      className="zone-rename"
+                      defaultValue={zone.name}
+                      key={zone.name}
+                      aria-label="Название зала"
+                      onBlur={(e) => void renameZone(zone.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
+                    />
+                  ) : (
+                    <h2>{zone.name}</h2>
+                  )}
+                  <span className="count">
+                    {pcs.filter((c) => c.session).length}/{pcs.length}
                   </span>
-                ) : state === "RESERVED" ? (
-                  <StateIcon kind="reserved" />
-                ) : state === "PAUSED" ? (
-                  <StateIcon kind="paused" />
-                ) : null}
-              </button>
+                  {edit && (
+                    <button
+                      className="zone-add-pc"
+                      onClick={() => void addComputer(zone.id)}
+                    >
+                      + ПК
+                    </button>
+                  )}
+                </div>
+                <div className="zone-grid">
+                  {pcs.map((cell) => {
+                    const state = cellState(cell);
+                    const guestName = cell.session?.guest?.fullName ?? null;
+                    return (
+                      <button
+                        key={cell.computer.id}
+                        className={`pc ${
+                          calls[cell.computer.id] ? "calling" : ""
+                        } ${edit ? "editing" : ""} ${
+                          sel?.id === cell.computer.id ? "sel" : ""
+                        }`}
+                        data-state={state}
+                        title={tileTitle(cell, state)}
+                        onClick={() =>
+                          edit
+                            ? setSel({ kind: "pc", id: cell.computer.id })
+                            : setSelectedId(cell.computer.id)
+                        }
+                      >
+                        <span className="pc-num">
+                          {pcLabel(cell.computer.name)}
+                        </span>
+                        {guestName && (
+                          <span className="pc-name">{guestName}</span>
+                        )}
+                        {cell.session ? (
+                          <span className="pc-timer">
+                            {state === "FREE"
+                              ? "∞"
+                              : clock(remainingMinutes(cell))}
+                          </span>
+                        ) : state === "RESERVED" ? (
+                          <StateIcon kind="reserved" />
+                        ) : state === "PAUSED" ? (
+                          <StateIcon kind="paused" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                  {edit && pcs.length === 0 && (
+                    <span className="hall-empty-zone">
+                      Пусто. «+ ПК» или перенеси ПК из другого зала: нажми ПК →
+                      «Зал».
+                    </span>
+                  )}
+                </div>
+              </section>
             );
           })}
+          {edit && (
+            <section className="zone-area add-zone">
+              <input
+                value={newZone}
+                placeholder="Новый зал"
+                onChange={(e) => setNewZone(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void addZone();
+                }}
+              />
+              <button
+                disabled={newZone.trim() === ""}
+                onClick={() => void addZone()}
+              >
+                + Зал
+              </button>
+            </section>
+          )}
+        </div>
+      )}
 
-          {/* После «Переставить» вся сетка — крупные цели: тап в любую клетку
-             переносит выбранное туда (занято — поменять местами, пусто — встать). */}
-          {carry &&
-            Array.from({ length: rows * cols }, (_, i) => {
-              const col = i % cols;
-              const row = Math.floor(i / cols);
-              const pcHere = pcLayout.placed.find(
-                (p) => p.col === col && p.row === row,
-              );
-              return (
-                <div
-                  key={`target-${col}-${row}`}
-                  className="map-target"
-                  style={{ gridColumn: col + 1, gridRow: row + 1 }}
-                  onClick={() => place(col, row, pcHere?.cell.computer.id)}
-                />
-              );
-            })}
+      {/* Обстановка клуба: ресепшн, WC, диваны, вход, перегородки. */}
+      {(objects.length > 0 || edit) && (
+        <div className="decor-row">
+          <span className="decor-title">Обстановка:</span>
+          {objects.map((o) => (
+            <button
+              key={o.id}
+              className={`decor-chip ${sel?.id === o.id ? "sel" : ""}`}
+              onClick={
+                edit ? () => setSel({ kind: "obj", id: o.id }) : undefined
+              }
+            >
+              {o.text || "Перегородка"}
+            </button>
+          ))}
+          {edit && objects.length === 0 && (
+            <span className="decor-empty">
+              Добавьте «+ Reception», «+ WC», «+ Lounge», «+ Entrance» или «+
+              Перегородка».
+            </span>
+          )}
         </div>
       )}
 

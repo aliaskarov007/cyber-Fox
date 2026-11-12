@@ -967,7 +967,60 @@ main {
 }
 .zone-grid {
   display: grid;
+  /* Квадраты ПК внутри зала; размер задаёт зум карты (--pc-min на <main>). */
+  grid-template-columns: repeat(auto-fill, var(--pc-min, 74px));
   gap: 8px;
+  align-items: start;
+}
+/* Зал растягиваем максимум на ~6 плиток в ряд, чтобы залы шли рядом, альбомно. */
+.zone-area {
+  max-width: calc(var(--pc-min, 74px) * 6 + 8px * 5 + 30px);
+}
+.zone-area.add-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+}
+.zone-area.add-zone input {
+  max-width: 160px;
+}
+.hall-empty-zone {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Обстановка клуба: ресепшн, WC, диваны, вход, перегородки — отдельной строкой. */
+.decor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 18px 0 6px;
+}
+.decor-title {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.decor-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.decor-chip.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.decor-empty {
+  color: var(--muted);
+  font-size: 13px;
 }
 /* Пустая клетка плана — цель для переноса ПК в режиме правки. */
 .pc-slot {
