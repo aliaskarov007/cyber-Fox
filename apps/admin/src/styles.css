@@ -943,6 +943,50 @@ main {
   color: #e9c35a;
 }
 
+/* --- Залы как отдельные области на плане (альбомно, рядом) --- */
+.hall-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.zone-area {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.zone-area .zone-head {
+  margin-bottom: 10px;
+}
+.zone-grid {
+  display: grid;
+  gap: 8px;
+}
+/* Пустая клетка плана — цель для переноса ПК в режиме правки. */
+.pc-slot {
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  opacity: 0.45;
+}
+/* Крестик удаления ПК в углу плитки (только в правке). */
+.pc-del {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 50%;
+  background: rgba(210, 69, 60, 0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 2;
+}
+
 .chip {
   font-size: 10px;
   text-transform: uppercase;

@@ -138,6 +138,76 @@ const STATE_LABEL: Record<string, string> = {
   IDLE: "свободен",
 };
 
+interface PlacedCell {
+  cell: HallCell;
+  col: number;
+  row: number;
+}
+
+/**
+ * Раскладка машин зала по плану: столбец/ряд из posX/posY. У кого позиция не
+ * задана — заполняем первые свободные клетки сетки, близкой к квадрату, чтобы
+ * старый зал «в один ряд» сразу встал опрятно, а дальше владелец перетащит
+ * машины куда удобно. В правке добавляем лишний ряд — место, куда переносить.
+ */
+function layoutZone(
+  cells: HallCell[],
+  edit: boolean,
+): { cols: number; rows: number; placed: PlacedCell[] } {
+  const count = Math.max(cells.length, 1);
+  let cols = Math.min(12, Math.max(4, Math.ceil(Math.sqrt(count) * 1.3)));
+
+  const explicit: HallCell[] = [];
+  const rest: HallCell[] = [];
+  for (const c of cells) {
+    if (c.computer.posX !== null && c.computer.posY !== null) explicit.push(c);
+    else rest.push(c);
+  }
+  rest.sort((a, b) =>
+    a.computer.name.localeCompare(b.computer.name, "ru", { numeric: true }),
+  );
+  const maxExplicitCol = explicit.reduce(
+    (m, c) => Math.max(m, c.computer.posX ?? 0),
+    -1,
+  );
+  cols = Math.max(cols, maxExplicitCol + 1);
+
+  const occupied = new Set<string>();
+  const placed: PlacedCell[] = [];
+  const deferred: HallCell[] = [];
+  for (const c of explicit) {
+    const col = c.computer.posX as number;
+    const row = c.computer.posY as number;
+    const key = `${col},${row}`;
+    if (occupied.has(key)) deferred.push(c);
+    else {
+      occupied.add(key);
+      placed.push({ cell: c, col, row });
+    }
+  }
+  let scan = 0;
+  for (const c of [...deferred, ...rest]) {
+    let col = scan % cols;
+    let row = Math.floor(scan / cols);
+    while (occupied.has(`${col},${row}`)) {
+      scan++;
+      col = scan % cols;
+      row = Math.floor(scan / cols);
+    }
+    occupied.add(`${col},${row}`);
+    placed.push({ cell: c, col, row });
+    scan++;
+  }
+
+  const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
+  const maxCol = placed.reduce((m, p) => Math.max(m, p.col), 0);
+  return {
+    cols: edit ? cols : Math.max(1, maxCol + 1),
+    rows: maxRow + 1 + (edit ? 1 : 0),
+    placed,
+  };
+}
+
 export function HallScreen({
   club,
   staff,
@@ -276,55 +346,33 @@ export function HallScreen({
   );
 
   /**
-   * Перенести машину в зал targetZoneId на место перед beforeId (или в конец,
-   * если beforeId пуст). Пересчитываем порядок (posX) в затронутых залах и
-   * шлём на сервер только реально изменившиеся машины. Сервер разрешает это
-   * лишь владельцу и управляющему — у кассира правка недоступна и в интерфейсе.
+   * Поставить машину на клетку (col, row) зала — хоть в тот же зал, хоть в
+   * другой. Позиция у каждой машины своя (posX/posY), поэтому перенос — это
+   * один запрос на одну машину: ни пересчёта соседей, ни лавины запросов.
+   * Сервер разрешает это лишь владельцу и управляющему.
    */
   async function move(
     computerId: string,
-    targetZoneId: string,
-    beforeId: string | null,
+    zoneId: string,
+    col: number,
+    row: number,
   ): Promise<void> {
-    const target = orderedZones.find((z) => z.id === targetZoneId);
-    const source = orderedZones.find((z) =>
-      z.cells.some((c) => c.computer.id === computerId),
-    );
-    if (!target || !source) return;
-
-    const targetIds = target.cells
-      .map((c) => c.computer.id)
-      .filter((id) => id !== computerId);
-    let idx = beforeId ? targetIds.indexOf(beforeId) : targetIds.length;
-    if (idx < 0) idx = targetIds.length;
-    targetIds.splice(idx, 0, computerId);
-
-    // Текущее положение каждой машины — чтобы не слать лишних запросов.
-    const current = new Map(
-      hall.map((c) => [
-        c.computer.id,
-        { zoneId: c.computer.zone.id, posX: c.computer.posX },
-      ]),
-    );
-    const updates: Array<{ id: string; zoneId: string; posX: number }> = [];
-    const consider = (id: string, zoneId: string, posX: number): void => {
-      const now = current.get(id);
-      if (!now || now.zoneId !== zoneId || now.posX !== posX)
-        updates.push({ id, zoneId, posX });
-    };
-    targetIds.forEach((id, i) => consider(id, targetZoneId, i));
-    if (source.id !== targetZoneId) {
-      source.cells
-        .map((c) => c.computer.id)
-        .filter((id) => id !== computerId)
-        .forEach((id, i) => consider(id, source.id, i));
-    }
-    if (updates.length === 0) return;
-
     setArrError(null);
     try {
-      // Один пакетный запрос, а не десятки — иначе упираемся в защиту от перебора.
-      await api.arrangeComputers(club.id, updates);
+      await api.arrangeComputers(club.id, [
+        { id: computerId, zoneId, posX: col, posY: row },
+      ]);
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+    await refresh();
+  }
+
+  async function removeComputer(cell: HallCell): Promise<void> {
+    if (!window.confirm(`Удалить ${cell.computer.name} из зала?`)) return;
+    setArrError(null);
+    try {
+      await api.deleteComputer(club.id, cell.computer.id);
     } catch (error) {
       setArrError((error as Error).message);
     }
@@ -415,8 +463,8 @@ export function HallScreen({
           {edit && (
             <>
               <span className="hall-arrange-hint">
-                Перетащите ПК, чтобы изменить порядок или перенести в другой
-                зал.
+                Перетащите ПК на свободную клетку — хоть в этом зале, хоть в
+                другом. ✕ на ПК — удалить.
               </span>
               <span className="hall-arrange-add">
                 <input
@@ -440,96 +488,122 @@ export function HallScreen({
       )}
       {edit && arrError && <div className="error">{arrError}</div>}
 
-      {orderedZones.map((zone) => (
-        <section className="zone-block" key={zone.id}>
-          <div className="zone-head">
-            {edit ? (
-              <input
-                className="zone-rename"
-                defaultValue={zone.name}
-                aria-label="Название зала"
-                onBlur={(e) => void renameZone(zone.id, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-              />
-            ) : (
-              <h2>{zone.name}</h2>
-            )}
-            <span className="count">
-              {zone.cells.filter((c) => c.session).length}/{zone.cells.length}
-            </span>
-          </div>
-
-          <div
-            className="hall-grid"
-            onDragOver={edit ? (e) => e.preventDefault() : undefined}
-            onDrop={
-              edit
-                ? (e) => {
-                    // Сброс на пустое место зала — в конец этого зала.
-                    e.preventDefault();
-                    if (dragId) void move(dragId, zone.id, null);
-                    setDragId(null);
-                  }
-                : undefined
+      <div className="hall-areas">
+        {orderedZones.map((zone) => {
+          const { cols, rows, placed } = layoutZone(zone.cells, edit);
+          const taken = new Set(placed.map((p) => `${p.col},${p.row}`));
+          const slots: Array<{ col: number; row: number }> = [];
+          if (edit) {
+            for (let r = 0; r < rows; r++) {
+              for (let c = 0; c < cols; c++) {
+                if (!taken.has(`${c},${r}`)) slots.push({ col: c, row: r });
+              }
             }
-          >
-            {zone.cells.length === 0 && edit && (
-              <span className="hall-empty-zone">Перетащите сюда ПК</span>
-            )}
-            {zone.cells.map((cell) => {
-              const state = cellState(cell);
-              // Имя играющего гостя внутри квадрата, под номером.
-              const guestName = cell.session?.guest?.fullName ?? null;
-              return (
-                <button
-                  key={cell.computer.id}
-                  /* Позвавшая машина видна и на карте: администратор смотрит на
-                     зал, а не на полосу вызовов. */
-                  className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
-                    edit ? "editing" : ""
-                  }`}
-                  data-state={state}
-                  title={tileTitle(cell, state)}
-                  draggable={edit}
-                  onDragStart={
-                    edit ? () => setDragId(cell.computer.id) : undefined
-                  }
-                  onDragOver={edit ? (e) => e.preventDefault() : undefined}
-                  onDrop={
-                    edit
-                      ? (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (dragId && dragId !== cell.computer.id)
-                            void move(dragId, zone.id, cell.computer.id);
-                          setDragId(null);
-                        }
-                      : undefined
-                  }
-                  onClick={
-                    edit ? undefined : () => setSelectedId(cell.computer.id)
-                  }
-                >
-                  {/* Номер сверху; статус несёт цвет рамки. */}
-                  <span className="pc-num">{pcLabel(cell.computer.name)}</span>
-                  {guestName && <span className="pc-name">{guestName}</span>}
-                  {cell.session ? (
-                    <span className="pc-timer">
-                      {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
-                    </span>
-                  ) : state === "RESERVED" ? (
-                    <StateIcon kind="reserved" />
-                  ) : state === "PAUSED" ? (
-                    <StateIcon kind="paused" />
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+          }
+          return (
+            <section className="zone-area" key={zone.id}>
+              <div className="zone-head">
+                {edit ? (
+                  <input
+                    className="zone-rename"
+                    defaultValue={zone.name}
+                    aria-label="Название зала"
+                    onBlur={(e) => void renameZone(zone.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                  />
+                ) : (
+                  <h2>{zone.name}</h2>
+                )}
+                <span className="count">
+                  {zone.cells.filter((c) => c.session).length}/
+                  {zone.cells.length}
+                </span>
+              </div>
+
+              <div
+                className="zone-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, var(--pc-min, 74px))`,
+                  gridTemplateRows: `repeat(${rows}, var(--pc-min, 74px))`,
+                }}
+              >
+                {/* Пустые клетки — цель для переноса (только в правке). */}
+                {slots.map(({ col, row }) => (
+                  <div
+                    key={`slot-${col}-${row}`}
+                    className="pc-slot"
+                    style={{ gridColumn: col + 1, gridRow: row + 1 }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragId) void move(dragId, zone.id, col, row);
+                      setDragId(null);
+                    }}
+                  />
+                ))}
+
+                {placed.map(({ cell, col, row }) => {
+                  const state = cellState(cell);
+                  const guestName = cell.session?.guest?.fullName ?? null;
+                  return (
+                    <button
+                      key={cell.computer.id}
+                      className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
+                        edit ? "editing" : ""
+                      }`}
+                      style={{ gridColumn: col + 1, gridRow: row + 1 }}
+                      data-state={state}
+                      title={tileTitle(cell, state)}
+                      draggable={edit}
+                      onDragStart={
+                        edit ? () => setDragId(cell.computer.id) : undefined
+                      }
+                      onClick={
+                        edit ? undefined : () => setSelectedId(cell.computer.id)
+                      }
+                    >
+                      {edit && (
+                        <span
+                          className="pc-del"
+                          role="button"
+                          aria-label="Удалить ПК"
+                          title="Удалить ПК"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void removeComputer(cell);
+                          }}
+                        >
+                          ×
+                        </span>
+                      )}
+                      {/* Номер сверху; статус несёт цвет рамки. */}
+                      <span className="pc-num">
+                        {pcLabel(cell.computer.name)}
+                      </span>
+                      {guestName && (
+                        <span className="pc-name">{guestName}</span>
+                      )}
+                      {cell.session ? (
+                        <span className="pc-timer">
+                          {state === "FREE"
+                            ? "∞"
+                            : clock(remainingMinutes(cell))}
+                        </span>
+                      ) : state === "RESERVED" ? (
+                        <StateIcon kind="reserved" />
+                      ) : state === "PAUSED" ? (
+                        <StateIcon kind="paused" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
 
       {hall.length > 0 && (
         <div className="hall-zoom" role="group" aria-label="Масштаб карты зала">
