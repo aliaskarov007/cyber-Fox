@@ -413,11 +413,7 @@ export function HallScreen({
           <div className="value">
             {summary.busy}/{summary.total}
           </div>
-          <div className="label">Занято машин</div>
-        </div>
-        <div className={`stat ${summary.onCredit > 0 ? "alert" : ""}`}>
-          <div className="value">{summary.onCredit}</div>
-          <div className="label">Играют в долг</div>
+          <div className="label">Занято ПК</div>
         </div>
         <div className="stat">
           <div className="value">{formatMoney(summary.accrued)}</div>

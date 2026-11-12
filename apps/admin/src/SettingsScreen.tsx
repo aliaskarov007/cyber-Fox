@@ -23,6 +23,64 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /** Настройки клуба и сети: доступны управляющему по своему залу, владельцу — по всем. */
+/**
+ * Свой WhatsApp для восстановления пароля. Раньше висел полосой на главном
+ * экране — перенесён сюда: это редкая настройка самого сотрудника, а не то,
+ * что нужно гостю. Гость регистрируется через WhatsApp на своём игровом ПК.
+ */
+function AccountSettings({ staff }: { staff: Staff }) {
+  const [phone, setPhone] = useState(staff.phone ?? "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save(): Promise<void> {
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const result = await api.setMyPhone(phone.trim());
+      setPhone(result.phone);
+      setMsg("WhatsApp сохранён");
+    } catch (cause) {
+      setErr((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="zone-block">
+      <div className="zone-head">
+        <h2>Мой аккаунт</h2>
+      </div>
+      {err && <div className="error">{err}</div>}
+      {msg && <div className="notice">{msg}</div>}
+      <p className="hint-text">
+        WhatsApp для восстановления пароля: на него придёт код, если вы забудете
+        пароль.
+      </p>
+      <div className="account-phone">
+        <input
+          type="tel"
+          inputMode="tel"
+          value={phone}
+          placeholder="+7 701 123 45 67"
+          autoComplete="tel"
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <button
+          className="primary"
+          disabled={busy || phone.trim().length < 10}
+          onClick={() => void save()}
+        >
+          {busy ? "Сохраняем…" : "Сохранить"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsScreen({
   club,
   staff,
@@ -74,6 +132,8 @@ export function SettingsScreen({
     <main>
       {error && <div className="error">{error}</div>}
       {done && <div className="notice">{done}</div>}
+
+      <AccountSettings staff={staff} />
 
       <ClubSettings
         club={club}

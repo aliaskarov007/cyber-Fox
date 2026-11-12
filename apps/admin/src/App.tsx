@@ -11,7 +11,6 @@ import { GuestsScreen } from "./GuestsScreen.js";
 import { HallScreen } from "./HallScreen.js";
 import { ForgotPasswordScreen } from "./ForgotPasswordScreen.js";
 import { LoginScreen } from "./LoginScreen.js";
-import { MyPhoneBanner } from "./MyPhoneBanner.js";
 import { NetworkScreen } from "./NetworkScreen.js";
 import { OnboardingScreen } from "./OnboardingScreen.js";
 import { PromosScreen } from "./PromosScreen.js";
@@ -210,10 +209,6 @@ function ClubApp() {
             Выйти
           </button>
         </header>
-
-        {!staff.phone && (
-          <MyPhoneBanner onSaved={(phone) => setStaff({ ...staff, phone })} />
-        )}
 
         {club === null ? (
           <main>

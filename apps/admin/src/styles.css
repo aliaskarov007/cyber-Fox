@@ -969,6 +969,21 @@ main {
   border-radius: 9px;
   opacity: 0.45;
 }
+/* «Мой аккаунт» в настройках: WhatsApp для восстановления пароля. */
+.hint-text {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+.account-phone {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.account-phone input {
+  max-width: 240px;
+}
+
 /* Крестик удаления ПК в углу плитки (только в правке). */
 .pc-del {
   position: absolute;
