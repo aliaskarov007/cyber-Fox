@@ -846,118 +846,88 @@ main {
   display: grid;
   /* Мелкие плотные квадраты; размер задаёт зум карты (--pc-min на <main>). */
   grid-template-columns: repeat(auto-fill, var(--pc-min, 62px));
-  gap: 6px;
+  gap: 8px;
 }
 
+/* Круглая плитка: кольцо несёт статус, в центре — только номер. */
 .pc {
   position: relative;
   aspect-ratio: 1 / 1;
-  text-align: left;
   overflow: hidden;
-  padding: 5px 6px;
+  padding: 2px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   cursor: pointer;
 }
 
-/* Цвет квадрата по состоянию: играет — голубой, свободен — зелёный,
+/* Цвет кольца по состоянию: играет — голубой, включён/свободен — зелёный,
    100%-скидка — жёлтый, бронь — фиолетовый, ремонт — красный, выключен — серый. */
 .pc[data-state="IDLE"] {
-  background: #10251a;
-  border-color: #255c3c;
+  border-color: #2ba58a;
+  background: rgba(43, 165, 138, 0.12);
 }
 .pc[data-state="IN_USE"] {
-  background: #16263c;
-  border-color: #35608f;
+  border-color: #5b7fbf;
+  background: rgba(91, 127, 191, 0.14);
 }
 .pc[data-state="FREE"] {
-  background: #322a0f;
-  border-color: #6b571a;
+  border-color: #d9a020;
+  background: rgba(217, 160, 32, 0.14);
 }
 .pc[data-state="RESERVED"] {
-  background: #241a38;
-  border-color: #4e3773;
+  border-color: #8a6fd0;
+  background: rgba(138, 111, 208, 0.14);
 }
 .pc[data-state="PAUSED"] {
-  background: #1b2436;
-  border-color: #3b4d6e;
+  border-color: #6c86b8;
+  background: rgba(108, 134, 184, 0.12);
 }
 .pc[data-state="MAINTENANCE"] {
-  background: #331c1a;
-  border-color: #6e322d;
+  border-color: #d2453c;
+  background: rgba(210, 69, 60, 0.14);
 }
 .pc[data-state="OFFLINE"] {
-  background: #16181d;
-  border-color: #2a2e38;
+  border-color: #2c3a63;
+  background: var(--surface);
 }
 
-.pc-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
+/* Размер цифры тянется за зумом карты (--pc-min на <main>). */
 .pc-num {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: clamp(11px, calc(var(--pc-min, 62px) * 0.3), 32px);
+  font-weight: 700;
   line-height: 1;
-  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 .pc[data-state="OFFLINE"] .pc-num {
-  color: var(--faint);
-}
-
-/* Точка-статус в углу: цвет = состояние. */
-.pc-dot {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--faint);
-}
-.pc[data-state="IDLE"] .pc-dot {
-  background: #45c07e;
-}
-.pc[data-state="IN_USE"] .pc-dot {
-  background: #78b4f0;
-}
-.pc[data-state="FREE"] .pc-dot {
-  background: #f0c850;
-}
-.pc[data-state="MAINTENANCE"] .pc-dot {
-  background: #ff8a80;
+  color: var(--muted);
 }
 
 .pc-icon {
-  flex: none;
   color: var(--muted);
 }
 .pc[data-state="RESERVED"] .pc-icon {
-  color: #b98fe8;
+  color: #b89bf0;
 }
 .pc[data-state="PAUSED"] .pc-icon {
-  color: #8fb0e8;
+  color: #9fb4df;
 }
 
-/* Таймер остатка времени внизу квадрата. */
+/* Таймер остатка времени — мелко под номером. */
 .pc-timer {
-  font-family: var(--mono);
-  font-size: 11px;
+  font-size: clamp(8px, calc(var(--pc-min, 62px) * 0.16), 16px);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: #8fc0f5;
+  color: var(--ink-2);
 }
 .pc[data-state="FREE"] .pc-timer {
-  color: #f0c850;
-  font-size: 13px;
-}
-.pc[data-state="PAUSED"] .pc-timer {
-  color: #8fb0e8;
+  color: #e9c35a;
 }
 
 .chip {

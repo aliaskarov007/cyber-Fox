@@ -44,7 +44,17 @@ function clock(minutes: number): string {
   return `${h}:${String(m).padStart(2, "0")}`;
 }
 
-/** Подсказка при наведении: весь контекст ПК без клика. */
+/**
+ * Короткая подпись в кружке: только номер. Из «ПК-18», «PC-03», «РС-7»
+ * остаётся «18», «03», «7». Если в имени нет цифры (например «Стрим») —
+ * показываем имя как есть.
+ */
+function pcLabel(name: string): string {
+  const match = name.match(/(\d+)\s*$/);
+  return match ? match[1] : name;
+}
+
+/** Подсказка при наведении: весь контекст ПК без клика. Полное имя — здесь. */
 function tileTitle(cell: HallCell, state: string): string {
   const parts = [cell.computer.name, STATE_LABEL[state]];
   const session = cell.session;
@@ -55,27 +65,6 @@ function tileTitle(cell: HallCell, state: string): string {
       parts.push(`баланс ${formatMoney(session.balance)}`);
   }
   return parts.join(" · ");
-}
-
-/** Значок «выключен» на квадрате. */
-function PowerIcon() {
-  return (
-    <svg
-      className="pc-icon"
-      aria-hidden="true"
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3v9"></path>
-      <path d="M6.3 7.3a8 8 0 1 0 11.4 0"></path>
-    </svg>
-  );
 }
 
 /**
@@ -300,24 +289,17 @@ export function HallScreen({
                   title={tileTitle(cell, state)}
                   onClick={() => setSelectedId(cell.computer.id)}
                 >
-                  <span className="pc-top">
-                    {/* Номер ПК виден всегда — и в игре, и выключенным. */}
-                    <span className="pc-num">{cell.computer.name}</span>
-                    {state === "OFFLINE" ? (
-                      <PowerIcon />
-                    ) : state === "RESERVED" ? (
-                      <StateIcon kind="reserved" />
-                    ) : state === "PAUSED" ? (
-                      <StateIcon kind="paused" />
-                    ) : (
-                      <span className="pc-dot" />
-                    )}
-                  </span>
-                  {cell.session && (
+                  {/* Только номер крупной цифрой; статус несёт цвет кольца. */}
+                  <span className="pc-num">{pcLabel(cell.computer.name)}</span>
+                  {cell.session ? (
                     <span className="pc-timer">
                       {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
                     </span>
-                  )}
+                  ) : state === "RESERVED" ? (
+                    <StateIcon kind="reserved" />
+                  ) : state === "PAUSED" ? (
+                    <StateIcon kind="paused" />
+                  ) : null}
                 </button>
               );
             })}
