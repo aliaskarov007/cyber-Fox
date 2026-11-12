@@ -23,10 +23,10 @@ import { StaffCalls } from "./StaffCalls.js";
 import { useRealtime } from "./useRealtime.js";
 
 /** Размер квадрата карты в px: минимум, максимум, шаг зума и значение по умолчанию. */
-const PC_MIN_MIN = 44;
-const PC_MIN_MAX = 108;
+const PC_MIN_MIN = 52;
+const PC_MIN_MAX = 120;
 const PC_MIN_STEP = 10;
-const PC_MIN_DEFAULT = 62;
+const PC_MIN_DEFAULT = 74;
 
 /** Остаток времени у сидящего гостя: пакет — его минуты, поминутно — на сколько хватит. */
 function remainingMinutes(cell: HallCell): number {
@@ -487,58 +487,51 @@ export function HallScreen({
             )}
             {zone.cells.map((cell) => {
               const state = cellState(cell);
-              // Имя под кружком у играющих: первое слово, чтобы влезло в колонку.
+              // Имя играющего гостя внутри квадрата, под номером.
               const guestName = cell.session?.guest?.fullName ?? null;
               return (
-                <div className="pc-cell" key={cell.computer.id}>
-                  <button
-                    /* Позвавшая машина видна и на карте: администратор смотрит
-                       на зал, а не на полосу вызовов. */
-                    className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
-                      edit ? "editing" : ""
-                    }`}
-                    data-state={state}
-                    title={tileTitle(cell, state)}
-                    draggable={edit}
-                    onDragStart={
-                      edit ? () => setDragId(cell.computer.id) : undefined
-                    }
-                    onDragOver={edit ? (e) => e.preventDefault() : undefined}
-                    onDrop={
-                      edit
-                        ? (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (dragId && dragId !== cell.computer.id)
-                              void move(dragId, zone.id, cell.computer.id);
-                            setDragId(null);
-                          }
-                        : undefined
-                    }
-                    onClick={
-                      edit ? undefined : () => setSelectedId(cell.computer.id)
-                    }
-                  >
-                    {/* Только номер крупной цифрой; статус несёт цвет кольца. */}
-                    <span className="pc-num">
-                      {pcLabel(cell.computer.name)}
+                <button
+                  key={cell.computer.id}
+                  /* Позвавшая машина видна и на карте: администратор смотрит на
+                     зал, а не на полосу вызовов. */
+                  className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
+                    edit ? "editing" : ""
+                  }`}
+                  data-state={state}
+                  title={tileTitle(cell, state)}
+                  draggable={edit}
+                  onDragStart={
+                    edit ? () => setDragId(cell.computer.id) : undefined
+                  }
+                  onDragOver={edit ? (e) => e.preventDefault() : undefined}
+                  onDrop={
+                    edit
+                      ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (dragId && dragId !== cell.computer.id)
+                            void move(dragId, zone.id, cell.computer.id);
+                          setDragId(null);
+                        }
+                      : undefined
+                  }
+                  onClick={
+                    edit ? undefined : () => setSelectedId(cell.computer.id)
+                  }
+                >
+                  {/* Номер сверху; статус несёт цвет рамки. */}
+                  <span className="pc-num">{pcLabel(cell.computer.name)}</span>
+                  {guestName && <span className="pc-name">{guestName}</span>}
+                  {cell.session ? (
+                    <span className="pc-timer">
+                      {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
                     </span>
-                    {cell.session ? (
-                      <span className="pc-timer">
-                        {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
-                      </span>
-                    ) : state === "RESERVED" ? (
-                      <StateIcon kind="reserved" />
-                    ) : state === "PAUSED" ? (
-                      <StateIcon kind="paused" />
-                    ) : null}
-                  </button>
-                  {guestName && (
-                    <span className="pc-name" title={guestName}>
-                      {guestName.split(" ")[0]}
-                    </span>
-                  )}
-                </div>
+                  ) : state === "RESERVED" ? (
+                    <StateIcon kind="reserved" />
+                  ) : state === "PAUSED" ? (
+                    <StateIcon kind="paused" />
+                  ) : null}
+                </button>
               );
             })}
           </div>
