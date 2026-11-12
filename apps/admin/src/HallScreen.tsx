@@ -303,15 +303,17 @@ export function HallScreen({
 
   const pcLayout = useMemo(() => layoutPCs(hall, zoneList), [hall, zoneList]);
 
+  // В правке поле делаем заметно больше содержимого — целый холст пустых клеток,
+  // чтобы можно было свободно переносить ПК и подписи в любой угол, как в зале.
   const cols = useMemo(() => {
     let c = pcLayout.cols;
     for (const o of objects) c = Math.max(c, o.posX + o.width);
-    return c + (edit ? 2 : 0);
+    return edit ? Math.max(c + 4, 16) : c;
   }, [pcLayout.cols, objects, edit]);
   const rows = useMemo(() => {
     let r = pcLayout.rows;
     for (const o of objects) r = Math.max(r, o.posY + o.height);
-    return r + (edit ? 2 : 0);
+    return edit ? Math.max(r + 4, 10) : r;
   }, [pcLayout.rows, objects, edit]);
 
   const pcCells = useMemo(
