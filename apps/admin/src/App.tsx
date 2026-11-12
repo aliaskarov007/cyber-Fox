@@ -222,7 +222,7 @@ function ClubApp() {
         ) : tab === "dashboard" ? (
           <DashboardScreen club={club} />
         ) : tab === "hall" ? (
-          <HallScreen club={club} onGoTo={setTab} />
+          <HallScreen club={club} staff={staff} onGoTo={setTab} />
         ) : tab === "bar" ? (
           <BarScreen club={club} staff={staff} />
         ) : tab === "guests" ? (

@@ -10,7 +10,9 @@ import type { Tab } from "./App.js";
 import {
   type Club,
   type HallCell,
+  type Staff,
   type Tariff,
+  type Zone,
   api,
   formatMoney,
 } from "./api.js";
@@ -138,14 +140,24 @@ const STATE_LABEL: Record<string, string> = {
 
 export function HallScreen({
   club,
+  staff,
   onGoTo,
 }: {
   club: Club;
+  staff: Staff;
   onGoTo: (tab: Tab) => void;
 }) {
   const [hall, setHall] = useState<HallCell[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Менять расположение и залы может только владелец или управляющий.
+  const canArrange = staff.role === "OWNER" || staff.role === "ADMIN";
+  const [edit, setEdit] = useState(false);
+  const [zoneList, setZoneList] = useState<Zone[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [newZone, setNewZone] = useState("");
+  const [arrError, setArrError] = useState<string | null>(null);
 
   /** Зал загружен хотя бы раз: до этого пустая карта — не пустой клуб. */
   const [loaded, setLoaded] = useState(false);
@@ -175,6 +187,18 @@ export function HallScreen({
     setLoaded(true);
   }, [club.id]);
 
+  // Полный список залов (включая пустые) нужен только для правки расположения.
+  const loadZones = useCallback(async () => {
+    try {
+      setZoneList(await api.zones(club.id));
+    } catch {
+      // Не загрузились залы — правка просто покажет те, где уже есть машины.
+    }
+  }, [club.id]);
+  useEffect(() => {
+    if (edit) void loadZones();
+  }, [edit, loadZones]);
+
   useEffect(() => {
     setLoaded(false);
     void refresh();
@@ -199,16 +223,42 @@ export function HallScreen({
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const zones = useMemo(() => {
-    const grouped = new Map<string, { name: string; cells: HallCell[] }>();
+  const orderedZones = useMemo(() => {
+    // Ячейки по залам; внутри — по заданному порядку (posX), нерасставленные в конец.
+    const byZone = new Map<string, HallCell[]>();
     for (const cell of hall) {
-      const zone = cell.computer.zone;
-      const entry = grouped.get(zone.id) ?? { name: zone.name, cells: [] };
-      entry.cells.push(cell);
-      grouped.set(zone.id, entry);
+      const arr = byZone.get(cell.computer.zone.id) ?? [];
+      arr.push(cell);
+      byZone.set(cell.computer.zone.id, arr);
     }
-    return [...grouped.entries()];
-  }, [hall]);
+    const sortCells = (cells: HallCell[]): HallCell[] =>
+      [...cells].sort((a, b) => {
+        const ax = a.computer.posX;
+        const bx = b.computer.posX;
+        if (ax === null && bx === null)
+          return a.computer.name.localeCompare(b.computer.name, "ru", {
+            numeric: true,
+          });
+        if (ax === null) return 1;
+        if (bx === null) return -1;
+        return ax - bx;
+      });
+
+    // В правке показываем все залы (в т.ч. пустые) по порядку; иначе — только с машинами.
+    const meta =
+      edit && zoneList.length > 0
+        ? zoneList.map((z) => ({ id: z.id, name: z.name }))
+        : [...byZone.keys()].map((id) => ({
+            id,
+            name: byZone.get(id)![0].computer.zone.name,
+          }));
+
+    return meta.map((z) => ({
+      id: z.id,
+      name: z.name,
+      cells: sortCells(byZone.get(z.id) ?? []),
+    }));
+  }, [hall, edit, zoneList]);
 
   const summary = useMemo(() => {
     const busy = hall.filter((c) => c.session !== null);
@@ -224,6 +274,96 @@ export function HallScreen({
   const freeComputers = hall.filter(
     (c) => c.session === null && c.computer.id !== selectedId,
   );
+
+  /**
+   * Перенести машину в зал targetZoneId на место перед beforeId (или в конец,
+   * если beforeId пуст). Пересчитываем порядок (posX) в затронутых залах и
+   * шлём на сервер только реально изменившиеся машины. Сервер разрешает это
+   * лишь владельцу и управляющему — у кассира правка недоступна и в интерфейсе.
+   */
+  async function move(
+    computerId: string,
+    targetZoneId: string,
+    beforeId: string | null,
+  ): Promise<void> {
+    const target = orderedZones.find((z) => z.id === targetZoneId);
+    const source = orderedZones.find((z) =>
+      z.cells.some((c) => c.computer.id === computerId),
+    );
+    if (!target || !source) return;
+
+    const targetIds = target.cells
+      .map((c) => c.computer.id)
+      .filter((id) => id !== computerId);
+    let idx = beforeId ? targetIds.indexOf(beforeId) : targetIds.length;
+    if (idx < 0) idx = targetIds.length;
+    targetIds.splice(idx, 0, computerId);
+
+    // Текущее положение каждой машины — чтобы не слать лишних запросов.
+    const current = new Map(
+      hall.map((c) => [
+        c.computer.id,
+        { zoneId: c.computer.zone.id, posX: c.computer.posX },
+      ]),
+    );
+    const updates: Array<{ id: string; zoneId: string; posX: number }> = [];
+    const consider = (id: string, zoneId: string, posX: number): void => {
+      const now = current.get(id);
+      if (!now || now.zoneId !== zoneId || now.posX !== posX)
+        updates.push({ id, zoneId, posX });
+    };
+    targetIds.forEach((id, i) => consider(id, targetZoneId, i));
+    if (source.id !== targetZoneId) {
+      source.cells
+        .map((c) => c.computer.id)
+        .filter((id) => id !== computerId)
+        .forEach((id, i) => consider(id, source.id, i));
+    }
+    if (updates.length === 0) return;
+
+    setArrError(null);
+    try {
+      await Promise.all(
+        updates.map((u) =>
+          api.updateComputer(club.id, u.id, {
+            zoneId: u.zoneId,
+            posX: u.posX,
+            posY: 0,
+          }),
+        ),
+      );
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+    await refresh();
+  }
+
+  async function addZone(): Promise<void> {
+    const name = newZone.trim();
+    if (!name) return;
+    setArrError(null);
+    try {
+      await api.createZone(club.id, { name, sortOrder: zoneList.length });
+      setNewZone("");
+      await loadZones();
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+  }
+
+  async function renameZone(zoneId: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    const existing = zoneList.find((z) => z.id === zoneId)?.name;
+    if (!trimmed || trimmed === existing) return;
+    setArrError(null);
+    try {
+      await api.updateZone(club.id, zoneId, { name: trimmed });
+      await loadZones();
+      await refresh();
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+  }
 
   return (
     <main style={{ "--pc-min": `${pcMin}px` } as CSSProperties}>
@@ -267,16 +407,84 @@ export function HallScreen({
 
       {loaded && hall.length === 0 && <FirstSteps onGoTo={onGoTo} />}
 
-      {zones.map(([zoneId, zone]) => (
-        <section className="zone-block" key={zoneId}>
+      {/* Правка расположения — только владельцу и управляющему. */}
+      {canArrange && hall.length > 0 && (
+        <div className="hall-arrange">
+          <button
+            className={edit ? "primary" : ""}
+            onClick={() => {
+              setEdit((v) => !v);
+              setArrError(null);
+            }}
+          >
+            {edit ? "Готово" : "Изменить расположение"}
+          </button>
+          {edit && (
+            <>
+              <span className="hall-arrange-hint">
+                Перетащите ПК, чтобы изменить порядок или перенести в другой
+                зал.
+              </span>
+              <span className="hall-arrange-add">
+                <input
+                  value={newZone}
+                  placeholder="Новый зал"
+                  onChange={(e) => setNewZone(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void addZone();
+                  }}
+                />
+                <button
+                  disabled={newZone.trim() === ""}
+                  onClick={() => void addZone()}
+                >
+                  + Зал
+                </button>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+      {edit && arrError && <div className="error">{arrError}</div>}
+
+      {orderedZones.map((zone) => (
+        <section className="zone-block" key={zone.id}>
           <div className="zone-head">
-            <h2>{zone.name}</h2>
+            {edit ? (
+              <input
+                className="zone-rename"
+                defaultValue={zone.name}
+                aria-label="Название зала"
+                onBlur={(e) => void renameZone(zone.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+              />
+            ) : (
+              <h2>{zone.name}</h2>
+            )}
             <span className="count">
               {zone.cells.filter((c) => c.session).length}/{zone.cells.length}
             </span>
           </div>
 
-          <div className="hall-grid">
+          <div
+            className="hall-grid"
+            onDragOver={edit ? (e) => e.preventDefault() : undefined}
+            onDrop={
+              edit
+                ? (e) => {
+                    // Сброс на пустое место зала — в конец этого зала.
+                    e.preventDefault();
+                    if (dragId) void move(dragId, zone.id, null);
+                    setDragId(null);
+                  }
+                : undefined
+            }
+          >
+            {zone.cells.length === 0 && edit && (
+              <span className="hall-empty-zone">Перетащите сюда ПК</span>
+            )}
             {zone.cells.map((cell) => {
               const state = cellState(cell);
               return (
@@ -284,10 +492,30 @@ export function HallScreen({
                   key={cell.computer.id}
                   /* Позвавшая машина видна и на карте: администратор смотрит на
                      зал, а не на полосу вызовов. */
-                  className={`pc ${calls[cell.computer.id] ? "calling" : ""}`}
+                  className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
+                    edit ? "editing" : ""
+                  }`}
                   data-state={state}
                   title={tileTitle(cell, state)}
-                  onClick={() => setSelectedId(cell.computer.id)}
+                  draggable={edit}
+                  onDragStart={
+                    edit ? () => setDragId(cell.computer.id) : undefined
+                  }
+                  onDragOver={edit ? (e) => e.preventDefault() : undefined}
+                  onDrop={
+                    edit
+                      ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (dragId && dragId !== cell.computer.id)
+                            void move(dragId, zone.id, cell.computer.id);
+                          setDragId(null);
+                        }
+                      : undefined
+                  }
+                  onClick={
+                    edit ? undefined : () => setSelectedId(cell.computer.id)
+                  }
                 >
                   {/* Только номер крупной цифрой; статус несёт цвет кольца. */}
                   <span className="pc-num">{pcLabel(cell.computer.name)}</span>

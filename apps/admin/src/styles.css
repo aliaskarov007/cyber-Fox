@@ -997,6 +997,45 @@ main {
   cursor: default;
 }
 
+/* --- Правка расположения ПК (владелец/управляющий) --- */
+.hall-arrange {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 16px;
+}
+.hall-arrange-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+.hall-arrange-add {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.hall-arrange-add input {
+  width: 150px;
+}
+.zone-rename {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 4px 8px;
+  max-width: 260px;
+}
+.hall-empty-zone {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 8px 2px;
+}
+/* В режиме правки плитки перетаскиваются, а не открывают карточку. */
+.pc.editing {
+  cursor: grab;
+}
+.pc.editing:active {
+  cursor: grabbing;
+}
+
 /* --- Панель справа --- */
 
 .drawer {
