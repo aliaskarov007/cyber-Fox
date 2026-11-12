@@ -47,4 +47,17 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy same-origin
 	}
+
+	# index.html — без кэша: иначе после деплоя браузер открывает старую
+	# версию, пока сам не решит перепроверить. Хэшированные ассеты (их имя
+	# меняется при каждой сборке) наоборот кэшируем надолго — они неизменны.
+	@html {
+		path / /index.html
+	}
+	header @html Cache-Control "no-cache, must-revalidate"
+
+	@assets {
+		path /assets/*
+	}
+	header @assets Cache-Control "public, max-age=31536000, immutable"
 }
