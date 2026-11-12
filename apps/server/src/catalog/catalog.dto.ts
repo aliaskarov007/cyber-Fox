@@ -6,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -34,6 +35,20 @@ export class UpdateZoneDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  /** Положение зала на плане клуба (px). */
+  @IsOptional()
+  @IsInt()
+  posX?: number;
+
+  @IsOptional()
+  @IsInt()
+  posY?: number;
+
+  /** Форма раскладки машин внутри зала. */
+  @IsOptional()
+  @IsIn(["GRID", "RING"])
+  layout?: string;
 
   /** Тариф, подхватываемый когда минуты пакета кончились. */
   @IsOptional()

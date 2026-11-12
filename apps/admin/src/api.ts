@@ -65,6 +65,9 @@ export interface Zone {
   id: string;
   name: string;
   sortOrder: number;
+  posX: number | null;
+  posY: number | null;
+  layout: "GRID" | "RING";
   defaultPerMinuteTariffId: string | null;
 }
 
@@ -438,6 +441,9 @@ export const api = {
     body: Partial<{
       name: string;
       sortOrder: number;
+      posX: number;
+      posY: number;
+      layout: "GRID" | "RING";
       defaultPerMinuteTariffId: string;
     }>,
   ) =>

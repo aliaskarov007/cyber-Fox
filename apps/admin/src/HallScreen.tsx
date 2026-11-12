@@ -1,8 +1,10 @@
 import {
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -28,6 +30,41 @@ const PC_MIN_MIN = 52;
 const PC_MIN_MAX = 120;
 const PC_MIN_STEP = 10;
 const PC_MIN_DEFAULT = 74;
+
+/** Минимальная высота холста плана (px) и автоместа для нерасставленных залов. */
+const FLOOR_MIN_H = 680;
+function autoZonePos(i: number): { x: number; y: number } {
+  return { x: 24 + (i % 3) * 372, y: 24 + Math.floor(i / 3) * 316 };
+}
+function autoObjPos(i: number): { x: number; y: number } {
+  return { x: 28 + (i % 6) * 128, y: 560 + Math.floor(i / 6) * 92 };
+}
+
+/**
+ * Раскладка машин по кругу: центр одного зала. Возвращает сторону квадратной
+ * области и левый-верхний угол каждой плитки, чтобы расставить их по окружности.
+ */
+function ringGeometry(
+  n: number,
+  tile: number,
+): { size: number; spots: Array<{ x: number; y: number }> } {
+  if (n <= 1) {
+    const size = tile + 16;
+    return { size, spots: [{ x: (size - tile) / 2, y: (size - tile) / 2 }] };
+  }
+  // Радиус подбираем так, чтобы плитки не наезжали друг на друга по дуге.
+  const radius = Math.max((tile * 1.18 * n) / (2 * Math.PI), tile * 0.95);
+  const size = Math.ceil(2 * radius + tile + 16);
+  const c = size / 2;
+  const spots = Array.from({ length: n }, (_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return {
+      x: c + radius * Math.cos(a) - tile / 2,
+      y: c + radius * Math.sin(a) - tile / 2,
+    };
+  });
+  return { size, spots };
+}
 
 /** Цвета залов на карте: по порядку зон, по кругу. */
 const ZONE_COLORS = [
@@ -169,6 +206,17 @@ export function HallScreen({
   );
   const [newZone, setNewZone] = useState("");
   const [arrError, setArrError] = useState<string | null>(null);
+
+  // Перетаскивание залов и мебели по холсту плана. Пока тащим — храним позицию
+  // локально (для плавности), на отпускании сохраняем на сервер.
+  const floorRef = useRef<HTMLDivElement | null>(null);
+  const dragOff = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const [drag, setDrag] = useState<{
+    kind: "zone" | "obj";
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const [pcMin, setPcMin] = useState<number>(() => {
     try {
@@ -365,12 +413,144 @@ export function HallScreen({
     await refresh();
   }
 
+  async function setZoneLayout(
+    zoneId: string,
+    layout: "GRID" | "RING",
+  ): Promise<void> {
+    setArrError(null);
+    try {
+      await api.updateZone(club.id, zoneId, { layout });
+      await refresh();
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+  }
+
+  async function moveZone(id: string, x: number, y: number): Promise<void> {
+    setArrError(null);
+    try {
+      await api.updateZone(club.id, id, { posX: x, posY: y });
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+    await refresh();
+  }
+
+  async function moveObjTo(id: string, x: number, y: number): Promise<void> {
+    setArrError(null);
+    try {
+      await api.updateMapObject(club.id, id, { posX: x, posY: y });
+    } catch (error) {
+      setArrError((error as Error).message);
+    }
+    await refresh();
+  }
+
+  // Позиция элемента на холсте: пока тащим — из drag, иначе сохранённая или
+  // автоместо (нерасставленный зал/мебель раскладываем, чтобы не легли в угол).
+  function zonePos(zone: Zone, i: number): { x: number; y: number } {
+    if (drag?.kind === "zone" && drag.id === zone.id)
+      return { x: drag.x, y: drag.y };
+    if (zone.posX !== null && zone.posY !== null)
+      return { x: zone.posX, y: zone.posY };
+    return autoZonePos(i);
+  }
+  function objPos(o: MapObject, i: number): { x: number; y: number } {
+    if (drag?.kind === "obj" && drag.id === o.id)
+      return { x: drag.x, y: drag.y };
+    if (o.posX !== 0 || o.posY !== 0) return { x: o.posX, y: o.posY };
+    return autoObjPos(i);
+  }
+
+  function startDrag(
+    e: ReactPointerEvent,
+    kind: "zone" | "obj",
+    id: string,
+    curX: number,
+    curY: number,
+  ): void {
+    if (!edit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const floor = floorRef.current;
+    if (!floor) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const fr = floor.getBoundingClientRect();
+    dragOff.current = {
+      dx: e.clientX - fr.left - curX,
+      dy: e.clientY - fr.top - curY,
+    };
+    setDrag({ kind, id, x: curX, y: curY });
+  }
+
+  function onDragMove(e: ReactPointerEvent): void {
+    if (!drag) return;
+    const floor = floorRef.current;
+    if (!floor) return;
+    const fr = floor.getBoundingClientRect();
+    const x = Math.max(
+      0,
+      Math.min(e.clientX - fr.left - dragOff.current.dx, fr.width - 48),
+    );
+    const y = Math.max(
+      0,
+      Math.min(
+        e.clientY - fr.top - dragOff.current.dy,
+        Math.max(fr.height, FLOOR_MIN_H) - 48,
+      ),
+    );
+    setDrag({ ...drag, x, y });
+  }
+
+  function endDrag(): void {
+    if (!drag) return;
+    const d = drag;
+    setDrag(null);
+    if (d.kind === "zone")
+      void moveZone(d.id, Math.round(d.x), Math.round(d.y));
+    else void moveObjTo(d.id, Math.round(d.x), Math.round(d.y));
+  }
+
   const selObj =
     sel?.kind === "obj" ? (objects.find((o) => o.id === sel.id) ?? null) : null;
   const selPc =
     sel?.kind === "pc"
       ? (hall.find((c) => c.computer.id === sel.id) ?? null)
       : null;
+
+  /** Плитка ПК. style задаётся при раскладке кругом (абсолютные координаты). */
+  function renderPcTile(cell: HallCell, style?: CSSProperties) {
+    const state = cellState(cell);
+    const guestName = cell.session?.guest?.fullName ?? null;
+    return (
+      <button
+        key={cell.computer.id}
+        className={`pc ${calls[cell.computer.id] ? "calling" : ""} ${
+          edit ? "editing" : ""
+        } ${sel?.id === cell.computer.id ? "sel" : ""}`}
+        data-state={state}
+        title={tileTitle(cell, state)}
+        style={style}
+        onClick={() =>
+          edit
+            ? setSel({ kind: "pc", id: cell.computer.id })
+            : setSelectedId(cell.computer.id)
+        }
+      >
+        <span className="pc-num">{pcLabel(cell.computer.name)}</span>
+        {guestName && <span className="pc-name">{guestName}</span>}
+        {cell.session ? (
+          <span className="pc-timer">
+            {state === "FREE" ? "∞" : clock(remainingMinutes(cell))}
+          </span>
+        ) : state === "RESERVED" ? (
+          <StateIcon kind="reserved" />
+        ) : state === "PAUSED" ? (
+          <StateIcon kind="paused" />
+        ) : null}
+      </button>
+    );
+  }
 
   return (
     <main style={{ "--pc-min": `${pcMin}px` } as CSSProperties}>
@@ -440,10 +620,10 @@ export function HallScreen({
                 + Перегородка
               </button>
               <span className="hall-arrange-hint">
-                Чтобы раскидать ПК по залам: нажмите на ПК → в панели выберите
-                «Зал» — компьютер перейдёт в эту группу (тариф зала применится
-                сам). Там же — удаление ПК. «+ ПК» добавляет машину в зал, «+
-                Зал» — новый зал.
+                Перетаскивайте залы и мебель за уголок с точками (⠿) — ставьте
+                как в клубе. Форма ПК в зале: ▦ квадратом или ◯ кругом. Чтобы
+                перенести ПК в другой зал — нажмите на него и выберите «Зал»
+                (тариф зала применится сам). Там же — удаление ПК.
               </span>
             </>
           )}
@@ -498,143 +678,193 @@ export function HallScreen({
         </div>
       )}
 
-      {/* Залы — отдельными группами. Чтобы раскидать ПК по залам: нажми на ПК
-         → выбери «Зал» — компьютер сразу перейдёт в эту группу. */}
-      {(hall.length > 0 || edit) && (
-        <div className="hall-areas">
-          {zoneList.map((zone) => {
-            const pcs = hall
-              .filter((c) => c.computer.zone.id === zone.id)
-              .sort((a, b) =>
-                a.computer.name.localeCompare(b.computer.name, "ru", {
-                  numeric: true,
-                }),
-              );
-            return (
-              <section className="zone-area" key={zone.id}>
-                <div className="zone-head">
-                  <span
-                    className="zone-dot"
-                    style={{ background: zoneColor(zone.id) }}
-                  />
-                  {edit ? (
-                    <input
-                      className="zone-rename"
-                      defaultValue={zone.name}
-                      key={zone.name}
-                      aria-label="Название зала"
-                      onBlur={(e) => void renameZone(zone.id, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                      }}
-                    />
-                  ) : (
-                    <h2>{zone.name}</h2>
-                  )}
-                  <span className="count">
-                    {pcs.filter((c) => c.session).length}/{pcs.length}
-                  </span>
-                  {edit && (
-                    <button
-                      className="zone-add-pc"
-                      onClick={() => void addComputer(zone.id)}
-                    >
-                      + ПК
-                    </button>
-                  )}
-                </div>
-                <div className="zone-grid">
-                  {pcs.map((cell) => {
-                    const state = cellState(cell);
-                    const guestName = cell.session?.guest?.fullName ?? null;
-                    return (
-                      <button
-                        key={cell.computer.id}
-                        className={`pc ${
-                          calls[cell.computer.id] ? "calling" : ""
-                        } ${edit ? "editing" : ""} ${
-                          sel?.id === cell.computer.id ? "sel" : ""
-                        }`}
-                        data-state={state}
-                        title={tileTitle(cell, state)}
-                        onClick={() =>
-                          edit
-                            ? setSel({ kind: "pc", id: cell.computer.id })
-                            : setSelectedId(cell.computer.id)
+      {/* План клуба: залы и мебель свободно расставлены по холсту. В правке их
+         перетаскивают за уголок с точками (⠿); форма ПК внутри зала — квадрат
+         или круг. Раскидать ПК по залам — через выбор зала у плитки. */}
+      {(hall.length > 0 || objects.length > 0 || edit) && (
+        <div className={`floor-wrap ${edit ? "editing" : ""}`}>
+          <div
+            className="floor"
+            ref={floorRef}
+            style={{ minHeight: FLOOR_MIN_H }}
+            onPointerMove={edit ? onDragMove : undefined}
+            onPointerUp={edit ? endDrag : undefined}
+            onPointerCancel={edit ? endDrag : undefined}
+          >
+            {zoneList.map((zone, i) => {
+              const pcs = hall
+                .filter((c) => c.computer.zone.id === zone.id)
+                .sort((a, b) =>
+                  a.computer.name.localeCompare(b.computer.name, "ru", {
+                    numeric: true,
+                  }),
+                );
+              const pos = zonePos(zone, i);
+              const ring = zone.layout === "RING";
+              const geo = ring ? ringGeometry(pcs.length, pcMin) : null;
+              return (
+                <section
+                  className={`zone-area floor-zone ${
+                    drag?.id === zone.id ? "dragging" : ""
+                  }`}
+                  key={zone.id}
+                  style={{ left: pos.x, top: pos.y }}
+                >
+                  <div className="zone-head">
+                    {edit && (
+                      <span
+                        className="drag-grip"
+                        title="Перетащить зал"
+                        onPointerDown={(e) =>
+                          startDrag(e, "zone", zone.id, pos.x, pos.y)
                         }
+                        onPointerMove={onDragMove}
+                        onPointerUp={endDrag}
                       >
-                        <span className="pc-num">
-                          {pcLabel(cell.computer.name)}
-                        </span>
-                        {guestName && (
-                          <span className="pc-name">{guestName}</span>
-                        )}
-                        {cell.session ? (
-                          <span className="pc-timer">
-                            {state === "FREE"
-                              ? "∞"
-                              : clock(remainingMinutes(cell))}
-                          </span>
-                        ) : state === "RESERVED" ? (
-                          <StateIcon kind="reserved" />
-                        ) : state === "PAUSED" ? (
-                          <StateIcon kind="paused" />
-                        ) : null}
+                        ⠿
+                      </span>
+                    )}
+                    <span
+                      className="zone-dot"
+                      style={{ background: zoneColor(zone.id) }}
+                    />
+                    {edit ? (
+                      <input
+                        className="zone-rename"
+                        defaultValue={zone.name}
+                        key={zone.name}
+                        aria-label="Название зала"
+                        onBlur={(e) => void renameZone(zone.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                        }}
+                      />
+                    ) : (
+                      <h2>{zone.name}</h2>
+                    )}
+                    <span className="count">
+                      {pcs.filter((c) => c.session).length}/{pcs.length}
+                    </span>
+                    {edit && (
+                      <span className="shape-toggle" role="group">
+                        <button
+                          className={ring ? "" : "on"}
+                          title="Квадратом"
+                          onClick={() => void setZoneLayout(zone.id, "GRID")}
+                        >
+                          ▦
+                        </button>
+                        <button
+                          className={ring ? "on" : ""}
+                          title="Кругом"
+                          onClick={() => void setZoneLayout(zone.id, "RING")}
+                        >
+                          ◯
+                        </button>
+                      </span>
+                    )}
+                    {edit && (
+                      <button
+                        className="zone-add-pc"
+                        onClick={() => void addComputer(zone.id)}
+                      >
+                        + ПК
                       </button>
-                    );
-                  })}
-                  {edit && pcs.length === 0 && (
-                    <span className="hall-empty-zone">
-                      Пусто. «+ ПК» или перенеси ПК из другого зала: нажми ПК →
-                      «Зал».
+                    )}
+                  </div>
+                  {ring && geo ? (
+                    <div
+                      className="zone-ring"
+                      style={{ width: geo.size, height: geo.size }}
+                    >
+                      {pcs.map((cell, idx) =>
+                        renderPcTile(cell, {
+                          position: "absolute",
+                          left: geo.spots[idx].x,
+                          top: geo.spots[idx].y,
+                          width: pcMin,
+                          height: pcMin,
+                        }),
+                      )}
+                      {edit && pcs.length === 0 && (
+                        <span className="hall-empty-zone">Пусто. «+ ПК»</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="zone-grid">
+                      {pcs.map((cell) => renderPcTile(cell))}
+                      {edit && pcs.length === 0 && (
+                        <span className="hall-empty-zone">
+                          Пусто. «+ ПК» или перенеси ПК из другого зала: нажми
+                          ПК → «Зал».
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+
+            {/* Мебель: ресепшн, WC, вход, диваны, перегородки — на том же холсте. */}
+            {objects.map((o, i) => {
+              const pos = objPos(o, i);
+              return (
+                <div
+                  className={`floor-obj ${o.kind.toLowerCase()} ${
+                    sel?.id === o.id ? "sel" : ""
+                  } ${drag?.id === o.id ? "dragging" : ""}`}
+                  key={o.id}
+                  style={{ left: pos.x, top: pos.y }}
+                  onPointerMove={edit ? onDragMove : undefined}
+                  onPointerUp={edit ? endDrag : undefined}
+                >
+                  {edit && (
+                    <span
+                      className="drag-grip"
+                      title="Перетащить"
+                      onPointerDown={(e) =>
+                        startDrag(e, "obj", o.id, pos.x, pos.y)
+                      }
+                      onPointerMove={onDragMove}
+                      onPointerUp={endDrag}
+                    >
+                      ⠿
                     </span>
                   )}
+                  <button
+                    className="floor-obj-label"
+                    onClick={
+                      edit ? () => setSel({ kind: "obj", id: o.id }) : undefined
+                    }
+                  >
+                    {o.text || "Перегородка"}
+                  </button>
                 </div>
-              </section>
-            );
-          })}
-          {edit && (
-            <section className="zone-area add-zone">
-              <input
-                value={newZone}
-                placeholder="Новый зал"
-                onChange={(e) => setNewZone(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void addZone();
-                }}
-              />
-              <button
-                disabled={newZone.trim() === ""}
-                onClick={() => void addZone()}
-              >
-                + Зал
-              </button>
-            </section>
-          )}
-        </div>
-      )}
+              );
+            })}
 
-      {/* Обстановка клуба: ресепшн, WC, диваны, вход, перегородки. */}
-      {(objects.length > 0 || edit) && (
-        <div className="decor-row">
-          <span className="decor-title">Обстановка:</span>
-          {objects.map((o) => (
-            <button
-              key={o.id}
-              className={`decor-chip ${sel?.id === o.id ? "sel" : ""}`}
-              onClick={
-                edit ? () => setSel({ kind: "obj", id: o.id }) : undefined
-              }
-            >
-              {o.text || "Перегородка"}
-            </button>
-          ))}
-          {edit && objects.length === 0 && (
-            <span className="decor-empty">
-              Добавьте «+ Reception», «+ WC», «+ Lounge», «+ Entrance» или «+
-              Перегородка».
-            </span>
-          )}
+            {edit && (
+              <section
+                className="zone-area add-zone floor-zone"
+                style={autoZonePos(zoneList.length)}
+              >
+                <input
+                  value={newZone}
+                  placeholder="Новый зал"
+                  onChange={(e) => setNewZone(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void addZone();
+                  }}
+                />
+                <button
+                  disabled={newZone.trim() === ""}
+                  onClick={() => void addZone()}
+                >
+                  + Зал
+                </button>
+              </section>
+            )}
+          </div>
         </div>
       )}
 

@@ -943,24 +943,52 @@ main {
   color: #e9c35a;
 }
 
-/* --- Залы как отдельные области на плане (альбомно, рядом) --- */
-.hall-areas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-start;
+/* --- План клуба: холст со свободно расставленными залами и мебелью --- */
+.floor-wrap {
+  /* На узком экране план можно прокрутить — как разглядывать схему зала. */
+  overflow: auto;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 26px 26px;
+  background-color: rgba(0, 0, 0, 0.12);
 }
+.floor {
+  position: relative;
+  width: 100%;
+  min-width: 860px;
+}
+.floor-wrap.editing .floor {
+  /* В правке холст заметно больше — есть куда растащить залы и мебель. */
+  min-width: 1100px;
+}
+
 .zone-area {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px 14px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+/* Зал на холсте — абсолютно по сохранённым координатам, не шире ~6 плиток. */
+.floor-zone {
+  position: absolute;
+  max-width: calc(var(--pc-min, 74px) * 6 + 8px * 5 + 30px);
+}
+.floor-zone.dragging {
+  z-index: 50;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0.97;
 }
 .zone-area .zone-head {
   margin-bottom: 10px;
 }
 .zone-add-pc {
-  margin-left: auto;
   padding: 4px 10px;
   font-size: 13px;
   border-radius: 7px;
@@ -972,24 +1000,100 @@ main {
   gap: 8px;
   align-items: start;
 }
-/* Зал растягиваем максимум на ~6 плиток в ряд, чтобы залы шли рядом, альбомно. */
-.zone-area {
-  max-width: calc(var(--pc-min, 74px) * 6 + 8px * 5 + 30px);
+/* Раскладка ПК по кругу: квадратная область, плитки абсолютно по окружности. */
+.zone-ring {
+  position: relative;
 }
 .zone-area.add-zone {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  align-self: stretch;
+  width: 180px;
 }
 .zone-area.add-zone input {
-  max-width: 160px;
+  max-width: 100%;
 }
 .hall-empty-zone {
   grid-column: 1 / -1;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
+  max-width: 220px;
+}
+
+/* Уголок-ручка для перетаскивания (залы и мебель). Крупная цель — удобно пальцем. */
+.drag-grip {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  margin: -2px 2px -2px -4px;
+  border-radius: 6px;
+}
+.drag-grip:active {
+  cursor: grabbing;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* Переключатель формы зала: ▦ квадрат / ◯ круг. */
+.shape-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.shape-toggle button {
+  padding: 3px 9px;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--muted);
+}
+.shape-toggle button.on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.zone-head .shape-toggle + .zone-add-pc {
+  margin-left: 8px;
+}
+
+/* Мебель на холсте: ресепшн, WC, вход, диваны, перегородки. */
+.floor-obj {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+}
+.floor-obj.wall {
+  background: #45597f;
+  border-color: #566d94;
+}
+.floor-obj.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.floor-obj.dragging {
+  z-index: 50;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+.floor-obj-label {
+  padding: 2px 6px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
 /* Обстановка клуба: ресепшн, WC, диваны, вход, перегородки — отдельной строкой. */
