@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -235,9 +236,12 @@ export function HallScreen({
   // Правка плана — только владельцу и управляющему.
   const canArrange = staff.role === "OWNER" || staff.role === "ADMIN";
   const [edit, setEdit] = useState(false);
-  const [drag, setDrag] = useState<{ kind: "pc" | "obj"; id: string } | null>(
-    null,
-  );
+  // Плавающая «тень» перетаскиваемого объекта — своё перетаскивание, не браузерное.
+  const [ghost, setGhost] = useState<{
+    label: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [sel, setSel] = useState<{ kind: "pc" | "obj"; id: string } | null>(
     null,
   );
@@ -365,11 +369,56 @@ export function HallScreen({
     await refresh();
   }
 
-  function onDropCell(col: number, row: number): void {
-    if (!drag) return;
-    if (drag.kind === "pc") void movePC(drag.id, col, row);
-    else void moveObj(drag.id, col, row);
-    setDrag(null);
+  /**
+   * Своё перетаскивание (не браузерное): зажал плитку — за курсором едет тень,
+   * отпустил на клетке. Клетку под курсором определяем по data-атрибутам через
+   * elementFromPoint, поэтому работает одинаково и мышью, и пальцем, без капризов
+   * HTML5 drag. Короткое нажатие без движения — это выбор (панель зала/удаления).
+   */
+  function beginDrag(
+    e: ReactPointerEvent,
+    kind: "pc" | "obj",
+    id: string,
+    label: string,
+  ): void {
+    if (!edit) return;
+    const start = { x: e.clientX, y: e.clientY };
+    let active = false;
+
+    const move = (ev: PointerEvent): void => {
+      if (!active) {
+        if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) < 6)
+          return;
+        active = true;
+      }
+      setGhost({ label, x: ev.clientX, y: ev.clientY });
+    };
+    const up = (ev: PointerEvent): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setGhost(null);
+      if (!active) {
+        setSel({ kind, id });
+        return;
+      }
+      const el = document.elementFromPoint(
+        ev.clientX,
+        ev.clientY,
+      ) as HTMLElement | null;
+      const cellEl = el?.closest("[data-col]") as HTMLElement | null;
+      if (!cellEl) return;
+      const col = Number(cellEl.dataset.col);
+      const row = Number(cellEl.dataset.row);
+      const overPc = cellEl.dataset.pcId;
+      if (kind === "pc") {
+        if (overPc && overPc !== id) void swapPC(id, overPc);
+        else void movePC(id, col, row);
+      } else {
+        void moveObj(id, col, row);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   /** Поменять местами две машины — чтобы переставлять в плотной сетке без пустых клеток. */
@@ -461,18 +510,21 @@ export function HallScreen({
     }
   }
 
-  async function addObject(kind: "LABEL" | "WALL"): Promise<void> {
-    let text: string | undefined;
-    if (kind === "LABEL") {
-      // Сразу спрашиваем, что за место — иначе непонятно, что делать с «Подписью».
-      const entered = window.prompt(
-        "Что за место? Например: Ресепшн, Уборная, Диваны, Зона отдыха, Бар, Вход",
-        "Ресепшн",
-      );
+  /**
+   * Добавить объект на план. Готовые подписи (Reception, Lounge, WC, Entrance)
+   * приходят сразу с текстом; пустой text у LABEL — спросим название. Ставим под
+   * сеткой ПК, чтобы не закрывать машины; дальше пользователь перетащит куда надо.
+   */
+  async function addObject(
+    kind: "LABEL" | "WALL",
+    presetText?: string,
+  ): Promise<void> {
+    let text: string | undefined = presetText;
+    if (kind === "LABEL" && presetText === undefined) {
+      const entered = window.prompt("Название места", "Подпись");
       if (entered === null) return;
       text = entered.trim() || "Подпись";
     }
-    // Ставим под сеткой ПК, а не в угол поверх машин — иначе объект закрывает ПК.
     const objBottom = objects.reduce(
       (m, o) => Math.max(m, o.posY + o.height),
       0,
@@ -489,7 +541,6 @@ export function HallScreen({
         height: kind === "WALL" ? 4 : 2,
       });
       await refresh();
-      // Выбираем созданное — дальше тапом по пустой клетке его можно поставить куда нужно.
       setSel({ kind: "obj", id: created.id });
     } catch (error) {
       setArrError((error as Error).message);
@@ -614,14 +665,22 @@ export function HallScreen({
           </button>
           {edit && (
             <>
-              <button onClick={() => void addObject("LABEL")}>+ Подпись</button>
+              {/* Готовые подписи по‑английски — ставятся одним кликом. */}
+              {["Reception", "Lounge", "WC", "Entrance"].map((t) => (
+                <button key={t} onClick={() => void addObject("LABEL", t)}>
+                  + {t}
+                </button>
+              ))}
+              <button onClick={() => void addObject("LABEL")}>
+                + Подпись…
+              </button>
               <button onClick={() => void addObject("WALL")}>
                 + Перегородка
               </button>
               <span className="hall-arrange-hint">
-                Зажмите ПК мышкой и перетащите: на пустое место — встанет туда,
-                на другой ПК — поменяются местами. Клик по ПК — выбрать зал или
-                удалить. Подписи и перегородки тоже перетаскиваются.
+                Зажмите ПК и тащите: на пустое место — встанет туда, на другой
+                ПК — поменяются местами. Клик по ПК — выбрать зал/удалить.
+                Готовые подписи и перегородки тоже перетаскиваются.
               </span>
             </>
           )}
@@ -758,36 +817,26 @@ export function HallScreen({
                 gridColumn: `${o.posX + 1} / span ${o.width}`,
                 gridRow: `${o.posY + 1} / span ${o.height}`,
               }}
-              draggable={edit}
-              onDragStart={
-                edit ? () => setDrag({ kind: "obj", id: o.id }) : undefined
-              }
-              onClick={
-                edit ? () => setSel({ kind: "obj", id: o.id }) : undefined
+              data-col={o.posX}
+              data-row={o.posY}
+              onPointerDown={
+                edit
+                  ? (e) => beginDrag(e, "obj", o.id, o.text ?? "Подпись")
+                  : undefined
               }
             >
               {o.text}
             </div>
           ))}
 
-          {/* Пустые клетки — цель для переноса. Работает и перетаскиванием
-             (мышь), и тапом: выбрал объект → нажал на клетку (нужно для
-             сенсорных экранов, где перетаскивание не срабатывает). */}
+          {/* Пустые клетки — цель, куда можно поставить ПК или объект. */}
           {slots.map(({ col, row }) => (
             <div
               key={`slot-${col}-${row}`}
-              className={`map-slot ${sel ? "ready" : ""}`}
+              className="map-slot"
               style={{ gridColumn: col + 1, gridRow: row + 1 }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                onDropCell(col, row);
-              }}
-              onClick={() => {
-                if (sel?.kind === "pc") void movePC(sel.id, col, row);
-                else if (sel?.kind === "obj") void moveObj(sel.id, col, row);
-                setSel(null);
-              }}
+              data-col={col}
+              data-row={row}
             />
           ))}
 
@@ -802,32 +851,23 @@ export function HallScreen({
                 } ${sel?.id === cell.computer.id ? "sel" : ""}`}
                 style={{ gridColumn: col + 1, gridRow: row + 1 }}
                 data-state={state}
+                data-col={col}
+                data-row={row}
+                data-pc-id={cell.computer.id}
                 title={tileTitle(cell, state)}
-                draggable={edit}
-                onDragStart={
+                onPointerDown={
                   edit
-                    ? () => setDrag({ kind: "pc", id: cell.computer.id })
+                    ? (e) =>
+                        beginDrag(
+                          e,
+                          "pc",
+                          cell.computer.id,
+                          pcLabel(cell.computer.name),
+                        )
                     : undefined
                 }
-                onDragOver={edit ? (e) => e.preventDefault() : undefined}
-                onDrop={
-                  edit
-                    ? (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Бросок одного ПК на другой — меняет их местами.
-                        if (drag?.kind === "pc" && drag.id !== cell.computer.id)
-                          void swapPC(drag.id, cell.computer.id);
-                        else if (drag?.kind === "obj")
-                          void moveObj(drag.id, col, row);
-                        setDrag(null);
-                      }
-                    : undefined
-                }
-                onClick={() =>
-                  edit
-                    ? setSel({ kind: "pc", id: cell.computer.id })
-                    : setSelectedId(cell.computer.id)
+                onClick={
+                  edit ? undefined : () => setSelectedId(cell.computer.id)
                 }
               >
                 <span
@@ -906,6 +946,17 @@ export function HallScreen({
             <button onClick={() => setSelectedId(null)}>Закрыть</button>
           </aside>
         </>
+      )}
+
+      {/* «Тень» под курсором при перетаскивании — не перехватывает мышь. */}
+      {ghost && (
+        <div
+          className="drag-ghost"
+          style={{ left: ghost.x, top: ghost.y }}
+          aria-hidden
+        >
+          {ghost.label}
+        </div>
       )}
     </main>
   );

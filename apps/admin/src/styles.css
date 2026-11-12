@@ -1106,17 +1106,30 @@ main {
 .map-size button {
   padding: 2px 8px;
 }
-/* Стрелки перемещения в панели выбранного ПК/объекта. */
-.map-move {
-  display: inline-flex;
-  gap: 4px;
+/* Своё перетаскивание: «тень» под курсором + поведение плиток в правке. */
+.drag-ghost {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1000;
+  background: var(--accent);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  opacity: 0.92;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
-.map-move button {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  font-size: 16px;
-  line-height: 1;
+.club-map.editing .pc,
+.club-map.editing .map-obj {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.club-map.editing .pc:active,
+.club-map.editing .map-obj:active {
+  cursor: grabbing;
 }
 
 /* Крестик удаления ПК в углу плитки (только в правке). */
