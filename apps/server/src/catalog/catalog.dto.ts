@@ -1,5 +1,5 @@
 import { PartialType } from "@nestjs/mapped-types";
-import { TariffKind } from "@prisma/client";
+import { MapObjectKind, TariffKind } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -102,6 +102,57 @@ export class ArrangeComputersDto {
   @ValidateNested({ each: true })
   @Type(() => ComputerPlacementDto)
   moves!: ComputerPlacementDto[];
+}
+
+export class CreateMapObjectDto {
+  @IsEnum(MapObjectKind)
+  kind!: MapObjectKind;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsInt()
+  @Min(0)
+  posX!: number;
+
+  @IsInt()
+  @Min(0)
+  posY!: number;
+
+  @IsInt()
+  @Min(1)
+  width!: number;
+
+  @IsInt()
+  @Min(1)
+  height!: number;
+}
+
+export class UpdateMapObjectDto {
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  posX?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  posY?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  width?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  height?: number;
 }
 
 export class CreateTariffDto {

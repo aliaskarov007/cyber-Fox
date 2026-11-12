@@ -990,6 +990,116 @@ main {
   max-width: 240px;
 }
 
+/* --- Единый план клуба: ПК + подписи + перегородки на одной сетке --- */
+.club-map {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+.map-slot {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  opacity: 0.3;
+  z-index: 1;
+}
+.map-obj {
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6px;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ink-2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.map-obj.label {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+.map-obj.wall {
+  background: #45597f;
+  border-radius: 3px;
+  opacity: 0.75;
+}
+.club-map.editing .map-obj {
+  cursor: grab;
+}
+.map-obj.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.club-map .pc {
+  z-index: 2;
+}
+/* Тонкая полоска сверху плитки — цвет зала. */
+.pc-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+.pc.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Легенда залов: цвет, переименование, + ПК. */
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+.zone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.zone-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* Панель выбранного объекта плана. */
+.map-sel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.map-sel label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.map-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.map-size button {
+  padding: 2px 8px;
+}
+
 /* Крестик удаления ПК в углу плитки (только в правке). */
 .pc-del {
   position: absolute;

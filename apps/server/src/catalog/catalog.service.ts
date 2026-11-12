@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   type Computer,
+  type MapObject,
   SessionStatus,
   type Tariff,
   TariffKind,
@@ -19,9 +20,11 @@ import { SubscriptionService } from "../billing-platform/subscription.service.js
 import type {
   ArrangeComputersDto,
   CreateComputerDto,
+  CreateMapObjectDto,
   CreateTariffDto,
   CreateZoneDto,
   UpdateComputerDto,
+  UpdateMapObjectDto,
   UpdateTariffDto,
   UpdateZoneDto,
 } from "./catalog.dto.js";
@@ -226,6 +229,76 @@ export class CatalogService {
     }
 
     await this.prisma.computer.delete({ where: { id: computerId } });
+    return { ok: true };
+  }
+
+  // --- План клуба: подписи и перегородки ---
+
+  async listMapObjects(
+    staff: AuthenticatedStaff,
+    clubId: string,
+  ): Promise<MapObject[]> {
+    await this.access.requireClub(staff, clubId);
+    return this.prisma.mapObject.findMany({
+      where: { clubId },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async createMapObject(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    dto: CreateMapObjectDto,
+  ): Promise<MapObject> {
+    await this.access.requireClub(staff, clubId);
+    return this.prisma.mapObject.create({
+      data: {
+        tenantId: staff.tenantId,
+        clubId,
+        kind: dto.kind,
+        text: dto.text?.trim() || null,
+        posX: dto.posX,
+        posY: dto.posY,
+        width: dto.width,
+        height: dto.height,
+      },
+    });
+  }
+
+  async updateMapObject(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    id: string,
+    dto: UpdateMapObjectDto,
+  ): Promise<MapObject> {
+    await this.access.requireClub(staff, clubId);
+    const object = await this.prisma.mapObject.findUnique({ where: { id } });
+    if (!object || object.clubId !== clubId) {
+      throw new NotFoundException("Объект карты не найден");
+    }
+    return this.prisma.mapObject.update({
+      where: { id },
+      data: {
+        ...(dto.text !== undefined ? { text: dto.text.trim() || null } : {}),
+        ...(dto.posX !== undefined ? { posX: dto.posX } : {}),
+        ...(dto.posY !== undefined ? { posY: dto.posY } : {}),
+        ...(dto.width !== undefined ? { width: dto.width } : {}),
+        ...(dto.height !== undefined ? { height: dto.height } : {}),
+      },
+    });
+  }
+
+  async deleteMapObject(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    id: string,
+  ): Promise<{ ok: true }> {
+    await this.access.requireClub(staff, clubId);
+    const object = await this.prisma.mapObject.findUnique({ where: { id } });
+    if (!object || object.clubId !== clubId) {
+      throw new NotFoundException("Объект карты не найден");
+    }
+    await this.prisma.mapObject.delete({ where: { id } });
     return { ok: true };
   }
 

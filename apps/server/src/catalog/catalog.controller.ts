@@ -16,9 +16,11 @@ import { ClubAccessService } from "../common/club-access.service.js";
 import {
   ArrangeComputersDto,
   CreateComputerDto,
+  CreateMapObjectDto,
   CreateTariffDto,
   CreateZoneDto,
   UpdateComputerDto,
+  UpdateMapObjectDto,
   UpdateTariffDto,
   UpdateZoneDto,
 } from "./catalog.dto.js";
@@ -113,6 +115,47 @@ export class CatalogController {
     @Param("computerId") computerId: string,
   ) {
     return this.catalog.deleteComputer(staff, clubId, computerId);
+  }
+
+  // --- План клуба: подписи и перегородки ---
+
+  @Get("clubs/:clubId/map-objects")
+  listMapObjects(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
+    return this.catalog.listMapObjects(staff, clubId);
+  }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Post("clubs/:clubId/map-objects")
+  createMapObject(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Body() dto: CreateMapObjectDto,
+  ) {
+    return this.catalog.createMapObject(staff, clubId, dto);
+  }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Patch("clubs/:clubId/map-objects/:id")
+  updateMapObject(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("id") id: string,
+    @Body() dto: UpdateMapObjectDto,
+  ) {
+    return this.catalog.updateMapObject(staff, clubId, id, dto);
+  }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Delete("clubs/:clubId/map-objects/:id")
+  deleteMapObject(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("id") id: string,
+  ) {
+    return this.catalog.deleteMapObject(staff, clubId, id);
   }
 
   @Get("clubs/:clubId/tariffs")

@@ -56,6 +56,7 @@ model Tenant {
   promoCodes   PromoCode[]
   promoRedemptions PromoRedemption[]
   barOrders    BarOrder[]
+  mapObjects   MapObject[]
   winbackCampaigns WinbackCampaign[]
   screenSlides ScreenSlide[]
   kaspiChannel KaspiChannel?
@@ -273,11 +274,40 @@ model Club {
   barOrders BarOrder[]
   winbackCampaigns WinbackCampaign[]
   screenSlides ScreenSlide[]
+  mapObjects MapObject[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+}
+
+/// Что рисуем на плане клуба, кроме машин. Подпись — именованная область
+/// (ресепшн, уборная, диваны, вход). Перегородка — стена между зонами.
+enum MapObjectKind {
+  LABEL
+  WALL
+}
+
+/// Декор плана клуба: подписи и перегородки. Координаты и размер — в клетках
+/// той же сетки, что и машины, поэтому план собирается как в реальном зале.
+model MapObject {
+  id       String        @id @default(uuid())
+  tenantId String
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String
+  club     Club          @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  kind     MapObjectKind
+  text   String?
+  posX   Int           @default(0)
+  posY   Int           @default(0)
+  width  Int           @default(2)
+  height Int           @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId])
 }
 
 /// Зона зала: VIP, Стандарт, PS5. Тарифы принадлежат зоне.

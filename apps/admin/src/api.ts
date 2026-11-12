@@ -68,6 +68,26 @@ export interface Zone {
   defaultPerMinuteTariffId: string | null;
 }
 
+/** Декор плана клуба: подпись (ресепшн, уборная, диваны) или перегородка. */
+export interface MapObject {
+  id: string;
+  kind: "LABEL" | "WALL";
+  text: string | null;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+}
+
+export interface MapObjectInput {
+  kind: "LABEL" | "WALL";
+  text?: string;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+}
+
 export interface Tariff {
   id: string;
   zoneId: string;
@@ -463,6 +483,28 @@ export const api = {
   /** Убрать машину из клуба (владелец/управляющий). */
   deleteComputer: (clubId: string, computerId: string) =>
     request<{ ok: true }>(`/clubs/${clubId}/computers/${computerId}`, {
+      method: "DELETE",
+    }),
+
+  // --- План клуба: подписи и перегородки ---
+  mapObjects: (clubId: string) =>
+    request<MapObject[]>(`/clubs/${clubId}/map-objects`),
+  createMapObject: (clubId: string, body: MapObjectInput) =>
+    request<MapObject>(`/clubs/${clubId}/map-objects`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateMapObject: (
+    clubId: string,
+    id: string,
+    body: Partial<Omit<MapObjectInput, "kind">>,
+  ) =>
+    request<MapObject>(`/clubs/${clubId}/map-objects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteMapObject: (clubId: string, id: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/map-objects/${id}`, {
       method: "DELETE",
     }),
 
