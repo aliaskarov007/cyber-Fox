@@ -50,6 +50,8 @@ const INTENT_TTL_MS = 24 * 60 * 60_000;
 export class KaspiProviderService {
   private readonly logger = new Logger(KaspiProviderService.name);
   private readonly allowedIps: string[];
+  /** Сумма в ответе check, тиын. По умолчанию 0 — «любая сумма». */
+  private readonly checkSum: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -57,6 +59,7 @@ export class KaspiProviderService {
     config: ConfigService,
   ) {
     this.allowedIps = parseAllowedIps(config.get<string>("KASPI_ALLOWED_IPS"));
+    this.checkSum = parseSum(config.get<string>("KASPI_CHECK_SUM")) ?? 0;
   }
 
   // --- Настройки (владелец сети) ---
@@ -127,14 +130,15 @@ export class KaspiProviderService {
 
   /**
    * Пополнение баланса: сумму гость вводит сам, обязательной суммы нет.
-   * Kaspi просит поле sum и в ответе check — отдаём 0.00, «любая сумма».
+   * Kaspi просит поле sum и в ответе check — отдаём 0.00, «любая сумма»
+   * (KASPI_CHECK_SUM задаёт другую, например 1.00 для теста Kaspi).
    */
   private async check(tenantId: string, txnId: string, account: string | undefined): Promise<KaspiReply> {
     const found = await this.findGuest(tenantId, account);
     if (!found) {
-      return buildReply({ txnId, result: KaspiResult.NOT_FOUND, sum: 0, comment: "Гость с таким номером не найден" });
+      return buildReply({ txnId, result: KaspiResult.NOT_FOUND, sum: this.checkSum, comment: "Гость с таким номером не найден" });
     }
-    return buildReply({ txnId, result: KaspiResult.OK, sum: 0, fields: this.fields(found.guest, found.club) });
+    return buildReply({ txnId, result: KaspiResult.OK, sum: this.checkSum, fields: this.fields(found.guest, found.club) });
   }
 
   private async pay(
