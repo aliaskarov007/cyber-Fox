@@ -100,8 +100,19 @@ export class KaspiProviderService {
       throw new ForbiddenException();
     }
     const channel = await this.prisma.kaspiProviderChannel.findUnique({ where: { token } });
-    if (!channel) throw new NotFoundException();
-    return withBin(await this.reply(channel.tenantId, channel.enabled, query), channel.bin);
+    if (!channel) {
+      this.logger.warn(`Запрос Kaspi с неизвестным адресом сервиса (ip ${ip ?? "?"})`);
+      throw new NotFoundException();
+    }
+    const reply = withBin(await this.reply(channel.tenantId, channel.enabled, query), channel.bin);
+    // Каждый запрос — строка в журнале: так видно, дошёл ли Kaspi и что ему ответили.
+    const one = (key: string): string => String([query[key]].flat()[0] ?? "").slice(0, 40);
+    this.logger.log(
+      `Kaspi ${one("command") || "?"} txn=${one("txn_id") || "?"} account=${one("account") || "?"} ` +
+        `sum=${one("sum") || "?"} ip=${ip ?? "?"} → result=${reply.result}` +
+        (reply.comment ? ` (${reply.comment})` : ""),
+    );
+    return reply;
   }
 
   private async reply(tenantId: string, enabled: boolean, query: Record<string, unknown>): Promise<KaspiReply> {
