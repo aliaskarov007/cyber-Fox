@@ -83,6 +83,13 @@ export function parseTxnDate(raw: string | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** БИН или ИИН — ровно 12 цифр. Пробелы при вводе убираем; пустое — «не задан». */
+export function parseBin(raw: string): string | null | undefined {
+  const digits = raw.replace(/\s/g, "");
+  if (digits === "") return null;
+  return /^\d{12}$/.test(digits) ? digits : undefined;
+}
+
 /** «Нурбол Әлиасқаров» → «Нурбол Ә.»: плательщик узнаёт себя, а чужой номер не раскрывает фамилию. */
 export function maskGuestName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -93,11 +100,20 @@ export function maskGuestName(fullName: string): string {
 
 export interface KaspiReply {
   txn_id: string;
+  /** БИН/ИИН получателя — Kaspi просит его в каждом ответе. */
+  bin?: string;
   prv_txn_id?: string;
   result: KaspiResultCode;
   sum?: string;
   comment: string;
   fields?: Record<string, { "@name": string; "#text": string }>;
+}
+
+/** Добавить БИН получателя в ответ (сразу после txn_id). */
+export function withBin(reply: KaspiReply, bin: string | null | undefined): KaspiReply {
+  if (!bin) return reply;
+  const { txn_id, ...rest } = reply;
+  return { txn_id, bin, ...rest };
 }
 
 /** Ответ в JSON-формате протокола. */

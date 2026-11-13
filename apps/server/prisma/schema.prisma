@@ -1572,6 +1572,8 @@ model KaspiProviderChannel {
   /// Часть адреса, который отдаётся Kaspi: по ней сервер узнаёт сеть.
   token   String  @unique @default(dbgenerated("(gen_random_uuid())::text"))
   enabled Boolean @default(true)
+  /// БИН/ИИН получателя — Kaspi просит его в каждом ответе (поле bin).
+  bin     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

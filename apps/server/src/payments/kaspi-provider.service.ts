@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { type Club, type Guest, type KaspiTxn, PaymentIntentStatus, PaymentPurpose } from "@prisma/client";
 
@@ -14,9 +14,11 @@ import {
   isAllowedIp,
   maskGuestName,
   parseAllowedIps,
+  parseBin,
   parseSum,
   parseTxnDate,
   parseTxnId,
+  withBin,
 } from "./kaspi-provider.rules.js";
 import { PaymentsService } from "./payments.service.js";
 
@@ -28,6 +30,8 @@ export interface PublicKaspiProvider {
   /** Регулярное выражение для поля «номер телефона», которое просит Kaspi. */
   accountRegex: string;
   allowedIps: string[];
+  /** БИН/ИИН получателя, который уходит в каждом ответе Kaspi. */
+  bin: string | null;
 }
 
 /** Срок у намерения формальный: деньги к моменту pay уже списаны у гостя. */
@@ -65,14 +69,22 @@ export class KaspiProviderService {
       path: channel ? `/api/payments/kaspi/${channel.token}` : null,
       accountRegex: KASPI_ACCOUNT_REGEX,
       allowedIps: this.allowedIps,
+      bin: channel?.bin ?? null,
     };
   }
 
-  async save(staff: AuthenticatedStaff, enabled: boolean): Promise<PublicKaspiProvider> {
+  /** bin не передан — не трогаем; пустая строка — убрать. */
+  async save(staff: AuthenticatedStaff, enabled: boolean, rawBin?: string): Promise<PublicKaspiProvider> {
+    const data: { enabled: boolean; bin?: string | null } = { enabled };
+    if (rawBin !== undefined) {
+      const bin = parseBin(rawBin);
+      if (bin === undefined) throw new BadRequestException("БИН/ИИН — 12 цифр");
+      data.bin = bin;
+    }
     await this.prisma.kaspiProviderChannel.upsert({
       where: { tenantId: staff.tenantId },
-      create: { tenantId: staff.tenantId, enabled },
-      update: { enabled },
+      create: { tenantId: staff.tenantId, ...data },
+      update: data,
     });
     return this.get(staff);
   }
@@ -86,20 +98,23 @@ export class KaspiProviderService {
     }
     const channel = await this.prisma.kaspiProviderChannel.findUnique({ where: { token } });
     if (!channel) throw new NotFoundException();
+    return withBin(await this.reply(channel.tenantId, channel.enabled, query), channel.bin);
+  }
 
+  private async reply(tenantId: string, enabled: boolean, query: Record<string, unknown>): Promise<KaspiReply> {
     const str = (key: string) => (typeof query[key] === "string" ? (query[key] as string) : undefined);
     const txnId = parseTxnId(str("txn_id"));
     if (!txnId) return buildReply({ txnId: str("txn_id") ?? "", result: KaspiResult.OTHER, comment: "Неверный txn_id" });
-    if (!channel.enabled) {
+    if (!enabled) {
       return buildReply({ txnId, result: KaspiResult.OTHER, comment: "Приём платежей временно отключён" });
     }
 
     try {
       switch (str("command")) {
         case "check":
-          return await this.check(channel.tenantId, txnId, str("account"));
+          return await this.check(tenantId, txnId, str("account"));
         case "pay":
-          return await this.pay(channel.tenantId, txnId, str("account"), str("sum"), str("txn_date"));
+          return await this.pay(tenantId, txnId, str("account"), str("sum"), str("txn_date"));
         default:
           return buildReply({ txnId, result: KaspiResult.OTHER, comment: "Неизвестная команда" });
       }

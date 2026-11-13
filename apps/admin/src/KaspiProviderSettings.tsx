@@ -15,10 +15,33 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [bin, setBin] = useState("");
 
   useEffect(() => {
-    void api.kaspiProvider().then(setChannel).catch(() => setChannel(null));
+    void api
+      .kaspiProvider()
+      .then((loaded) => {
+        setChannel(loaded);
+        setBin(loaded.bin ?? "");
+      })
+      .catch(() => setChannel(null));
   }, []);
+
+  async function saveBin(): Promise<void> {
+    if (!channel) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await api.saveKaspiProvider(channel.enabled, bin);
+      setChannel(saved);
+      setBin(saved.bin ?? "");
+      onSaved(saved.bin ? "БИН/ИИН сохранён — Kaspi получит его в каждом ответе" : "БИН/ИИН убран из ответов");
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const url = channel?.path ? `${window.location.origin}${channel.path}` : null;
 
@@ -85,6 +108,26 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
               </button>
             </div>
             <p className="hint">Запросы принимаются только с адресов Kaspi: {channel.allowedIps.join(", ")}</p>
+
+            <label>
+              БИН/ИИН получателя (поле bin в ответах Kaspi)
+              <input
+                inputMode="numeric"
+                maxLength={14}
+                value={bin}
+                onChange={(e) => setBin(e.target.value)}
+                placeholder="12 цифр"
+              />
+            </label>
+            <div className="actions">
+              <button
+                type="button"
+                disabled={busy || bin.replace(/\s/g, "") === (channel.bin ?? "")}
+                onClick={() => void saveBin()}
+              >
+                Сохранить БИН/ИИН
+              </button>
+            </div>
           </div>
 
           <div className="actions" style={{ marginTop: 10 }}>

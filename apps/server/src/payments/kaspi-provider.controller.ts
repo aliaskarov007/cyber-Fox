@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put, Query, Req } from "@nestjs/common";
 import { StaffRole } from "@prisma/client";
 import { SkipThrottle } from "@nestjs/throttler";
-import { IsBoolean } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MaxLength } from "class-validator";
 import type { Request } from "express";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -12,6 +12,12 @@ import { KaspiProviderService } from "./kaspi-provider.service.js";
 class SaveKaspiProviderDto {
   @IsBoolean()
   enabled!: boolean;
+
+  /** БИН/ИИН получателя; пустая строка — убрать. Проверка 12 цифр — в сервисе. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  bin?: string;
 }
 
 /**
@@ -32,7 +38,7 @@ export class KaspiProviderController {
   @Roles(StaffRole.OWNER)
   @Put("network/kaspi-provider")
   save(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: SaveKaspiProviderDto) {
-    return this.kaspi.save(staff, dto.enabled);
+    return this.kaspi.save(staff, dto.enabled, dto.bin);
   }
 
   /**

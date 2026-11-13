@@ -9,9 +9,11 @@ import {
   isAllowedIp,
   maskGuestName,
   parseAllowedIps,
+  parseBin,
   parseSum,
   parseTxnDate,
   parseTxnId,
+  withBin,
 } from "./kaspi-provider.rules.js";
 
 describe("протокол провайдера Kaspi", () => {
@@ -77,5 +79,21 @@ describe("протокол провайдера Kaspi", () => {
     expect(buildReply({ txnId: "1", result: KaspiResult.OK, fields: [["Гость", "Нурбол Ә."]] }).fields).toEqual({
       field1: { "@name": "Гость", "#text": "Нурбол Ә." },
     });
+  });
+
+  it("БИН — 12 цифр, пустой убирает", () => {
+    expect(parseBin("123456789012")).toBe("123456789012");
+    expect(parseBin(" 1234 5678 9012 ")).toBe("123456789012");
+    expect(parseBin("")).toBeNull();
+    expect(parseBin("12345")).toBeUndefined();
+    expect(parseBin("12345678901a")).toBeUndefined();
+  });
+
+  it("bin идёт в ответе сразу после txn_id, а без БИН ответ не меняется", () => {
+    const reply = buildReply({ txnId: "1234567", result: KaspiResult.OK, comment: "" });
+    expect(withBin(reply, null)).toEqual(reply);
+    const withIt = withBin(reply, "123456789012");
+    expect(withIt).toEqual({ txn_id: "1234567", bin: "123456789012", result: 0, comment: "" });
+    expect(Object.keys(withIt).slice(0, 2)).toEqual(["txn_id", "bin"]);
   });
 });
