@@ -125,10 +125,16 @@ export class KaspiProviderService {
     }
   }
 
+  /**
+   * Пополнение баланса: сумму гость вводит сам, обязательной суммы нет.
+   * Kaspi просит поле sum и в ответе check — отдаём 0.00, «любая сумма».
+   */
   private async check(tenantId: string, txnId: string, account: string | undefined): Promise<KaspiReply> {
     const found = await this.findGuest(tenantId, account);
-    if (!found) return buildReply({ txnId, result: KaspiResult.NOT_FOUND, comment: "Гость с таким номером не найден" });
-    return buildReply({ txnId, result: KaspiResult.OK, fields: this.fields(found.guest, found.club) });
+    if (!found) {
+      return buildReply({ txnId, result: KaspiResult.NOT_FOUND, sum: 0, comment: "Гость с таким номером не найден" });
+    }
+    return buildReply({ txnId, result: KaspiResult.OK, sum: 0, fields: this.fields(found.guest, found.club) });
   }
 
   private async pay(
@@ -277,10 +283,31 @@ export class KaspiProviderService {
   private async findGuest(tenantId: string, account: string | undefined): Promise<{ guest: Guest; club: Club } | null> {
     const phone = accountToPhone(account);
     if (!phone) return null;
-    const guest = await this.prisma.guest.findUnique({ where: { tenantId_phone: { tenantId, phone } } });
+    const guest = await this.guestByPhone(tenantId, phone);
     if (!guest) return null;
     const club = await this.clubFor(guest);
     return club ? { guest, club } : null;
+  }
+
+  /**
+   * Номер в базе записан так, как его ввели: касса хранит «+77…», регистрация
+   * за ПК — «77…», бывает и «8 777 …» с пробелами. Сравниваем только цифры,
+   * иначе гость, заведённый на кассе, для Kaspi «не найден».
+   */
+  private async guestByPhone(tenantId: string, phone: string): Promise<Guest | null> {
+    const exact = await this.prisma.guest.findFirst({
+      where: { tenantId, phone: { in: [phone, `+${phone}`] } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (exact) return exact;
+    const local = phone.slice(1);
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Guest"
+      WHERE "tenantId" = ${tenantId}
+        AND regexp_replace("phone", '[^0-9]', '', 'g') IN (${phone}, ${`8${local}`}, ${local})
+      ORDER BY "createdAt" ASC
+      LIMIT 1`;
+    return rows[0] ? this.prisma.guest.findUnique({ where: { id: rows[0].id } }) : null;
   }
 
   /**
