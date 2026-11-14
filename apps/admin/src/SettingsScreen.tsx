@@ -12,6 +12,7 @@ import {
 import { ComputersSection } from "./ComputersSection.js";
 import { ZonesSection } from "./ZonesSection.js";
 import { GuestScreenSettings } from "./GuestScreenSettings.js";
+import { InternetSettings } from "./InternetSettings.js";
 import { KaspiProviderSettings } from "./KaspiProviderSettings.js";
 import { KaspiSettings } from "./KaspiSettings.js";
 import { WhatsAppSettings } from "./WhatsAppSettings.js";
@@ -159,6 +160,10 @@ export function SettingsScreen({
           <ZonesSection club={club} onChanged={() => onClubsChanged()} />
           <ComputersSection club={club} />
           <GuestScreenSettings club={club} isOwner={isOwner} />
+          <InternetSettings
+            club={club}
+            onSaved={(msg) => void run(async () => {}, msg)}
+          />
         </>
       )}
 

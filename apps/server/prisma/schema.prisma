@@ -62,6 +62,8 @@ model Tenant {
   kaspiChannel KaspiChannel?
   kaspiProvider KaspiProviderChannel?
   kaspiTxns    KaspiTxn[]
+  internetRouters  InternetRouter[]
+  internetChannels InternetChannel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +277,8 @@ model Club {
   winbackCampaigns WinbackCampaign[]
   screenSlides ScreenSlide[]
   mapObjects MapObject[]
+  internetRouter   InternetRouter?
+  internetChannels InternetChannel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -308,6 +312,68 @@ model MapObject {
   updatedAt DateTime @updatedAt
 
   @@index([clubId])
+}
+
+/**
+ * Подключение к роутеру клуба (MikroTik) для управления интернет-каналами.
+ * Один роутер на клуб. Провайдеры у каждого клуба свои, поэтому конфиг
+ * хранится на клубе, а не на сети. Пароль наружу не отдаётся.
+ */
+model InternetRouter {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String @unique
+  club     Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// Адрес роутера в локальной сети клуба и порт его API.
+  host    String
+  /// 0 — драйвер подставит умолчание (443 для REST RouterOS 7, 8728 для API).
+  apiPort Int    @default(0)
+  username String
+  /// Пароль API-пользователя роутера. Нужен в открытом виде, чтобы ходить в
+  /// роутер; наружу (в админку) не отдаётся — показываем только факт «задан».
+  password String
+  /// Как общаемся с роутером: ROS7 (REST API) или ROS6 (бинарный API).
+  driver   String  @default("ROS7")
+  enabled  Boolean @default(true)
+  /// Разрешать гостю менять канал посреди сессии (с предупреждением об обрыве).
+  allowMidSession Boolean @default(true)
+
+  lastState   String?
+  lastCheckAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/**
+ * Интернет-канал клуба: понятное название + ссылка на настройку роутера
+ * (имя address-list/маршрута). Тип подключения (статика/динамика, PPPoE/DHCP)
+ * живёт на самом роутере — софт знает только имя канала. Максимум 2 на клуб.
+ */
+model InternetChannel {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clubId   String
+  club     Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// Название для гостя: «Казахтелеком», «Beeline».
+  name String
+  /// Имя address-list/маршрута на роутере, которым этот канал включается.
+  routerMark String
+  /// Канал по умолчанию — через него идут все, кто не выбрал другой.
+  isDefault Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clubId])
+  @@index([tenantId])
 }
 
 /// Зона зала: VIP, Стандарт, PS5. Тарифы принадлежат зоне.

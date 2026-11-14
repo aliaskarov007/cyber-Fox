@@ -872,6 +872,57 @@ export const api = {
       body: JSON.stringify({ enabled, bin }),
     }),
 
+  // --- Интернет-каналы клуба (роутер + провайдеры) ---
+
+  internet: (clubId: string) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet`),
+  saveInternetRouter: (
+    clubId: string,
+    body: Partial<{
+      host: string;
+      apiPort: number;
+      username: string;
+      password: string;
+      driver: "ROS7" | "ROS6";
+      enabled: boolean;
+      allowMidSession: boolean;
+    }>,
+  ) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet/router`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteInternetRouter: (clubId: string) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet/router`, {
+      method: "DELETE",
+    }),
+  addInternetChannel: (
+    clubId: string,
+    body: { name: string; routerMark: string; isDefault?: boolean },
+  ) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet/channels`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateInternetChannel: (
+    clubId: string,
+    channelId: string,
+    body: Partial<{
+      name: string;
+      routerMark: string;
+      isDefault: boolean;
+      sortOrder: number;
+    }>,
+  ) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet/channels/${channelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteInternetChannel: (clubId: string, channelId: string) =>
+    request<ClubInternet>(`/clubs/${clubId}/internet/channels/${channelId}`, {
+      method: "DELETE",
+    }),
+
   whatsapp: () => request<WhatsAppChannel>("/network/whatsapp"),
 
   saveWhatsApp: (body: {
@@ -1293,6 +1344,33 @@ export interface PendingQrTopUp {
   guestPhone: string | null;
   computerName: string;
   createdAt: string;
+}
+
+/** Интернет-канал клуба (провайдер) — ссылка на настройку роутера. */
+export interface InternetChannel {
+  id: string;
+  name: string;
+  routerMark: string;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Роутер клуба без пароля — то, что показываем в админке. */
+export interface InternetRouterPublic {
+  configured: boolean;
+  host: string | null;
+  apiPort: number;
+  username: string | null;
+  driver: string;
+  enabled: boolean;
+  allowMidSession: boolean;
+  lastState: string | null;
+  lastCheckAt: string | null;
+}
+
+export interface ClubInternet {
+  router: InternetRouterPublic;
+  channels: InternetChannel[];
 }
 
 /** Kaspi Pay через ApiPay: пополнения с игровых ПК зачисляются сами. */

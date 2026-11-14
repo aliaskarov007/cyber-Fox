@@ -10,6 +10,7 @@ import { AuthModule } from "./auth/auth.module.js";
 import { SubscriptionModule } from "./billing-platform/subscription.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
+import { UplinksModule } from "./uplinks/uplinks.module.js";
 import { GuestsModule } from "./guests/guests.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ImportModule } from "./import/import.module.js";
@@ -59,6 +60,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     SubscriptionModule,
     AuthModule,
     CatalogModule,
+    UplinksModule,
     GuestsModule,
     SessionsModule,
     ShiftsModule,
