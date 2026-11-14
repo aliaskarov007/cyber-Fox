@@ -633,6 +633,32 @@ button:disabled {
   border-radius: 12px;
 }
 
+/* --- Выбор интернет-провайдера --- */
+
+.net-panel {
+  display: grid;
+  gap: 12px;
+}
+.net-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.net-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.net-options button {
+  min-width: 140px;
+}
+.net-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 /* --- Пополнение по QR --- */
 
 .topup {

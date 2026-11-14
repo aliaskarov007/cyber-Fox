@@ -45,7 +45,8 @@ function readFile(file: string): Partial<AgentSettings> {
   }
 }
 
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
+const text = (value: unknown): string =>
+  typeof value === "string" ? value : "";
 
 export function readSettings(): AgentSettings {
   const image = readFile(imagePath());
@@ -84,4 +85,24 @@ export function machineMac(): string {
     })),
   );
   return pickMac(adapters) ?? "";
+}
+
+/**
+ * Локальный IPv4 машины — тот, что у выбранного сетевого адаптера (по его MAC).
+ * Им роутер направляет машину в выбранный интернет-канал. Пусто — не нашли.
+ */
+export function machineLanIp(): string {
+  const mac = machineMac();
+  if (!mac) return "";
+  for (const list of Object.values(networkInterfaces())) {
+    for (const entry of list ?? []) {
+      if (
+        !entry.internal &&
+        String(entry.family) === "IPv4" &&
+        entry.mac.trim().toLowerCase() === mac
+      )
+        return entry.address;
+    }
+  }
+  return "";
 }

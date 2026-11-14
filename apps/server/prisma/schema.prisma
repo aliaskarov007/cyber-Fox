@@ -369,6 +369,8 @@ model InternetChannel {
   isDefault Boolean @default(false)
   sortOrder Int     @default(0)
 
+  sessions Session[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -537,6 +539,9 @@ model Computer {
   /// признак: образ у всех общий, а настройки в профиле стираются при
   /// перезагрузке. Сама загрузка по сети без уникального MAC невозможна.
   macAddress String?
+  /// Локальный IP машины в сети клуба — сообщает агент. По нему роутер
+  /// направляет трафик ПК в выбранный интернет-канал.
+  lanIp      String?
   lastSeenAt DateTime?
 
   /// Место машины на плане зала: столбец и ряд, как она стоит в помещении.
@@ -765,6 +770,10 @@ model Session {
   /// Остаток предоплаты для анонимной посадки, в тиын.
   /// У гостя с аккаунтом деньги живут в кошельке, здесь пусто.
   prepaidRemaining Int?
+
+  /// Интернет-канал, выбранный на эту сессию. Пусто — канал по умолчанию.
+  internetChannelId String?
+  internetChannel   InternetChannel? @relation(fields: [internetChannelId], references: [id], onDelete: SetNull)
 
 
   segments     SessionSegment[]

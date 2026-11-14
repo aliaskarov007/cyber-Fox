@@ -7,6 +7,7 @@ import {
   formatRemaining,
 } from "./agent-client.js";
 import { BarPanel } from "./BarPanel.js";
+import { NetPanel } from "./NetPanel.js";
 import { PromoField } from "./PromoField.js";
 import { TopUpPanel } from "./TopUpPanel.js";
 
@@ -43,10 +44,14 @@ export function SessionBar({
    */
   const [called, setCalled] = useState(false);
   /* Открытая панель под полосой: одна за раз, чтобы не заслонять полки. */
-  const [panel, setPanel] = useState<"promo" | "topup" | "bar" | null>(null);
+  const [panel, setPanel] = useState<"promo" | "topup" | "bar" | "net" | null>(
+    null,
+  );
   const [promoNote, setPromoNote] = useState<string | null>(null);
   /* Клуб разрешил заказ из бара с ПК — узнаём при старте сессии. */
   const [barEnabled, setBarEnabled] = useState(false);
+  /* В клубе настроены два интернет-канала — можно дать гостю выбор. */
+  const [netEnabled, setNetEnabled] = useState(false);
   const hasAccount = Boolean(tick.guestName);
 
   // Сообщение о зачислении висит недолго: новый баланс уже виден в полосе.
@@ -63,6 +68,14 @@ export function SessionBar({
       .then((menu) => setBarEnabled(menu.enabled))
       .catch(() => setBarEnabled(false));
   }, [client, hasAccount, tick.sessionId]);
+
+  // Выбор провайдера доступен всем, в том числе анонимной посадке.
+  useEffect(() => {
+    void client
+      .netChannels()
+      .then((net) => setNetEnabled(net.enabled && net.channels.length >= 2))
+      .catch(() => setNetEnabled(false));
+  }, [client, tick.sessionId]);
 
   // Администратор отнёс или отменил заказ — гость узнаёт об этом у себя.
   useEffect(
@@ -155,6 +168,15 @@ export function SessionBar({
               Промокод
             </button>
           )}
+          {netEnabled && (
+            <button
+              className={panel === "net" ? "primary" : "ghost"}
+              disabled={offline}
+              onClick={() => setPanel(panel === "net" ? null : "net")}
+            >
+              Интернет
+            </button>
+          )}
           <button
             className="ghost"
             disabled={offline || called}
@@ -198,6 +220,18 @@ export function SessionBar({
             onPaid={(amount) =>
               setPromoNote(`Счёт пополнен на ${formatMoney(amount)}`)
             }
+            onClose={() => setPanel(null)}
+          />
+        </div>
+      )}
+
+      {panel === "net" && (
+        <div className="promo-panel">
+          <NetPanel
+            client={client}
+            disabled={offline}
+            playing
+            onChanged={(name) => setPromoNote(`Интернет: ${name}`)}
             onClose={() => setPanel(null)}
           />
         </div>

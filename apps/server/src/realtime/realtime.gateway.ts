@@ -22,6 +22,7 @@ import { PromosService } from "../promos/promos.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
 import { BarOrdersService } from "../products/bar-orders.service.js";
 import { ScreenService } from "../screen/screen.service.js";
+import { UplinksService } from "../uplinks/uplinks.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
 
 /** Комната кассовых экранов клуба. */
@@ -63,6 +64,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly barOrders: BarOrdersService,
     private readonly kaspi: KaspiService,
     private readonly screen: ScreenService,
+    private readonly uplinks: UplinksService,
   ) {}
 
   onModuleInit(): void {
@@ -258,6 +260,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     client.data.computerId = computer.id;
     client.data.clubId = computer.clubId;
     client.data.zoneId = computer.zoneId;
+    // Локальный IP машины в сети клуба — им роутер направляет её в выбранный
+    // интернет-канал. Приходит в рукопожатии; молча запоминаем, если есть.
+    const lanIp = (client.handshake.auth as { lanIp?: string }).lanIp;
+    if (lanIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(lanIp))
+      await this.prisma.computer
+        .updateMany({ where: { id: computer.id }, data: { lanIp } })
+        .catch(() => undefined);
     await client.join(agentRoom(computer.id));
     await client.join(clubAgentsRoom(computer.clubId));
     client.emit("paired", {
@@ -399,6 +408,39 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     return this.kaspi.options(computerId);
   }
 
+  /** Интернет-каналы для экрана ПК: что показать гостю и что выбрано сейчас. */
+  @SubscribeMessage("net.channels")
+  async netChannels(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { lanIp?: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId)
+      return {
+        enabled: false,
+        allowMidSession: true,
+        currentId: null,
+        channels: [],
+      };
+    return this.uplinks.channelsForComputer(computerId, body?.lanIp);
+  }
+
+  /** Гость выбрал интернет-канал на экране ПК. */
+  @SubscribeMessage("net.select")
+  async netSelect(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { channelId?: string; lanIp?: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    if (!body?.channelId) return { ok: false, reason: "Канал не выбран" };
+    return this.uplinks.selectForComputer(
+      computerId,
+      body.channelId,
+      body.lanIp,
+    );
+  }
+
   /** Карточка вошедшего гостя заново — после пополнения на экране блокировки. */
   @SubscribeMessage("guest.card")
   async guestCard(@ConnectedSocket() client: Socket) {
@@ -507,6 +549,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       );
       // Дальше гостя определяет сессия; после неё машина снова ничья.
       this.forgetLogin(client);
+      // Новая сессия начинается на канале по умолчанию. Не критично для игры:
+      // ошибку роутера глотаем, игра начинается в любом случае.
+      void this.uplinks
+        .applyChannelForSession(computerId, null)
+        .catch(() => undefined);
       return { ok: true, sessionId: session.id };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };
@@ -522,6 +569,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
     try {
       await this.agents.stopByGuest(computerId, body.sessionId);
+      // Машина освободилась — возвращаем её на канал по умолчанию.
+      void this.uplinks
+        .applyChannelForSession(computerId, null)
+        .catch(() => undefined);
       return { ok: true };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };

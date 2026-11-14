@@ -3,7 +3,12 @@ import { exec, spawn } from "node:child_process";
 import { join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
-import { machineMac, readSettings, writeSettings } from "./config.js";
+import {
+  machineLanIp,
+  machineMac,
+  readSettings,
+  writeSettings,
+} from "./config.js";
 import {
   applyGuard,
   applyLockdown,
@@ -154,6 +159,7 @@ ipcMain.handle("agent:config", () => {
     // В бездисковом зале имя и настройки у машин общие, поэтому себя они
     // называют MAC-адресом.
     macAddress: machineMac(),
+    lanIp: machineLanIp(),
     configured: isConfigured(settings),
     version: app.getVersion(),
   };

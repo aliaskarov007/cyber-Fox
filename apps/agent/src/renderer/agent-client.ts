@@ -10,6 +10,8 @@ export interface AgentConfig extends AgentSettings {
   hostname: string;
   /** MAC сетевой карты: им машина называет себя в бездисковом зале. */
   macAddress: string;
+  /** Локальный IPv4 машины — им роутер направляет её в интернет-канал. */
+  lanIp: string;
   /** Машину уже настроили: есть адрес сервера и способ себя назвать. */
   configured: boolean;
   /** Версия агента — видна в углу экрана блокировки. */
@@ -153,6 +155,17 @@ export interface Tick {
   accruedCost: number;
 }
 
+/** Интернет-каналы для экрана ПК. */
+export interface NetChannels {
+  /** Фича включена в клубе (есть роутер и минимум два канала). */
+  enabled: boolean;
+  /** Можно ли менять канал во время игры. */
+  allowMidSession: boolean;
+  /** Выбранный сейчас канал. */
+  currentId: string | null;
+  channels: Array<{ id: string; name: string; isDefault: boolean }>;
+}
+
 declare global {
   interface Window {
     cyberfox: {
@@ -182,6 +195,8 @@ declare global {
 export class AgentClient {
   private socket: Socket | null = null;
   private serverUrl = "";
+  /** Локальный IP машины — шлём серверу при выборе интернет-канала. */
+  private lanIp = "";
 
   async connect(handlers: {
     onPaired: (info: PairedInfo) => void;
@@ -203,6 +218,7 @@ export class AgentClient {
   }): Promise<void> {
     const config = await window.cyberfox.config();
     this.serverUrl = config.serverUrl;
+    this.lanIp = config.lanIp ?? "";
 
     this.socket = io(config.serverUrl, {
       auth: {
@@ -212,6 +228,7 @@ export class AgentClient {
         macAddress: config.macAddress,
         pairingToken: config.pairingToken || undefined,
         hostname: config.hostname,
+        lanIp: config.lanIp || undefined,
       },
       transports: ["websocket"],
       reconnection: true,
@@ -308,6 +325,16 @@ export class AgentClient {
   /** Какими способами можно пополнить счёт с этой машины. */
   topUpOptions(): Promise<{ kaspi: boolean; staticQr: boolean }> {
     return this.request("topup.options", {});
+  }
+
+  /** Интернет-каналы для этой машины: что показать гостю и что выбрано. */
+  netChannels(): Promise<NetChannels> {
+    return this.request("net.channels", { lanIp: this.lanIp });
+  }
+
+  /** Гость выбрал интернет-канал. */
+  netSelect(channelId: string): Promise<{ ok: boolean; reason?: string }> {
+    return this.request("net.select", { channelId, lanIp: this.lanIp });
   }
 
   /** Счёт Kaspi не состоялся: истёк, отменён или Kaspi отказал. */
