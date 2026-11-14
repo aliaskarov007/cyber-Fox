@@ -1,4 +1,11 @@
-import { IsInt, IsOptional, IsString, Matches, Min } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from "class-validator";
 
 export class StartSessionDto {
   @IsString()
@@ -17,6 +24,15 @@ export class StartSessionDto {
   @IsInt()
   @Min(1)
   prepaidAmount?: number;
+
+  /**
+   * Чем приняли предоплату за анонимную посадку: наличные, карта или Kaspi.
+   * От этого зависит, в нал или безнал попадёт сумма при сверке смены.
+   * Пусто — наличные.
+   */
+  @IsOptional()
+  @IsIn(["cash", "card", "kaspi"])
+  method?: "cash" | "card" | "kaspi";
 
   /**
    * Тариф, которым играть. Пусто — система сама возьмёт минуты пакета гостя

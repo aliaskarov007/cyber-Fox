@@ -644,6 +644,7 @@ export const api = {
       guestId?: string;
       tariffId?: string;
       prepaidAmount?: number;
+      method?: "cash" | "card" | "kaspi";
     },
   ) =>
     request<{ id: string }>(`/clubs/${clubId}/sessions`, {

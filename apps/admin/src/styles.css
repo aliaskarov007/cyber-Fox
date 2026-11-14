@@ -1469,6 +1469,27 @@ main {
   gap: 10px;
 }
 
+/* Сегментный переключатель (способ оплаты и т.п.). */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.seg button {
+  padding: 6px 14px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--ink-2);
+}
+.seg button.on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
 /* Список интернет-каналов клуба в настройках. */
 .channel-list {
   display: grid;

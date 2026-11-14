@@ -34,6 +34,8 @@ export function SeatPanel({
   const [busy, setBusy] = useState(false);
   /** Принятая вперёд сумма для посадки без аккаунта, в тенге. */
   const [prepaid, setPrepaid] = useState("1000");
+  /** Чем приняли предоплату: наличные, карта или Kaspi. */
+  const [method, setMethod] = useState<"cash" | "card" | "kaspi">("cash");
 
   const zoneId = cell.computer.zone.id;
   const zoneTariffs = tariffs.filter((t) => t.zoneId === zoneId && t.isActive);
@@ -42,7 +44,8 @@ export function SeatPanel({
 
   // Минуты гостя, действующие за этим ПК, и минуты, которые здесь не работают.
   const minutesHere = card?.packages.filter((p) => p.zoneId === zoneId) ?? [];
-  const minutesElsewhere = card?.packages.filter((p) => p.zoneId !== zoneId) ?? [];
+  const minutesElsewhere =
+    card?.packages.filter((p) => p.zoneId !== zoneId) ?? [];
 
   // Долг блокирует начало новой сессии и покупку пакета. Сервер откажет всё равно,
   // но узнать об этом до нажатия — экономия времени очереди у стойки.
@@ -126,7 +129,8 @@ export function SeatPanel({
             </div>
             {card.balance < 0 && (
               <div className="notice warn">
-                На счету долг. Сначала погасите его — новую сессию начать нельзя.
+                На счету долг. Сначала погасите его — новую сессию начать
+                нельзя.
               </div>
             )}
             {minutesHere.map((p) => (
@@ -138,7 +142,9 @@ export function SeatPanel({
             {minutesElsewhere.length > 0 && (
               <div className="notice">
                 Есть минуты в другой зоне — здесь они не действуют:{" "}
-                {minutesElsewhere.map((p) => `${p.minutesRemaining} мин`).join(", ")}
+                {minutesElsewhere
+                  .map((p) => `${p.minutesRemaining} мин`)
+                  .join(", ")}
               </div>
             )}
           </div>
@@ -154,14 +160,20 @@ export function SeatPanel({
                 key={tariff.id}
                 disabled={busy || inDebt}
                 onClick={() =>
-                  void run(() => api.buyPackage(club.id, card.guest.id, tariff.id, "CASH"))
+                  void run(() =>
+                    api.buyPackage(club.id, card.guest.id, tariff.id, "CASH"),
+                  )
                 }
               >
                 {tariff.name} · {formatMoney(tariff.packagePrice ?? 0)}
               </button>
             ))}
           </div>
-          <TopUp club={club} guestId={card.guest.id} onDone={() => void pick(card.guest)} />
+          <TopUp
+            club={club}
+            guestId={card.guest.id}
+            onDone={() => void pick(card.guest)}
+          />
         </div>
       )}
 
@@ -174,7 +186,10 @@ export function SeatPanel({
             disabled={!canStart}
             onClick={() =>
               void run(() =>
-                api.startSession(club.id, { computerId: cell.computer.id, guestId: selected!.id }),
+                api.startSession(club.id, {
+                  computerId: cell.computer.id,
+                  guestId: selected!.id,
+                }),
               )
             }
           >
@@ -206,6 +221,23 @@ export function SeatPanel({
         */}
         <div className="section" style={{ borderTop: "none", paddingTop: 0 }}>
           <h3>Без аккаунта</h3>
+          <div className="seg" role="group" aria-label="Способ оплаты">
+            {(
+              [
+                ["cash", "Наличные"],
+                ["card", "Карта"],
+                ["kaspi", "Kaspi"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                className={method === value ? "on" : ""}
+                onClick={() => setMethod(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="actions">
             <input
               style={{ width: 120 }}
@@ -222,6 +254,7 @@ export function SeatPanel({
                     computerId: cell.computer.id,
                     tariffId: perMinute[0]?.id,
                     prepaidAmount: toTiyn(prepaid),
+                    method,
                   }),
                 )
               }
@@ -231,7 +264,8 @@ export function SeatPanel({
           </div>
           {perMinute[0]?.pricePerMinute ? (
             <div className="note">
-              Хватит примерно на {Math.floor(toTiyn(prepaid || "0") / perMinute[0].pricePerMinute)}{" "}
+              Хватит примерно на{" "}
+              {Math.floor(toTiyn(prepaid || "0") / perMinute[0].pricePerMinute)}{" "}
               мин по тарифу {formatMoney(perMinute[0].pricePerMinute)}/мин.
             </div>
           ) : null}
@@ -268,7 +302,12 @@ function TopUp({
           setBusy(true);
           try {
             // На стойке вводят тенге, сервер считает в тиын.
-            await api.topUp(club.id, guestId, Math.round(Number(amount) * 100), "CASH");
+            await api.topUp(
+              club.id,
+              guestId,
+              Math.round(Number(amount) * 100),
+              "CASH",
+            );
             onDone();
           } finally {
             setBusy(false);

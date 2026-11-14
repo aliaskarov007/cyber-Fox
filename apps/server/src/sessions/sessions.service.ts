@@ -60,6 +60,14 @@ const AGENT_GRACE_MS = 95_000;
  */
 const AGENT_LOST_MS = 30 * 60_000;
 
+/** Способ приёма предоплаты за анонимную посадку → способ платежа смены. */
+const PREPAID_METHOD: Record<"cash" | "card" | "kaspi", PaymentMethod> = {
+  cash: PaymentMethod.CASH,
+  card: PaymentMethod.CARD,
+  // Kaspi — это онлайн-перевод, в сверке смены идёт в безнал.
+  kaspi: PaymentMethod.ONLINE,
+};
+
 @Injectable()
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
@@ -87,6 +95,7 @@ export class SessionsService {
       tariffId: dto.tariffId ?? null,
       startedBy: SessionStartedBy.STAFF,
       prepaidAmount: dto.prepaidAmount ?? null,
+      prepaidMethod: dto.method ?? "cash",
     });
   }
 
@@ -103,6 +112,8 @@ export class SessionsService {
     startedBy: SessionStartedBy;
     /** Предоплата для анонимной посадки, в тиын. */
     prepaidAmount?: number | null;
+    /** Чем приняли предоплату: наличные (по умолчанию), карта или Kaspi. */
+    prepaidMethod?: "cash" | "card" | "kaspi";
   }): Promise<Session> {
     const club = await this.prisma.club.findUniqueOrThrow({
       where: { id: params.clubId },
@@ -253,7 +264,8 @@ export class SessionsService {
         },
       });
 
-      // Принятые вперёд наличные попадают в кассу смены — иначе сверка не сойдётся.
+      // Принятые вперёд деньги попадают в смену — иначе сверка не сойдётся.
+      // Способ влияет лишь на то, в нал или безнал они лягут при закрытии.
       if (!params.guestId && params.prepaidAmount) {
         const shift = await tx.shift.findFirst({
           where: { clubId: params.clubId, closedAt: null },
@@ -265,7 +277,7 @@ export class SessionsService {
             sessionId: created.id,
             shiftId: shift?.id ?? null,
             amount: params.prepaidAmount,
-            method: PaymentMethod.CASH,
+            method: PREPAID_METHOD[params.prepaidMethod ?? "cash"],
           },
         });
       }
