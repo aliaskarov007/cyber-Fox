@@ -1469,6 +1469,41 @@ main {
   gap: 10px;
 }
 
+/* Отправка сообщения на экран ПК. */
+.pc-message-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pc-message-box input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.pc-message-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+.hall-broadcast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.hall-broadcast-label {
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.hall-broadcast .pc-message-box {
+  flex: 1 1 240px;
+}
+
 /* Сегментный переключатель (способ оплаты и т.п.). */
 .seg {
   display: inline-flex;

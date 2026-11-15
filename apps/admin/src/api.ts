@@ -657,6 +657,16 @@ export const api = {
       method: "POST",
     }),
 
+  /** Сообщение на экран ПК. computerId пусто — всем машинам клуба. */
+  sendPcMessage: (
+    clubId: string,
+    body: { computerId?: string; text: string },
+  ) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/pc-message`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   pauseSession: (clubId: string, sessionId: string) =>
     request<unknown>(`/clubs/${clubId}/sessions/${sessionId}/pause`, {
       method: "POST",

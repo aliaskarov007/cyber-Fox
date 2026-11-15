@@ -100,6 +100,15 @@ export interface RealtimeEvents {
     guestId: string;
     amount: number;
   };
+  /*
+   * Сообщение от кассира/админа на экран ПК — всплывашкой сверху.
+   * computerId пусто — всем машинам клуба (broadcast).
+   */
+  "pc.message": {
+    clubId: string;
+    computerId: string | null;
+    text: string;
+  };
 }
 
 @Injectable()

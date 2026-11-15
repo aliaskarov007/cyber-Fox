@@ -1,6 +1,13 @@
 import { useState } from "react";
 
-import { type Club, type HallCell, api, formatDuration, formatMoney } from "./api.js";
+import {
+  type Club,
+  type HallCell,
+  api,
+  formatDuration,
+  formatMoney,
+} from "./api.js";
+import { PcMessageBox } from "./PcMessageBox.js";
 
 /** Управление идущей сессией: продлить нельзя молча — всё пишется в отрезки. */
 export function SessionPanel({
@@ -38,7 +45,11 @@ export function SessionPanel({
       <div className="drawer-head">
         <h2>{cell.computer.name}</h2>
         <span className={`chip ${session.onCredit ? "credit" : "in-use"}`}>
-          {session.status === "PAUSED" ? "пауза" : session.onCredit ? "в долг" : "играет"}
+          {session.status === "PAUSED"
+            ? "пауза"
+            : session.onCredit
+              ? "в долг"
+              : "играет"}
         </span>
       </div>
 
@@ -47,7 +58,8 @@ export function SessionPanel({
       {session.onCredit && (
         <div className="notice warn">
           Баланс исчерпан, гость играет в долг. Осталось{" "}
-          {formatMoney(session.creditLeft ?? 0)} — подойдите и предложите пополнение.
+          {formatMoney(session.creditLeft ?? 0)} — подойдите и предложите
+          пополнение.
         </div>
       )}
 
@@ -64,7 +76,9 @@ export function SessionPanel({
           </div>
           <div className="row">
             <span className="k">Режим</span>
-            <span>{session.mode === "PACKAGE" ? "Минуты пакета" : "Поминутно"}</span>
+            <span>
+              {session.mode === "PACKAGE" ? "Минуты пакета" : "Поминутно"}
+            </span>
           </div>
           {session.packageMinutesLeft !== null && (
             <div className="row">
@@ -78,19 +92,22 @@ export function SessionPanel({
               <span>{formatMoney(session.balance)}</span>
             </div>
           )}
-          {session.minutesAffordable !== null && session.mode === "PER_MINUTE" && (
-            <div className="row">
-              <span className="k">Хватит на</span>
-              <span>{session.minutesAffordable} мин</span>
-            </div>
-          )}
+          {session.minutesAffordable !== null &&
+            session.mode === "PER_MINUTE" && (
+              <div className="row">
+                <span className="k">Хватит на</span>
+                <span>{session.minutesAffordable} мин</span>
+              </div>
+            )}
           <div className="row">
             <span className="k">Начислено</span>
             <span>{formatMoney(session.totalCharged)}</span>
           </div>
           <div className="row">
             <span className="k">Открыл</span>
-            <span>{session.startedBy === "GUEST" ? "Гость сам" : "Администратор"}</span>
+            <span>
+              {session.startedBy === "GUEST" ? "Гость сам" : "Администратор"}
+            </span>
           </div>
         </div>
       </div>
@@ -99,13 +116,20 @@ export function SessionPanel({
         <h3>Действия</h3>
         <div className="actions">
           {session.status === "ACTIVE" ? (
-            <button disabled={busy} onClick={() => void run(() => api.pauseSession(club.id, session.id))}>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(() => api.pauseSession(club.id, session.id))
+              }
+            >
               Пауза
             </button>
           ) : (
             <button
               disabled={busy}
-              onClick={() => void run(() => api.resumeSession(club.id, session.id))}
+              onClick={() =>
+                void run(() => api.resumeSession(club.id, session.id))
+              }
             >
               Продолжить
             </button>
@@ -129,16 +153,29 @@ export function SessionPanel({
           {freeComputers.map((target) => (
             <option key={target.computer.id} value={target.computer.id}>
               {target.computer.name} · {target.computer.zone.name}
-              {target.computer.zone.id !== cell.computer.zone.id ? " (другая зона)" : ""}
+              {target.computer.zone.id !== cell.computer.zone.id
+                ? " (другая зона)"
+                : ""}
             </option>
           ))}
         </select>
         <button
           disabled={busy || !moveTo}
-          onClick={() => void run(() => api.moveSession(club.id, session.id, moveTo))}
+          onClick={() =>
+            void run(() => api.moveSession(club.id, session.id, moveTo))
+          }
         >
           Пересадить
         </button>
+      </div>
+
+      <div className="section">
+        <h3>Сообщение на экран</h3>
+        <PcMessageBox
+          clubId={club.id}
+          computerId={cell.computer.id}
+          placeholder="Текст гостю на этот ПК…"
+        />
       </div>
     </>
   );

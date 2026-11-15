@@ -10,6 +10,7 @@ import {
   formatMoney,
   toTiyn,
 } from "./api.js";
+import { PcMessageBox } from "./PcMessageBox.js";
 
 /**
  * Посадка гостя. Порядок полей повторяет порядок действий на стойке:
@@ -269,6 +270,15 @@ export function SeatPanel({
               мин по тарифу {formatMoney(perMinute[0].pricePerMinute)}/мин.
             </div>
           ) : null}
+        </div>
+
+        <div className="section">
+          <h3>Сообщение на экран</h3>
+          <PcMessageBox
+            clubId={club.id}
+            computerId={cell.computer.id}
+            placeholder="Текст гостю на этот ПК…"
+          />
         </div>
       </div>
     </>

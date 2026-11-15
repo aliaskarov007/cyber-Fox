@@ -362,6 +362,14 @@ export class AgentClient {
     };
   }
 
+  /** Сообщение от кассира/админа — показываем всплывашкой сверху. */
+  onPcMessage(listener: (event: { text: string }) => void): () => void {
+    this.socket?.on("pc.message", listener);
+    return () => {
+      this.socket?.off("pc.message", listener);
+    };
+  }
+
   /** Заказ из бара отнесли или отменили. */
   onBarOrderUpdated(
     listener: (event: { orderId: string; status: "DONE" | "CANCELED" }) => void,

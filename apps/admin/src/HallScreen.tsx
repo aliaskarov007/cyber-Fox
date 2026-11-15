@@ -19,6 +19,7 @@ import {
   api,
   formatMoney,
 } from "./api.js";
+import { PcMessageBox } from "./PcMessageBox.js";
 import { SeatPanel } from "./SeatPanel.js";
 import { SessionPanel } from "./SessionPanel.js";
 import { SeatRequests } from "./SeatRequests.js";
@@ -590,6 +591,14 @@ export function HallScreen({
 
       {loaded && hall.length === 0 && objects.length === 0 && (
         <FirstSteps onGoTo={onGoTo} />
+      )}
+
+      {/* Сообщение всем машинам клуба — доступно и кассиру. */}
+      {hall.length > 0 && (
+        <div className="hall-broadcast">
+          <span className="hall-broadcast-label">Сообщение всем ПК:</span>
+          <PcMessageBox clubId={club.id} placeholder="Текст всем игрокам…" />
+        </div>
       )}
 
       {/* Правка плана — только владельцу и управляющему. */}

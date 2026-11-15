@@ -92,6 +92,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     this.bus.on("staff.called", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("staff.called", e);
     });
+    // Сообщение кассира/админа: на один ПК или всем машинам клуба.
+    this.bus.on("pc.message", (e) => {
+      const room = e.computerId
+        ? agentRoom(e.computerId)
+        : clubAgentsRoom(e.clubId);
+      this.server.to(room).emit("pc.message", { text: e.text });
+    });
     /*
      * Каталог изменился — машинам уходит только сигнал. Список они забирают
      * сами: у зон он разный, и рассылать всем всё значило бы слать VIP-полку

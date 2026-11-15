@@ -138,6 +138,8 @@ export function App() {
   const [localMinutes, setLocalMinutes] = useState<number | null>(null);
   /** Название, слоган и карусель экрана блокировки. */
   const [screen, setScreen] = useState<GuestScreen | null>(null);
+  /** Всплывающие сообщения от кассира/админа — сверху, сами исчезают. */
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const started = useRef(false);
   const journal = useRef<JournalState>(emptyJournal());
 
@@ -301,6 +303,36 @@ export function App() {
     return () => clearInterval(timer);
   }, [online, tick]);
 
+  /*
+   * Сообщения от кассира/админа. Подписываемся, когда появилась связь (к этому
+   * моменту сокет поднят). Каждое висит несколько секунд и уходит само.
+   */
+  useEffect(() => {
+    if (!online) return;
+    return client.onPcMessage(({ text }) => {
+      const id = Date.now() + Math.random();
+      setToasts((list) => [...list, { id, text }]);
+      setTimeout(
+        () => setToasts((list) => list.filter((t) => t.id !== id)),
+        12_000,
+      );
+    });
+  }, [client, online]);
+
+  const pcToasts = toasts.length > 0 && (
+    <div className="pc-toasts">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="pc-toast"
+          onClick={() => setToasts((list) => list.filter((x) => x.id !== t.id))}
+        >
+          {t.text}
+        </div>
+      ))}
+    </div>
+  );
+
   const displayTick: Tick | null =
     tick && localMinutes !== null
       ? {
@@ -373,6 +405,7 @@ export function App() {
   if (displayTick) {
     return (
       <div className="playing">
+        {pcToasts}
         <SessionBar
           client={client}
           tick={displayTick}
@@ -428,6 +461,7 @@ export function App() {
 
   return (
     <div className="lock-layout">
+      {pcToasts}
       {/* Секретный выход в сервисный режим по паролю клуба (Ctrl+Alt+Shift+S). */}
       <ServiceExit client={client} />
       <BrandPanel

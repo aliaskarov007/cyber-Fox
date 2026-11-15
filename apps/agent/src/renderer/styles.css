@@ -633,6 +633,45 @@ button:disabled {
   border-radius: 12px;
 }
 
+/* --- Сообщения от кассира/админа (всплывашки сверху) --- */
+
+.pc-toasts {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(680px, 92vw);
+  pointer-events: none;
+}
+.pc-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  animation: pc-toast-in 0.22s ease-out;
+}
+@keyframes pc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* --- Выбор интернет-провайдера --- */
 
 .net-panel {
