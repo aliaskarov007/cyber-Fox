@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import {
   InvoiceStatus,
@@ -30,7 +35,9 @@ export class SubscriptionService {
 
   /** Подписка сети. Создаётся при регистрации, но старые сети могли её не иметь. */
   async forTenant(tenantId: string): Promise<Subscription> {
-    const existing = await this.prisma.subscription.findUnique({ where: { tenantId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { tenantId },
+    });
     if (existing) return existing;
 
     return this.prisma.subscription.create({
@@ -47,6 +54,11 @@ export class SubscriptionService {
   async access(tenantId: string): Promise<AccessDecision> {
     const subscription = await this.forTenant(tenantId);
     return evaluateAccess(subscription, new Date());
+  }
+
+  /** Сколько машин подключено во всей сети — для «занято из лимита». */
+  async computerCount(tenantId: string): Promise<number> {
+    return this.prisma.computer.count({ where: { club: { tenantId } } });
   }
 
   /**
@@ -69,25 +81,33 @@ export class SubscriptionService {
     });
 
     const verdict = canAddComputer(subscription, computers);
-    if (!verdict.allowed) throw new BadRequestException(verdict.message ?? "Лимит машин исчерпан");
+    if (!verdict.allowed)
+      throw new BadRequestException(verdict.message ?? "Лимит машин исчерпан");
   }
 
   /** Смена тарифа владельцем. */
-  async changePlan(staff: AuthenticatedStaff, plan: SubscriptionPlan): Promise<Subscription> {
+  async changePlan(
+    staff: AuthenticatedStaff,
+    plan: SubscriptionPlan,
+  ): Promise<Subscription> {
     const definition = PLANS[plan];
     if (!definition) throw new BadRequestException("Неизвестный тариф");
     if (plan === SubscriptionPlan.TRIAL) {
       throw new BadRequestException("Вернуться на пробный период нельзя");
     }
 
-    const clubs = await this.prisma.club.count({ where: { tenantId: staff.tenantId } });
+    const clubs = await this.prisma.club.count({
+      where: { tenantId: staff.tenantId },
+    });
     if (!definition.multiClub && clubs > 1) {
       throw new BadRequestException(
         `Тариф «${definition.title}» рассчитан на один зал, а у вас ${clubs}. Выберите тариф для сети.`,
       );
     }
 
-    const computers = await this.prisma.computer.count({ where: { club: { tenantId: staff.tenantId } } });
+    const computers = await this.prisma.computer.count({
+      where: { club: { tenantId: staff.tenantId } },
+    });
     if (computers > definition.maxComputers) {
       throw new BadRequestException(
         `На тарифе «${definition.title}» доступно ${definition.maxComputers} машин, а подключено ${computers}.`,
@@ -140,7 +160,8 @@ export class SubscriptionService {
       data: {
         tenantId,
         periodStart: new Date(),
-        periodEnd: subscription.currentPeriodEnd ?? new Date(Date.now() + 30 * DAY_MS),
+        periodEnd:
+          subscription.currentPeriodEnd ?? new Date(Date.now() + 30 * DAY_MS),
         computers,
         amount,
         dueAt: new Date(Date.now() + 7 * DAY_MS),
@@ -156,7 +177,11 @@ export class SubscriptionService {
   async refreshSubscriptions(): Promise<void> {
     const now = new Date();
     const subscriptions = await this.prisma.subscription.findMany({
-      where: { status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE] } },
+      where: {
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
+        },
+      },
     });
 
     for (const subscription of subscriptions) {
@@ -169,7 +194,11 @@ export class SubscriptionService {
           const computers = await this.prisma.computer.count({
             where: { club: { tenantId: subscription.tenantId } },
           });
-          await this.issueInvoice(subscription.tenantId, subscription, computers);
+          await this.issueInvoice(
+            subscription.tenantId,
+            subscription,
+            computers,
+          );
           await this.prisma.subscription.update({
             where: { id: subscription.id },
             data: {
@@ -177,7 +206,9 @@ export class SubscriptionService {
               graceEndsAt: new Date(now.getTime() + GRACE_DAYS * DAY_MS),
             },
           });
-          this.logger.log(`Сеть ${subscription.tenantId}: выставлен счёт, начался льготный период`);
+          this.logger.log(
+            `Сеть ${subscription.tenantId}: выставлен счёт, начался льготный период`,
+          );
           continue;
         }
 
@@ -191,13 +222,21 @@ export class SubscriptionService {
             data: { status: SubscriptionStatus.SUSPENDED },
           });
           await this.prisma.invoice.updateMany({
-            where: { tenantId: subscription.tenantId, status: InvoiceStatus.ISSUED },
+            where: {
+              tenantId: subscription.tenantId,
+              status: InvoiceStatus.ISSUED,
+            },
             data: { status: InvoiceStatus.OVERDUE },
           });
-          this.logger.warn(`Сеть ${subscription.tenantId}: льготный период кончился`);
+          this.logger.warn(
+            `Сеть ${subscription.tenantId}: льготный период кончился`,
+          );
         }
       } catch (error) {
-        this.logger.error(`Не удалось обновить подписку ${subscription.id}`, error as Error);
+        this.logger.error(
+          `Не удалось обновить подписку ${subscription.id}`,
+          error as Error,
+        );
       }
     }
   }

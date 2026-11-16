@@ -1191,6 +1191,8 @@ export interface SubscriptionInfo {
     message: string | null;
     daysLeft: number | null;
   };
+  /** Машин подключено во всей сети — для «занято из лимита». */
+  computers: number;
   plans: PlanDefinition[];
 }
 

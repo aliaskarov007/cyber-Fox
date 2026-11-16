@@ -20,11 +20,12 @@ export class SubscriptionController {
   /** Состояние подписки и что доступно прямо сейчас. */
   @Get()
   async current(@CurrentStaff() staff: AuthenticatedStaff) {
-    const [subscription, access] = await Promise.all([
+    const [subscription, access, computers] = await Promise.all([
       this.subscriptions.forTenant(staff.tenantId),
       this.subscriptions.access(staff.tenantId),
+      this.subscriptions.computerCount(staff.tenantId),
     ]);
-    return { subscription, access, plans: Object.values(PLANS) };
+    return { subscription, access, computers, plans: Object.values(PLANS) };
   }
 
   @Get("invoices")
@@ -34,7 +35,10 @@ export class SubscriptionController {
 
   @Roles(StaffRole.OWNER)
   @Post("plan")
-  changePlan(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: ChangePlanDto) {
+  changePlan(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Body() dto: ChangePlanDto,
+  ) {
     return this.subscriptions.changePlan(staff, dto.plan);
   }
 }

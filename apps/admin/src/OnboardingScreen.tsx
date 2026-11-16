@@ -21,6 +21,24 @@ const PLAN_STATUS: Record<string, string> = {
   CANCELED: "отменён",
 };
 
+/** Дата, до которой действует текущий статус (DD.MM) — для подписи «до …». */
+function periodEndLabel(info: SubscriptionInfo): string | null {
+  const s = info.subscription;
+  const iso =
+    s.status === "TRIALING"
+      ? s.trialEndsAt
+      : s.status === "PAST_DUE"
+        ? s.graceEndsAt
+        : s.status === "ACTIVE"
+          ? s.currentPeriodEnd
+          : null;
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
 /**
  * Подключение и переезд: то, чем чужой владелец занимается в первый день.
  *
@@ -28,8 +46,16 @@ const PLAN_STATUS: Record<string, string> = {
  * и выбор тарифа собраны на одном экране — это последовательность одного дня,
  * а не четыре разных задачи.
  */
-export function OnboardingScreen({ club, isOwner }: { club: Club; isOwner: boolean }) {
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+export function OnboardingScreen({
+  club,
+  isOwner,
+}: {
+  club: Club;
+  isOwner: boolean;
+}) {
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(
+    null,
+  );
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [computers, setComputers] = useState<Computer[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -74,13 +100,14 @@ export function OnboardingScreen({ club, isOwner }: { club: Club; isOwner: boole
         </div>
 
         <div className="notice">
-          На каждой игровой машине установите агента и укажите её код привязки. Код одноразово
-          связывает программу с конкретным ПК — вводить его повторно не нужно.
+          На каждой игровой машине установите агента и укажите её код привязки.
+          Код одноразово связывает программу с конкретным ПК — вводить его
+          повторно не нужно.
         </div>
 
         {/* Сначала где взять программу, потом чем её настроить. */}
-      <AgentDownload />
-      {isOwner && <DisklessKey club={club} />}
+        <AgentDownload />
+        {isOwner && <DisklessKey club={club} />}
 
         <div className="table-wrap">
           <table>
@@ -108,7 +135,8 @@ export function OnboardingScreen({ club, isOwner }: { club: Club; isOwner: boole
               {computers.length === 0 && (
                 <tr>
                   <td colSpan={3} style={{ color: "var(--muted)" }}>
-                    Машин пока нет — заведите их вручную или загрузите списком ниже
+                    Машин пока нет — заведите их вручную или загрузите списком
+                    ниже
                   </td>
                 </tr>
               )}
@@ -154,17 +182,47 @@ function SubscriptionBlock({
     <section className="zone-block">
       <div className="zone-head">
         <h2>Подписка</h2>
-        <span className={`chip ${info.access.level === "FULL" ? "in-use" : info.access.level === "WARNING" ? "credit" : "maintenance"}`}>
+        <span
+          className={`chip ${info.access.level === "FULL" ? "in-use" : info.access.level === "WARNING" ? "credit" : "maintenance"}`}
+        >
           {PLAN_STATUS[info.subscription.status] ?? info.subscription.status}
         </span>
       </div>
 
       {/* Предупреждение показываем заранее: платёж не должен догонять смену. */}
       {info.access.message && (
-        <div className={info.access.level === "READ_ONLY" ? "error" : "notice warn"}>
+        <div
+          className={
+            info.access.level === "READ_ONLY" ? "error" : "notice warn"
+          }
+        >
           {info.access.message}
         </div>
       )}
+
+      {/* Главное наглядно: сколько осталось и сколько машин из лимита. */}
+      <div className="summary">
+        <div className="stat">
+          <div className="value">
+            {info.access.daysLeft === null
+              ? "—"
+              : info.access.daysLeft === 0
+                ? "0 дней"
+                : `${info.access.daysLeft} дн.`}
+          </div>
+          <div className="label">
+            Осталось ·{" "}
+            {PLAN_STATUS[info.subscription.status] ?? info.subscription.status}
+            {periodEndLabel(info) ? ` · до ${periodEndLabel(info)}` : ""}
+          </div>
+        </div>
+        <div className="stat">
+          <div className="value">
+            {info.computers} из {info.subscription.maxComputers}
+          </div>
+          <div className="label">Машин в сети подключено</div>
+        </div>
+      </div>
 
       <div className="summary">
         {info.plans.map((plan) => {
@@ -172,7 +230,9 @@ function SubscriptionBlock({
           return (
             <div className={`stat ${current ? "alert" : ""}`} key={plan.plan}>
               <div className="value">
-                {plan.pricePerComputer === 0 ? "0 ₸" : formatMoney(plan.pricePerComputer)}
+                {plan.pricePerComputer === 0
+                  ? "0 ₸"
+                  : formatMoney(plan.pricePerComputer)}
               </div>
               <div className="label">
                 {plan.title} · до {plan.maxComputers} машин
@@ -196,12 +256,16 @@ function SubscriptionBlock({
         <div className="notice">
           {checkout.url ? (
             <>
-              Счёт на {formatMoney(checkout.amount)}: откройте ссылку и оплатите картой. Подписка
-              продлится сама, как только банк подтвердит платёж — отмечать вручную не нужно.
+              Счёт на {formatMoney(checkout.amount)}: откройте ссылку и оплатите
+              картой. Подписка продлится сама, как только банк подтвердит платёж
+              — отмечать вручную не нужно.
               <div className="checkout-link">{checkout.url}</div>
             </>
           ) : (
-            <>Оплата картой пока не подключена — напишите нам, выставим счёт на компанию.</>
+            <>
+              Оплата картой пока не подключена — напишите нам, выставим счёт на
+              компанию.
+            </>
           )}
           <div className="actions" style={{ marginTop: 8 }}>
             <button onClick={() => setCheckout(null)}>Скрыть</button>
@@ -225,8 +289,8 @@ function SubscriptionBlock({
               {invoices.map((invoice) => (
                 <tr key={invoice.id}>
                   <td className="num">
-                    {new Date(invoice.periodStart).toLocaleDateString("ru-KZ")} —{" "}
-                    {new Date(invoice.periodEnd).toLocaleDateString("ru-KZ")}
+                    {new Date(invoice.periodStart).toLocaleDateString("ru-KZ")}{" "}
+                    — {new Date(invoice.periodEnd).toLocaleDateString("ru-KZ")}
                   </td>
                   <td className="num">{invoice.computers}</td>
                   <td className="num">{formatMoney(invoice.amount)}</td>
@@ -243,7 +307,11 @@ function SubscriptionBlock({
                         <button
                           className="primary"
                           disabled={busy}
-                          onClick={() => void run(async () => setCheckout(await api.payInvoice(invoice.id)))}
+                          onClick={() =>
+                            void run(async () =>
+                              setCheckout(await api.payInvoice(invoice.id)),
+                            )
+                          }
                         >
                           Оплатить
                         </button>
@@ -270,7 +338,9 @@ function SubscriptionBlock({
  */
 /** Отдаёт содержимое файлом, не заставляя человека сохранять текст руками. */
 function downloadJson(content: string): void {
-  const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+  const url = URL.createObjectURL(
+    new Blob([content], { type: "application/json" }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = "cyberfox.json";
@@ -292,9 +362,9 @@ function DisklessKey({ club }: { club: Club }) {
     <div className="notice">
       <b>Зал на бездисковой загрузке (CCBoot и подобные)</b>
       <div className="note" style={{ marginTop: 6 }}>
-        Коды привязки здесь не нужны: положите файл <code>cyberfox.json</code> рядом с агентом в
-        общий образ, и машины подключатся сами, различаясь по MAC сетевой карты. Новая машина
-        появится в зале при первой загрузке.
+        Коды привязки здесь не нужны: положите файл <code>cyberfox.json</code>{" "}
+        рядом с агентом в общий образ, и машины подключатся сами, различаясь по
+        MAC сетевой карты. Новая машина появится в зале при первой загрузке.
       </div>
 
       <div className="actions" style={{ marginTop: 8 }}>
@@ -303,17 +373,29 @@ function DisklessKey({ club }: { club: Club }) {
          * «выделить мышкой» до «сохранить как cyberfox.json» — это лишний шаг,
          * на котором теряют кавычки и получают файл с расширением .txt.
          */}
-        <button className="primary" type="button" onClick={() => downloadJson(file)}>
+        <button
+          className="primary"
+          type="button"
+          onClick={() => downloadJson(file)}
+        >
           Скачать cyberfox.json
         </button>
-        {!shown && <button onClick={() => setShown(true)}>Показать содержимое</button>}
+        {!shown && (
+          <button onClick={() => setShown(true)}>Показать содержимое</button>
+        )}
       </div>
 
       {shown && (
         <>
-          <div className="checkout-link" style={{ marginTop: 8, whiteSpace: "pre" }}>{file}</div>
+          <div
+            className="checkout-link"
+            style={{ marginTop: 8, whiteSpace: "pre" }}
+          >
+            {file}
+          </div>
           <div className="note" style={{ marginTop: 6 }}>
-            Ключ пускает машину в этот клуб — держите образ там, куда нет доступа у гостей.
+            Ключ пускает машину в этот клуб — держите образ там, куда нет
+            доступа у гостей.
           </div>
         </>
       )}
@@ -340,7 +422,8 @@ const IMPORT_KINDS = [
 ];
 
 function ImportBlock({ club, onDone }: { club: Club; onDone: () => void }) {
-  const [kind, setKind] = useState<(typeof IMPORT_KINDS)[number]["kind"]>("guests");
+  const [kind, setKind] =
+    useState<(typeof IMPORT_KINDS)[number]["kind"]>("guests");
   const [csv, setCsv] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -355,8 +438,9 @@ function ImportBlock({ club, onDone }: { club: Club; onDone: () => void }) {
       </div>
 
       <div className="notice">
-        Выгрузите данные из Senet, SmartShell или Excel и вставьте содержимое файла сюда. Загружать
-        можно повторно: строки сопоставляются по телефону и названию, дубли не появятся.
+        Выгрузите данные из Senet, SmartShell или Excel и вставьте содержимое
+        файла сюда. Загружать можно повторно: строки сопоставляются по телефону
+        и названию, дубли не появятся.
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -412,7 +496,8 @@ function ImportBlock({ club, onDone }: { club: Club; onDone: () => void }) {
       {result && (
         <>
           <div className="notice">
-            Создано {result.created}, обновлено {result.updated}, пропущено {result.skipped}.
+            Создано {result.created}, обновлено {result.updated}, пропущено{" "}
+            {result.skipped}.
           </div>
           {/* Пропущенные строки показываем поимённо: иначе владелец не узнает,
               кого из гостей потерял при переезде. */}
