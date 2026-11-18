@@ -157,11 +157,19 @@ export function LockScreen({
         )}
 
         {minutes ? (
-          <button className="primary" disabled={busy || !card.ok} onClick={() => void start()}>
+          <button
+            className="primary"
+            disabled={busy || !card.ok}
+            onClick={() => void start()}
+          >
             Играть на минутах пакета ({minutes.minutesRemaining} мин)
           </button>
         ) : (
-          <button className="primary" disabled={busy || !card.ok} onClick={() => void start()}>
+          <button
+            className="primary"
+            disabled={busy || !card.ok}
+            onClick={() => void start()}
+          >
             Начать по поминутному тарифу
           </button>
         )}
@@ -174,7 +182,12 @@ export function LockScreen({
             onClose={() => setTopUpOpen(false)}
           />
         ) : (
-          <button className="ghost" type="button" disabled={!online} onClick={() => setTopUpOpen(true)}>
+          <button
+            className="ghost"
+            type="button"
+            disabled={!online}
+            onClick={() => setTopUpOpen(true)}
+          >
             Пополнить счёт по QR
           </button>
         )}
@@ -216,8 +229,8 @@ export function LockScreen({
           вместо того чтобы принимать ввод и молча отказывать. */}
       {!online && (
         <div className="banner warn">
-          Нет связи с сервером — самостоятельный вход временно недоступен. Подойдите к
-          администратору.
+          Нет связи с сервером — самостоятельный вход временно недоступен.
+          Подойдите к администратору.
         </div>
       )}
 
@@ -244,17 +257,43 @@ export function LockScreen({
         />
       </label>
 
-      <button className="primary" type="submit" disabled={busy || pin.length !== 4}>
+      <button
+        className="primary"
+        type="submit"
+        disabled={busy || pin.length !== 4}
+      >
         {busy ? "Проверяем…" : "Войти"}
       </button>
 
       {/* Новый гость регистрируется сам: QR → сообщение в WhatsApp клуба → ник и PIN. */}
-      <button className="ghost" type="button" disabled={!online} onClick={() => setSigningUp(true)}>
+      <button
+        className="ghost"
+        type="button"
+        disabled={!online}
+        onClick={() => setSigningUp(true)}
+      >
         Я здесь впервые — регистрация
       </button>
 
+      {/*
+       * Забыл PIN — тот же путь: подтвердив номер в WhatsApp, гость задаёт новый
+       * PIN (сервер узнаёт существующий аккаунт и покажет «С возвращением»).
+       * Отдельная кнопка нужна, потому что вернувшийся гость не нажмёт
+       * «Я здесь впервые».
+       */}
+      <button
+        className="ghost"
+        type="button"
+        disabled={!online}
+        onClick={() => setSigningUp(true)}
+      >
+        Забыли PIN? Получить новый по WhatsApp
+      </button>
+
       {perMinutePrice !== null && (
-        <div className="note">Поминутный тариф этой зоны — {formatMoney(perMinutePrice)}/мин.</div>
+        <div className="note">
+          Поминутный тариф этой зоны — {formatMoney(perMinutePrice)}/мин.
+        </div>
       )}
 
       <button
