@@ -10,9 +10,11 @@ import {
   maskGuestName,
   parseAllowedIps,
   parseBin,
+  parsePayLink,
   parseSum,
   parseTxnDate,
   parseTxnId,
+  payLinkFor,
   withBin,
 } from "./kaspi-provider.rules.js";
 
@@ -95,5 +97,24 @@ describe("протокол провайдера Kaspi", () => {
     const withIt = withBin(reply, "123456789012");
     expect(withIt).toEqual({ txn_id: "1234567", bin: "123456789012", result: 0, comment: "" });
     expect(Object.keys(withIt).slice(0, 2)).toEqual(["txn_id", "bin"]);
+  });
+
+  it("ссылка Kaspi хранится без значения поля", () => {
+    const sent =
+      "https://kaspi.kz/pay/CYBERFOX?21895=%D0%9D%D0%BE%D0%BC%D0%B5%D1%80%20%D1%82%D0%B5%D0%BB%D0%B5%D1%84%D0%BE%D0%BD%D0%B0";
+    expect(parsePayLink(sent)).toBe("https://kaspi.kz/pay/CYBERFOX?21895=");
+    expect(parsePayLink(" https://kaspi.kz/pay/CYBERFOX?21895=7786279492 ")).toBe("https://kaspi.kz/pay/CYBERFOX?21895=");
+    expect(parsePayLink("")).toBeNull();
+    expect(parsePayLink("https://kaspi.kz/pay/CYBERFOX")).toBeUndefined();
+    expect(parsePayLink("https://evil.kz/pay/CYBERFOX?21895=")).toBeUndefined();
+    expect(parsePayLink("http://kaspi.kz/pay/CYBERFOX?21895=")).toBeUndefined();
+    expect(parsePayLink("не ссылка")).toBeUndefined();
+  });
+
+  it("в ссылку подставляются 10 цифр номера гостя", () => {
+    const link = "https://kaspi.kz/pay/CYBERFOX?21895=";
+    expect(payLinkFor(link, "+77786279492")).toBe(`${link}7786279492`);
+    expect(payLinkFor(link, "87786279492")).toBe(`${link}7786279492`);
+    expect(payLinkFor(link, "+1 555 0100")).toBeNull();
   });
 });

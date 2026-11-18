@@ -16,6 +16,7 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [bin, setBin] = useState("");
+  const [payLink, setPayLink] = useState("");
 
   useEffect(() => {
     void api
@@ -23,16 +24,33 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
       .then((loaded) => {
         setChannel(loaded);
         setBin(loaded.bin ?? "");
+        setPayLink(loaded.payLink ?? "");
       })
       .catch(() => setChannel(null));
   }, []);
+
+  async function savePayLink(): Promise<void> {
+    if (!channel) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await api.saveKaspiProvider({ enabled: channel.enabled, payLink });
+      setChannel(saved);
+      setPayLink(saved.payLink ?? "");
+      onSaved(saved.payLink ? "Ссылка сохранена — на экранах ПК появится QR Kaspi" : "QR Kaspi на экранах ПК выключен");
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveBin(): Promise<void> {
     if (!channel) return;
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.saveKaspiProvider(channel.enabled, bin);
+      const saved = await api.saveKaspiProvider({ enabled: channel.enabled, bin });
       setChannel(saved);
       setBin(saved.bin ?? "");
       onSaved(saved.bin ? "БИН/ИИН сохранён — Kaspi получит его в каждом ответе" : "БИН/ИИН убран из ответов");
@@ -49,7 +67,7 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
     setBusy(true);
     setError(null);
     try {
-      setChannel(await api.saveKaspiProvider(enabled));
+      setChannel(await api.saveKaspiProvider({ enabled }));
       onSaved(message);
     } catch (cause) {
       setError((cause as Error).message);
@@ -126,6 +144,28 @@ export function KaspiProviderSettings({ onSaved }: { onSaved: (message: string) 
                 onClick={() => void saveBin()}
               >
                 Сохранить БИН/ИИН
+              </button>
+            </div>
+
+            <label>
+              Ссылка на услугу в Kaspi (для QR на экранах ПК)
+              <input
+                value={payLink}
+                onChange={(e) => setPayLink(e.target.value)}
+                placeholder="https://kaspi.kz/pay/CYBERFOX?21895=…"
+              />
+            </label>
+            <p className="hint">
+              Вставьте ссылку, которую прислал Kaspi, как есть. На экране ПК гость увидит QR: камера телефона
+              откроет Kaspi с уже подставленным номером, останется ввести сумму. Пусто — QR не показывается.
+            </p>
+            <div className="actions">
+              <button
+                type="button"
+                disabled={busy || payLink.trim() === (channel.payLink ?? "")}
+                onClick={() => void savePayLink()}
+              >
+                Сохранить ссылку
               </button>
             </div>
           </div>

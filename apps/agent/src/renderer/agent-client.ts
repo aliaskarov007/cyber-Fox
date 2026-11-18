@@ -323,7 +323,7 @@ export class AgentClient {
   }
 
   /** Какими способами можно пополнить счёт с этой машины. */
-  topUpOptions(): Promise<{ kaspi: boolean; staticQr: boolean }> {
+  topUpOptions(): Promise<{ kaspi: boolean; staticQr: boolean; kaspiLink?: string | null }> {
     return this.request("topup.options", {});
   }
 

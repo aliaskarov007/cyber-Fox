@@ -15,9 +15,11 @@ import {
   maskGuestName,
   parseAllowedIps,
   parseBin,
+  parsePayLink,
   parseSum,
   parseTxnDate,
   parseTxnId,
+  payLinkFor,
   withBin,
 } from "./kaspi-provider.rules.js";
 import { PaymentsService } from "./payments.service.js";
@@ -32,6 +34,15 @@ export interface PublicKaspiProvider {
   allowedIps: string[];
   /** БИН/ИИН получателя, который уходит в каждом ответе Kaspi. */
   bin: string | null;
+  /** Ссылка на услугу в Kaspi (без номера) — по ней экран ПК рисует QR. */
+  payLink: string | null;
+}
+
+/** Что сохранить в настройках: не переданное поле не трогаем, пустая строка — убрать. */
+export interface KaspiProviderUpdate {
+  enabled: boolean;
+  bin?: string;
+  payLink?: string;
 }
 
 /** Срок у намерения формальный: деньги к моменту pay уже списаны у гостя. */
@@ -73,16 +84,23 @@ export class KaspiProviderService {
       accountRegex: KASPI_ACCOUNT_REGEX,
       allowedIps: this.allowedIps,
       bin: channel?.bin ?? null,
+      payLink: channel?.payLink ?? null,
     };
   }
 
-  /** bin не передан — не трогаем; пустая строка — убрать. */
-  async save(staff: AuthenticatedStaff, enabled: boolean, rawBin?: string): Promise<PublicKaspiProvider> {
-    const data: { enabled: boolean; bin?: string | null } = { enabled };
-    if (rawBin !== undefined) {
-      const bin = parseBin(rawBin);
+  async save(staff: AuthenticatedStaff, update: KaspiProviderUpdate): Promise<PublicKaspiProvider> {
+    const data: { enabled: boolean; bin?: string | null; payLink?: string | null } = { enabled: update.enabled };
+    if (update.bin !== undefined) {
+      const bin = parseBin(update.bin);
       if (bin === undefined) throw new BadRequestException("БИН/ИИН — 12 цифр");
       data.bin = bin;
+    }
+    if (update.payLink !== undefined) {
+      const payLink = parsePayLink(update.payLink);
+      if (payLink === undefined) {
+        throw new BadRequestException("Нужна ссылка от Kaspi вида https://kaspi.kz/pay/CYBERFOX?21895=…");
+      }
+      data.payLink = payLink;
     }
     await this.prisma.kaspiProviderChannel.upsert({
       where: { tenantId: staff.tenantId },
@@ -90,6 +108,20 @@ export class KaspiProviderService {
       update: data,
     });
     return this.get(staff);
+  }
+
+  // --- Экран ПК ---
+
+  /**
+   * Ссылка на оплату в Kaspi с номером этого гостя — для QR на экране ПК.
+   * Нет ссылки в настройках, канал выключен или номер не казахстанский — null.
+   */
+  async payLinkForGuest(guestId: string): Promise<string | null> {
+    const guest = await this.prisma.guest.findUnique({ where: { id: guestId }, select: { tenantId: true, phone: true } });
+    if (!guest) return null;
+    const channel = await this.prisma.kaspiProviderChannel.findUnique({ where: { tenantId: guest.tenantId } });
+    if (!channel?.enabled || !channel.payLink) return null;
+    return payLinkFor(channel.payLink, guest.phone);
   }
 
   // --- Запросы Kaspi ---

@@ -16,6 +16,6 @@ import { PaymentsService } from "./payments.service.js";
   imports: [GuestsModule, SessionsModule],
   controllers: [PaymentsController, KaspiController, KaspiProviderController],
   providers: [PaymentsService, HmacPaymentProvider, ClubAccessService, ApiPayClient, KaspiService, KaspiProviderService],
-  exports: [PaymentsService, KaspiService],
+  exports: [PaymentsService, KaspiService, KaspiProviderService],
 })
 export class PaymentsModule {}

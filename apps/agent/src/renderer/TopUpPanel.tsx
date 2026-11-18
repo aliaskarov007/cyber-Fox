@@ -21,6 +21,10 @@ type Step =
  * приложение Kaspi на номер гостя, и деньги зачисляются сами. Не подключён —
  * статический QR клуба, гость вводит сумму сам, поступление подтверждает касса.
  * В обоих случаях экран ждёт зачисления и закрывается сам.
+ *
+ * Kaspi «Платежи» (сеть подключена к Kaspi напрямую) — первым показываем QR со
+ * ссылкой на услугу клуба и номером гостя: камера телефона открывает Kaspi,
+ * гость вводит сумму, деньги зачисляются сами.
  */
 export function TopUpPanel({
   client,
@@ -38,13 +42,32 @@ export function TopUpPanel({
   const [error, setError] = useState<string | null>(null);
   const [kaspi, setKaspi] = useState(false);
   const [method, setMethod] = useState<Method>("phone");
+  const [kaspiLink, setKaspiLink] = useState<string | null>(null);
+  /** Гость ушёл с QR Kaspi «Платежи» на прежние способы. */
+  const [otherWays, setOtherWays] = useState(false);
+  const [hasOtherWays, setHasOtherWays] = useState(false);
 
   useEffect(() => {
     void client
       .topUpOptions()
-      .then((options) => setKaspi(options.kaspi))
+      .then((options) => {
+        setKaspi(options.kaspi);
+        setKaspiLink(options.kaspiLink ?? null);
+        setHasOtherWays(options.kaspi || options.staticQr);
+      })
       .catch(() => setKaspi(false));
   }, [client]);
+
+  const showKaspiLink = kaspiLink !== null && !otherWays && step.kind === "amount";
+
+  // QR Kaspi «Платежи»: платёж не привязан к счёту на экране — ждём любое зачисление этому гостю.
+  useEffect(() => {
+    if (!showKaspiLink) return;
+    return client.onTopUpPaid((event) => {
+      setStep({ kind: "paid", amount: event.amount });
+      onPaid(event.amount);
+    });
+  }, [client, showKaspiLink, onPaid]);
 
   const waitingFor = step.kind === "waiting" ? step.payment.intentId : null;
 
@@ -137,6 +160,29 @@ export function TopUpPanel({
         )}
 
         <div className="note">Ждём оплату… Экран обновится сам.</div>
+        <button className="ghost" type="button" onClick={onClose}>
+          Закрыть
+        </button>
+      </div>
+    );
+  }
+
+  if (showKaspiLink && kaspiLink) {
+    return (
+      <div className="topup">
+        <h2 className="topup-title">Пополнить через Kaspi</h2>
+        <Qr text={kaspiLink} label="QR для оплаты в Kaspi" />
+        <ol className="steps">
+          <li>Наведите камеру телефона на QR — откроется Kaspi с вашим номером.</li>
+          <li>Введите сумму и подтвердите оплату.</li>
+          <li>Деньги зачислятся на счёт сами через несколько секунд.</li>
+        </ol>
+        <div className="note">Ждём оплату… Экран обновится сам.</div>
+        {hasOtherWays && (
+          <button type="button" onClick={() => setOtherWays(true)}>
+            Другой способ
+          </button>
+        )}
         <button className="ghost" type="button" onClick={onClose}>
           Закрыть
         </button>

@@ -20,6 +20,7 @@ import { LibraryService } from "../library/library.service.js";
 import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
+import { KaspiProviderService } from "../payments/kaspi-provider.service.js";
 import { BarOrdersService } from "../products/bar-orders.service.js";
 import { ScreenService } from "../screen/screen.service.js";
 import { UplinksService } from "../uplinks/uplinks.service.js";
@@ -65,6 +66,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly kaspi: KaspiService,
     private readonly screen: ScreenService,
     private readonly uplinks: UplinksService,
+    private readonly kaspiProvider: KaspiProviderService,
   ) {}
 
   onModuleInit(): void {
@@ -151,24 +153,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     });
     this.bus.on("topup.paid", (e) => {
       this.server.to(adminRoom(e.clubId)).emit("topup.paid", e);
-      if (!e.computerId) return;
-      const computerId = e.computerId;
-      this.server.to(agentRoom(computerId)).emit("topup.paid", {
-        intentId: e.intentId,
-        amount: e.amount,
-      });
-      // Гость играет — новый баланс сразу в полосу сессии.
-      void this.sessions
-        .activeSessionFor(computerId)
-        .then((id) => (id ? this.sessions.sessionSnapshot(id) : null))
-        .then((snapshot) => {
-          if (snapshot)
-            this.server
-              .to(agentRoom(computerId))
-              .emit("session.tick", snapshot);
-        })
+      if (e.computerId) {
+        this.notifyTopUp(e.computerId, e.intentId, e.amount);
+        return;
+      }
+      // Kaspi «Платежи» (в том числе по QR с экрана): платёж не знает машину —
+      // сообщаем тем ПК, где этот гость играет или вошёл.
+      void this.computersOfGuest(e.guestId)
+        .then((ids) => ids.forEach((id) => this.notifyTopUp(id, e.intentId, e.amount)))
         .catch((error: Error) =>
-          this.logger.warn(`Баланс после пополнения: ${error.message}`),
+          this.logger.warn(`Пополнение без машины: ${error.message}`),
         );
     });
     this.bus.on("signup.confirmed", (e) => {
@@ -411,8 +405,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("topup.options")
   async topUpOptions(@ConnectedSocket() client: Socket) {
     const computerId = client.data.computerId as string | undefined;
-    if (!computerId) return { kaspi: false, staticQr: false };
-    return this.kaspi.options(computerId);
+    if (!computerId) return { kaspi: false, staticQr: false, kaspiLink: null };
+    const { guestId } = await this.resolveGuest(client);
+    const [options, kaspiLink] = await Promise.all([
+      this.kaspi.options(computerId),
+      guestId ? this.kaspiProvider.payLinkForGuest(guestId) : Promise.resolve(null),
+    ]);
+    // kaspiLink — ссылка в Kaspi «Платежи» с номером гостя: экран рисует по ней QR.
+    return { ...options, kaspiLink };
   }
 
   /** Интернет-каналы для экрана ПК: что показать гостю и что выбрано сейчас. */
@@ -715,6 +715,35 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   }
 
   /** Гость за этой машиной прямо сейчас, если сессия его, а не анонимная. */
+  /** Экран ПК: деньги пришли — закрыть QR и обновить баланс в полосе сессии. */
+  private notifyTopUp(computerId: string, intentId: string, amount: number): void {
+    this.server.to(agentRoom(computerId)).emit("topup.paid", { intentId, amount });
+    void this.sessions
+      .activeSessionFor(computerId)
+      .then((id) => (id ? this.sessions.sessionSnapshot(id) : null))
+      .then((snapshot) => {
+        if (snapshot)
+          this.server.to(agentRoom(computerId)).emit("session.tick", snapshot);
+      })
+      .catch((error: Error) =>
+        this.logger.warn(`Баланс после пополнения: ${error.message}`),
+      );
+  }
+
+  /** Машины, где гость сейчас играет или вошёл на экране блокировки. */
+  private async computersOfGuest(guestId: string): Promise<string[]> {
+    const playing = await this.prisma.session.findMany({
+      where: { guestId, status: "ACTIVE" },
+      select: { computerId: true },
+    });
+    const ids = new Set(playing.map((s) => s.computerId));
+    for (const socket of await this.server.fetchSockets()) {
+      const computerId = socket.data.computerId as string | undefined;
+      if (computerId && socket.data.loginGuestId === guestId) ids.add(computerId);
+    }
+    return [...ids];
+  }
+
   private async currentGuest(client: Socket): Promise<string | null> {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return null;

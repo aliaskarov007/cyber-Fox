@@ -109,6 +109,33 @@ export interface KaspiReply {
   fields?: Record<string, { "@name": string; "#text": string }>;
 }
 
+/**
+ * Ссылка, которую прислал Kaspi: «https://kaspi.kz/pay/CYBERFOX?21895=Номер%20телефона».
+ * Вместо значения поля подставляется номер гостя, поэтому храним без него:
+ * «https://kaspi.kz/pay/CYBERFOX?21895=». Пусто — null; не похоже на ссылку Kaspi — undefined.
+ */
+export function parsePayLink(raw: string): string | null | undefined {
+  const text = raw.trim();
+  if (text === "") return null;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "kaspi.kz") return undefined;
+  const service = /^\/pay\/([A-Za-z0-9_-]+)\/?$/.exec(url.pathname)?.[1];
+  const field = [...url.searchParams.keys()][0];
+  if (!service || !field || !/^\d+$/.test(field)) return undefined;
+  return `https://kaspi.kz/pay/${service}?${field}=`;
+}
+
+/** Ссылка на оплату с номером гостя: в поле Kaspi — 10 цифр, «7786279492». */
+export function payLinkFor(payLink: string, guestPhone: string): string | null {
+  const phone = accountToPhone(guestPhone);
+  return phone ? `${payLink}${phone.slice(1)}` : null;
+}
+
 /** Добавить БИН получателя в ответ (сразу после txn_id). */
 export function withBin(reply: KaspiReply, bin: string | null | undefined): KaspiReply {
   if (!bin) return reply;

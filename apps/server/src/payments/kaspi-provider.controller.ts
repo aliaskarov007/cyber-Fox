@@ -18,6 +18,12 @@ class SaveKaspiProviderDto {
   @IsString()
   @MaxLength(20)
   bin?: string;
+
+  /** Ссылка на услугу от Kaspi; пустая строка — убрать. Проверка — в сервисе. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  payLink?: string;
 }
 
 /**
@@ -38,7 +44,7 @@ export class KaspiProviderController {
   @Roles(StaffRole.OWNER)
   @Put("network/kaspi-provider")
   save(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: SaveKaspiProviderDto) {
-    return this.kaspi.save(staff, dto.enabled, dto.bin);
+    return this.kaspi.save(staff, { enabled: dto.enabled, bin: dto.bin, payLink: dto.payLink });
   }
 
   /**

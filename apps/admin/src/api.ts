@@ -877,10 +877,10 @@ export const api = {
   disconnectKaspi: () =>
     request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
   kaspiProvider: () => request<KaspiProvider>("/network/kaspi-provider"),
-  saveKaspiProvider: (enabled: boolean, bin?: string) =>
+  saveKaspiProvider: (update: { enabled: boolean; bin?: string; payLink?: string }) =>
     request<KaspiProvider>("/network/kaspi-provider", {
       method: "PUT",
-      body: JSON.stringify({ enabled, bin }),
+      body: JSON.stringify(update),
     }),
 
   // --- Интернет-каналы клуба (роутер + провайдеры) ---
@@ -1406,6 +1406,8 @@ export interface KaspiProvider {
   allowedIps: string[];
   /** БИН/ИИН получателя в ответах Kaspi. */
   bin: string | null;
+  /** Ссылка на услугу в Kaspi без номера — для QR на экранах ПК. */
+  payLink: string | null;
 }
 
 export type PromoKind = "BALANCE" | "BONUS";
