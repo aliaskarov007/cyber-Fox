@@ -20,7 +20,7 @@ import { WhatsAppSettings } from "./WhatsAppSettings.js";
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Владелец сети",
   ADMIN: "Управляющий",
-  STAFF: "Администратор зала",
+  STAFF: "Кассир",
 };
 
 /** Настройки клуба и сети: доступны управляющему по своему залу, владельцу — по всем. */
@@ -795,7 +795,7 @@ function StaffSection({
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
           >
-            <option value="STAFF">Администратор зала</option>
+            <option value="STAFF">Кассир</option>
             <option value="ADMIN">Управляющий</option>
             <option value="OWNER">Владелец сети</option>
           </select>

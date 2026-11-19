@@ -30,6 +30,13 @@ const TRANSACTION_LABEL: Record<string, string> = {
   PROMO: "Промокод",
 };
 
+const PACKAGE_STATUS: Record<string, string> = {
+  ACTIVE: "активен",
+  EXHAUSTED: "израсходован",
+  EXPIRED: "истёк",
+  REFUNDED: "возврат",
+};
+
 export function GuestsScreen({ club, staff }: { club: Club; staff: Staff }) {
   const [query, setQuery] = useState("");
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -372,6 +379,26 @@ function GuestCardPanel({
                 <span className="k">{p.minutesRemaining} мин</span>
                 <span>
                   до {new Date(p.expiresAt).toLocaleDateString("ru-KZ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {history && history.packages.length > 0 && (
+        <div className="section">
+          <h3>Купленные пакеты</h3>
+          <div className="rows">
+            {history.packages.map((p) => (
+              <div className="row" key={p.id}>
+                <span className="k">
+                  {new Date(p.purchasedAt).toLocaleDateString("ru-KZ")} ·{" "}
+                  {p.zoneName} · {p.minutesRemaining}/{p.minutesTotal} мин
+                </span>
+                <span>
+                  {formatMoney(p.pricePaid)} ·{" "}
+                  {PACKAGE_STATUS[p.status] ?? p.status}
                 </span>
               </div>
             ))}

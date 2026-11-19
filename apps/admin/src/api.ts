@@ -265,6 +265,17 @@ export interface ShiftReport {
   cashTotal: number;
   /** Из Итога — онлайн. */
   onlineTotal: number;
+  /** Журнал действий кассира за смену: пополнения и пробитые товары, новые сверху. */
+  operations: ShiftOperation[];
+}
+
+export interface ShiftOperation {
+  id: string;
+  at: string;
+  kind: "topup" | "product";
+  title: string;
+  amount: number;
+  method: "CASH" | "CARD" | "ONLINE" | "BALANCE" | "BONUS";
 }
 
 export interface GuestHistory {

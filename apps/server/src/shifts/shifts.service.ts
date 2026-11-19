@@ -22,6 +22,17 @@ const TOURNAMENT_TYPES = [
   TransactionType.TOURNAMENT_PRIZE,
 ];
 
+/** Одно действие кассира за смену для журнала: пополнение счёта или продажа товара. */
+export interface ShiftOperation {
+  id: string;
+  at: Date;
+  kind: "topup" | "product";
+  title: string;
+  /** В тиын, всегда положительная: деньги, принятые кассиром. */
+  amount: number;
+  method: PaymentMethod;
+}
+
 export interface ShiftReport {
   shift: Shift;
   staffName: string;
@@ -50,6 +61,8 @@ export interface ShiftReport {
   cashTotal: number;
   /** Из Итога — онлайн (пополнения + бар). Заработает с подключением Kaspi. */
   onlineTotal: number;
+  /** Журнал действий кассира за смену: пополнения и пробитые товары, новые сверху. */
+  operations: ShiftOperation[];
 }
 
 @Injectable()
@@ -161,8 +174,14 @@ export class ShiftsService {
     const window = { gte: shift.openedAt, lte: until };
 
     const [payments, sales, staffRecord] = await Promise.all([
-      this.prisma.payment.findMany({ where: { shiftId: shift.id } }),
-      this.prisma.productSale.findMany({ where: { shiftId: shift.id } }),
+      this.prisma.payment.findMany({
+        where: { shiftId: shift.id },
+        include: { guest: { select: { fullName: true } } },
+      }),
+      this.prisma.productSale.findMany({
+        where: { shiftId: shift.id },
+        include: { product: { select: { name: true } } },
+      }),
       this.prisma.staff.findUnique({ where: { id: shift.staffId } }),
     ]);
 
@@ -235,6 +254,31 @@ export class ShiftsService {
     const onlineTotal =
       sumBy(PaymentMethod.ONLINE) + salesBy(PaymentMethod.ONLINE);
 
+    // Журнал действий: каждое пополнение и каждый пробитый товар отдельной
+    // строкой, новые сверху. Бонусные списания — не деньги кассы, их не берём.
+    const operations: ShiftOperation[] = [
+      ...payments
+        .filter((p) => p.method !== PaymentMethod.BONUS)
+        .map((p) => ({
+          id: `p-${p.id}`,
+          at: p.createdAt,
+          kind: "topup" as const,
+          title: p.guest?.fullName
+            ? `Пополнение · ${p.guest.fullName}`
+            : "Пополнение счёта",
+          amount: p.amount,
+          method: p.method,
+        })),
+      ...sales.map((s) => ({
+        id: `s-${s.id}`,
+        at: s.createdAt,
+        kind: "product" as const,
+        title: `${s.product.name} ×${s.quantity}`,
+        amount: s.total,
+        method: s.method,
+      })),
+    ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
     return {
       shift,
       staffName: staffRecord?.fullName ?? "—",
@@ -256,6 +300,7 @@ export class ShiftsService {
       grandTotal,
       cashTotal,
       onlineTotal,
+      operations,
     };
   }
 

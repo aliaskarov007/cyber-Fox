@@ -2,6 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type Club, type ShiftReport, api, formatMoney } from "./api.js";
 
+const METHOD_LABEL: Record<string, string> = {
+  CASH: "наличные",
+  CARD: "карта",
+  ONLINE: "онлайн",
+  BALANCE: "с баланса",
+  BONUS: "бонусы",
+};
+
 /**
  * «Смена» — дашборд по деньгам открытой смены.
  *
@@ -120,6 +128,35 @@ export function DashboardScreen({ club }: { club: Club }) {
               <span>{report.sessionsCount}</span>
             </div>
           </div>
+        </section>
+
+        <section className="dash-card dash-wide">
+          <div className="dash-title">Действия за смену</div>
+          {report.operations.length === 0 ? (
+            <div className="dash-rows">
+              <div className="row">
+                <span className="k">Пока ничего не пробито</span>
+              </div>
+            </div>
+          ) : (
+            <div className="dash-rows dash-ops">
+              {report.operations.map((op) => (
+                <div className="row" key={op.id}>
+                  <span className="k">
+                    {new Date(op.at).toLocaleTimeString("ru-KZ", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    · {op.title}
+                  </span>
+                  <span>
+                    {formatMoney(op.amount)}
+                    <i> · {METHOD_LABEL[op.method] ?? op.method}</i>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>

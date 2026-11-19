@@ -36,6 +36,22 @@ export type Tab =
   | "onboarding"
   | "settings";
 
+/*
+ * Кассир (STAFF) видит только то, что нужно на стойке: смену, карту клуба, бар,
+ * гостей, промокоды и тарифы (последние два — лишь на просмотр). Остальное —
+ * настройки клуба, подключение, ивенты, отчёты — забота владельца и
+ * управляющего. Список намеренно «белый»: новая вкладка по умолчанию не
+ * открывается кассиру, пока её сюда не внесут.
+ */
+const CASHIER_TABS: Tab[] = [
+  "dashboard",
+  "hall",
+  "bar",
+  "guests",
+  "promos",
+  "tariffs",
+];
+
 const TABS: Array<{
   id: Tab;
   label: string;
@@ -61,7 +77,7 @@ const TABS: Array<{
 /*
  * Платформенная часть живёт по своему адресу и со своим входом. Разделение
  * намеренное: это разные люди с разными правами, и путать их экраны нельзя —
- * администратор зала не должен случайно увидеть чужие клубы.
+ * кассир не должен случайно увидеть чужие клубы.
  */
 export function App() {
   if (window.location.pathname.startsWith("/platform")) return <PlatformApp />;
@@ -109,6 +125,14 @@ function ClubApp() {
     void load();
   }, []);
 
+  // Кассира нельзя оставить на скрытой вкладке: если дочерний экран увёл его
+  // в недоступный раздел (напр. onGoTo в «Настройки»), возвращаем на «Смену».
+  useEffect(() => {
+    if (staff?.role === "STAFF" && !CASHIER_TABS.includes(tab)) {
+      setTab("dashboard");
+    }
+  }, [staff, tab]);
+
   if (loading) return <div className="login-wrap">Загружаем…</div>;
   if (!staff) {
     if (signingUp) {
@@ -152,13 +176,14 @@ function ClubApp() {
           Cyber-<span>Fox</span>
         </span>
         <nav className="side-nav">
-          {/* Сводка по сети — забота владельца; управляющему она не нужна. */}
-          {TABS.filter(
-            (item) =>
-              (!item.ownerOnly || staff.role === "OWNER") &&
-              (!item.manageOnly ||
-                staff.role === "OWNER" ||
-                staff.role === "ADMIN"),
+          {/* Кассиру — только разделы стойки; владельцу и управляющему — по роли. */}
+          {TABS.filter((item) =>
+            staff.role === "STAFF"
+              ? CASHIER_TABS.includes(item.id)
+              : (!item.ownerOnly || staff.role === "OWNER") &&
+                (!item.manageOnly ||
+                  staff.role === "OWNER" ||
+                  staff.role === "ADMIN"),
           ).map((item) => (
             <button
               key={item.id}
@@ -242,7 +267,7 @@ function ClubApp() {
             onClubsChanged={() => void load()}
           />
         ) : (
-          <TariffsScreen club={club} />
+          <TariffsScreen club={club} staff={staff} />
         )}
       </div>
     </div>
