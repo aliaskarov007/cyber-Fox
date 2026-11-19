@@ -8,6 +8,7 @@ import {
 } from "./agent-client.js";
 import { BarPanel } from "./BarPanel.js";
 import { NetPanel } from "./NetPanel.js";
+import { PackagePanel } from "./PackagePanel.js";
 import { PromoField } from "./PromoField.js";
 import { TopUpPanel } from "./TopUpPanel.js";
 
@@ -44,14 +45,16 @@ export function SessionBar({
    */
   const [called, setCalled] = useState(false);
   /* Открытая панель под полосой: одна за раз, чтобы не заслонять полки. */
-  const [panel, setPanel] = useState<"promo" | "topup" | "bar" | "net" | null>(
-    null,
-  );
+  const [panel, setPanel] = useState<
+    "promo" | "topup" | "bar" | "net" | "pkg" | null
+  >(null);
   const [promoNote, setPromoNote] = useState<string | null>(null);
   /* Клуб разрешил заказ из бара с ПК — узнаём при старте сессии. */
   const [barEnabled, setBarEnabled] = useState(false);
   /* В клубе настроены два интернет-канала — можно дать гостю выбор. */
   const [netEnabled, setNetEnabled] = useState(false);
+  /* В зоне есть пакеты, которые гость может докупить сам. */
+  const [pkgAvailable, setPkgAvailable] = useState(false);
   const hasAccount = Boolean(tick.guestName);
 
   // Сообщение о зачислении висит недолго: новый баланс уже виден в полосе.
@@ -67,6 +70,18 @@ export function SessionBar({
       .barMenu()
       .then((menu) => setBarEnabled(menu.enabled))
       .catch(() => setBarEnabled(false));
+  }, [client, hasAccount, tick.sessionId]);
+
+  // Докупить пакет может только гость с аккаунтом (с баланса).
+  useEffect(() => {
+    if (!hasAccount) {
+      setPkgAvailable(false);
+      return;
+    }
+    void client
+      .packageOptions()
+      .then((r) => setPkgAvailable(r.packages.length > 0))
+      .catch(() => setPkgAvailable(false));
   }, [client, hasAccount, tick.sessionId]);
 
   // Выбор провайдера доступен всем, в том числе анонимной посадке.
@@ -168,6 +183,15 @@ export function SessionBar({
               Промокод
             </button>
           )}
+          {hasAccount && pkgAvailable && (
+            <button
+              className={panel === "pkg" ? "primary" : "ghost"}
+              disabled={offline}
+              onClick={() => setPanel(panel === "pkg" ? null : "pkg")}
+            >
+              Пакет
+            </button>
+          )}
           {netEnabled && (
             <button
               className={panel === "net" ? "primary" : "ghost"}
@@ -220,6 +244,17 @@ export function SessionBar({
             onPaid={(amount) =>
               setPromoNote(`Счёт пополнен на ${formatMoney(amount)}`)
             }
+            onClose={() => setPanel(null)}
+          />
+        </div>
+      )}
+
+      {panel === "pkg" && (
+        <div className="promo-panel">
+          <PackagePanel
+            client={client}
+            disabled={offline}
+            onBought={(name) => setPromoNote(`Пакет куплен: ${name}`)}
             onClose={() => setPanel(null)}
           />
         </div>

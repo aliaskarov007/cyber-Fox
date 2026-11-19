@@ -155,6 +155,17 @@ export interface Tick {
   accruedCost: number;
 }
 
+/** Пакет, который гость может купить сам с баланса. */
+export interface BuyablePackage {
+  id: string;
+  name: string;
+  minutes: number;
+  /** Цена со скидкой гостя, в тиын. */
+  price: number;
+  /** Хватает ли баланса (в долг пакет не продаётся). */
+  affordable: boolean;
+}
+
 /** Интернет-каналы для экрана ПК. */
 export interface NetChannels {
   /** Фича включена в клубе (есть роутер и минимум два канала). */
@@ -323,7 +334,11 @@ export class AgentClient {
   }
 
   /** Какими способами можно пополнить счёт с этой машины. */
-  topUpOptions(): Promise<{ kaspi: boolean; staticQr: boolean; kaspiLink?: string | null }> {
+  topUpOptions(): Promise<{
+    kaspi: boolean;
+    staticQr: boolean;
+    kaspiLink?: string | null;
+  }> {
     return this.request("topup.options", {});
   }
 
@@ -350,6 +365,18 @@ export class AgentClient {
   /** Карточка вошедшего гостя заново — например, после пополнения. */
   guestCard(): Promise<GuestLoginResult> {
     return this.request("guest.card", {});
+  }
+
+  /** Пакеты, которые гость может купить сам на этом ПК (в своей зоне). */
+  packageOptions(): Promise<{ packages: BuyablePackage[] }> {
+    return this.request("package.options", {});
+  }
+
+  /** Гость купил пакет с баланса. Возвращается свежая карточка. */
+  buyPackage(
+    tariffId: string,
+  ): Promise<{ ok: boolean; reason?: string; card?: GuestLoginResult }> {
+    return this.request("package.buy", { tariffId });
   }
 
   /** Деньги по QR зачислены. Возвращается функция отписки. */

@@ -17,6 +17,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
 import { AgentService } from "./agent.service.js";
 import { LibraryService } from "../library/library.service.js";
+import { GuestsService } from "../guests/guests.service.js";
 import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
@@ -67,6 +68,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     private readonly screen: ScreenService,
     private readonly uplinks: UplinksService,
     private readonly kaspiProvider: KaspiProviderService,
+    private readonly guests: GuestsService,
   ) {}
 
   onModuleInit(): void {
@@ -160,7 +162,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       // Kaspi «Платежи» (в том числе по QR с экрана): платёж не знает машину —
       // сообщаем тем ПК, где этот гость играет или вошёл.
       void this.computersOfGuest(e.guestId)
-        .then((ids) => ids.forEach((id) => this.notifyTopUp(id, e.intentId, e.amount)))
+        .then((ids) =>
+          ids.forEach((id) => this.notifyTopUp(id, e.intentId, e.amount)),
+        )
         .catch((error: Error) =>
           this.logger.warn(`Пополнение без машины: ${error.message}`),
         );
@@ -409,7 +413,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const { guestId } = await this.resolveGuest(client);
     const [options, kaspiLink] = await Promise.all([
       this.kaspi.options(computerId),
-      guestId ? this.kaspiProvider.payLinkForGuest(guestId) : Promise.resolve(null),
+      guestId
+        ? this.kaspiProvider.payLinkForGuest(guestId)
+        : Promise.resolve(null),
     ]);
     // kaspiLink — ссылка в Kaspi «Платежи» с номером гостя: экран рисует по ней QR.
     return { ...options, kaspiLink };
@@ -456,6 +462,43 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     if (!computerId || !guestId)
       return { ok: false, reason: "Войдите заново", guest: null };
     return this.agents.guestCard(computerId, guestId);
+  }
+
+  /** Пакеты, которые гость может купить сам на этом ПК (в своей зоне). */
+  @SubscribeMessage("package.options")
+  async packageOptions(@ConnectedSocket() client: Socket) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { packages: [] };
+    const { guestId } = await this.resolveGuest(client);
+    if (!guestId) return { packages: [] };
+    const packages = await this.guests.listBuyablePackages(
+      client.data.clubId as string,
+      client.data.zoneId as string,
+      guestId,
+    );
+    return { packages };
+  }
+
+  /** Гость купил пакет с баланса сам. Возвращаем свежую карточку. */
+  @SubscribeMessage("package.buy")
+  async packageBuy(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { tariffId?: string },
+  ) {
+    const computerId = client.data.computerId as string | undefined;
+    if (!computerId) return { ok: false, reason: "ПК не опознан" };
+    const { guestId } = await this.resolveGuest(client);
+    if (!guestId) return { ok: false, reason: "Сначала войдите" };
+    if (!body?.tariffId) return { ok: false, reason: "Пакет не выбран" };
+    const result = await this.guests.buyPackageFromBalance(
+      client.data.clubId as string,
+      guestId,
+      body.tariffId,
+      client.data.zoneId as string,
+    );
+    if (!result.ok) return result;
+    const card = await this.agents.guestCard(computerId, guestId);
+    return { ok: true, card };
   }
 
   /** Меню бара для этой машины; выключено в клубе — пустое. */
@@ -716,8 +759,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
 
   /** Гость за этой машиной прямо сейчас, если сессия его, а не анонимная. */
   /** Экран ПК: деньги пришли — закрыть QR и обновить баланс в полосе сессии. */
-  private notifyTopUp(computerId: string, intentId: string, amount: number): void {
-    this.server.to(agentRoom(computerId)).emit("topup.paid", { intentId, amount });
+  private notifyTopUp(
+    computerId: string,
+    intentId: string,
+    amount: number,
+  ): void {
+    this.server
+      .to(agentRoom(computerId))
+      .emit("topup.paid", { intentId, amount });
     void this.sessions
       .activeSessionFor(computerId)
       .then((id) => (id ? this.sessions.sessionSnapshot(id) : null))
@@ -739,7 +788,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
     const ids = new Set(playing.map((s) => s.computerId));
     for (const socket of await this.server.fetchSockets()) {
       const computerId = socket.data.computerId as string | undefined;
-      if (computerId && socket.data.loginGuestId === guestId) ids.add(computerId);
+      if (computerId && socket.data.loginGuestId === guestId)
+        ids.add(computerId);
     }
     return [...ids];
   }

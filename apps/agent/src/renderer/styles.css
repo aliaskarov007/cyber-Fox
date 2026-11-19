@@ -672,6 +672,31 @@ button:disabled {
   }
 }
 
+/* --- Покупка пакета гостем --- */
+
+.pkg-buy {
+  display: grid;
+  gap: 8px;
+}
+.pkg-buy-title {
+  font-weight: 600;
+  color: var(--ink-2, #b9c3da);
+}
+.pkg-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.pkg-option .pkg-name {
+  font-weight: 600;
+}
+.pkg-option .pkg-meta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* --- Выбор интернет-провайдера --- */
 
 .net-panel {

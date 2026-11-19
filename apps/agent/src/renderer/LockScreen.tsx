@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import {
   type AgentClient,
+  type BuyablePackage,
   type GuestLoginResult,
   formatMoney,
 } from "./agent-client.js";
@@ -48,6 +49,8 @@ export function LockScreen({
   const [card, setCard] = useState<GuestLoginResult | null>(null);
   const [signingUp, setSigningUp] = useState(false);
   const [topUpOpen, setTopUpOpen] = useState(false);
+  /* Пакеты, которые гость может купить сам в своей зоне. */
+  const [packages, setPackages] = useState<BuyablePackage[]>([]);
 
   /* Деньги пришли — карточка пересчитывается: от баланса зависит, можно ли начать. */
   async function refreshCard(): Promise<void> {
@@ -59,6 +62,45 @@ export function LockScreen({
       }
     } catch {
       // Карточку обновит следующий вход; деньги на счёте уже есть.
+    }
+    void refreshPackages();
+  }
+
+  /* Список покупаемых пакетов и доступность зависят от баланса — обновляем вместе. */
+  async function refreshPackages(): Promise<void> {
+    try {
+      const { packages: list } = await client.packageOptions();
+      setPackages(list);
+    } catch {
+      setPackages([]);
+    }
+  }
+
+  // Гость опознан — подтягиваем доступные пакеты его зоны.
+  useEffect(() => {
+    if (!card?.guest) {
+      setPackages([]);
+      return;
+    }
+    void refreshPackages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card?.guest?.id]);
+
+  async function buyPackage(tariffId: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await client.buyPackage(tariffId);
+      if (result.ok && result.card) {
+        setCard(result.card);
+        void refreshPackages();
+      } else {
+        setError(result.reason ?? "Не удалось купить пакет");
+      }
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -172,6 +214,26 @@ export function LockScreen({
           >
             Начать по поминутному тарифу
           </button>
+        )}
+
+        {packages.length > 0 && (
+          <div className="pkg-buy">
+            <div className="pkg-buy-title">Купить пакет</div>
+            {packages.map((p) => (
+              <button
+                key={p.id}
+                className="pkg-option"
+                disabled={busy || !online || !p.affordable}
+                onClick={() => void buyPackage(p.id)}
+              >
+                <span className="pkg-name">{p.name}</span>
+                <span className="pkg-meta">
+                  {p.minutes} мин · {formatMoney(p.price)}
+                  {!p.affordable ? " · не хватает" : ""}
+                </span>
+              </button>
+            ))}
+          </div>
         )}
 
         {topUpOpen ? (

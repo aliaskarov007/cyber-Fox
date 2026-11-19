@@ -406,6 +406,124 @@ export class GuestsService {
     });
   }
 
+  /**
+   * Пакеты, которые гость может купить сам с ПК в своей зоне: действующие
+   * пакетные тарифы зоны с ценой уже со скидкой гостя и пометкой, хватает ли
+   * баланса (в долг пакет не продаётся).
+   */
+  async listBuyablePackages(
+    clubId: string,
+    zoneId: string,
+    guestId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      minutes: number;
+      price: number;
+      affordable: boolean;
+    }>
+  > {
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+      select: { discountPercent: true },
+    });
+    const wallet = await this.wallets.resolveWallet(guestId, clubId);
+    const tariffs = await this.prisma.tariff.findMany({
+      where: { clubId, zoneId, kind: TariffKind.PACKAGE, isActive: true },
+      orderBy: { packagePrice: "asc" },
+    });
+    return tariffs
+      .filter((t) => t.packageMinutes && t.packagePrice !== null)
+      .map((t) => {
+        const price = discountedPrice(
+          t.packagePrice as number,
+          guest?.discountPercent ?? 0,
+        );
+        return {
+          id: t.id,
+          name: t.name,
+          minutes: t.packageMinutes as number,
+          price,
+          affordable: wallet.balance >= price,
+        };
+      });
+  }
+
+  /**
+   * Гость покупает пакет сам с ПК — деньги списываются с баланса (в долг
+   * нельзя). Тариф должен быть пакетным, действующим и из зоны этой машины.
+   */
+  async buyPackageFromBalance(
+    clubId: string,
+    guestId: string,
+    tariffId: string,
+    zoneId: string,
+  ): Promise<{ ok: boolean; reason?: string }> {
+    const club = await this.prisma.club.findUnique({ where: { id: clubId } });
+    if (!club) return { ok: false, reason: "Клуб не найден" };
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
+    if (!guest) return { ok: false, reason: "Гость не опознан" };
+    const tariff = await this.prisma.tariff.findUnique({
+      where: { id: tariffId },
+    });
+    if (
+      !tariff ||
+      tariff.clubId !== clubId ||
+      tariff.kind !== TariffKind.PACKAGE ||
+      !tariff.isActive
+    )
+      return { ok: false, reason: "Пакет недоступен" };
+    if (tariff.zoneId !== zoneId)
+      return { ok: false, reason: "Этот пакет для другой зоны" };
+    if (!tariff.packageMinutes || tariff.packagePrice === null)
+      return { ok: false, reason: "У пакета не заданы минуты или цена" };
+
+    const price = discountedPrice(tariff.packagePrice, guest.discountPercent);
+    const validityDays = tariff.validityDays ?? club.packageValidityDays;
+    const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const wallet = await this.wallets.resolveWallet(guestId, clubId, tx);
+        if (wallet.balance < price)
+          throw new BadRequestException(
+            "Недостаточно средств на балансе — пакет в долг не продаётся",
+          );
+        await this.wallets.record(tx, {
+          walletId: wallet.id,
+          clubId,
+          amount: -price,
+          type: TransactionType.PACKAGE_PURCHASE,
+          comment: tariff.name,
+        });
+        const bonus = bonusFor(price, club.bonusPercent);
+        if (bonus > 0)
+          await tx.guest.update({
+            where: { id: guestId },
+            data: { bonusPoints: { increment: bonus } },
+          });
+        await tx.guestPackage.create({
+          data: {
+            clubId,
+            guestId,
+            zoneId: tariff.zoneId,
+            sourceTariffId: tariff.id,
+            minutesTotal: tariff.packageMinutes as number,
+            minutesRemaining: tariff.packageMinutes as number,
+            pricePaid: price,
+            expiresAt,
+          },
+        });
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message };
+    }
+  }
+
   async setPin(
     staff: AuthenticatedStaff,
     clubId: string,
