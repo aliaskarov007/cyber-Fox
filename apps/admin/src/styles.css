@@ -2415,6 +2415,58 @@ button.link {
   color: var(--ink);
 }
 
+/* --- Чек бара: набранные позиции в выезжающей панели --- */
+.cart-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cart-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cart-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--ink);
+}
+.cart-qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cart-qty button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+.cart-qty span {
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cart-sum {
+  min-width: 72px;
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.cart-del {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 1;
+}
+
 /* --- Левый сайдбар и каркас --- */
 .shell {
   display: flex;

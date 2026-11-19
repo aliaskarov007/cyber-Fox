@@ -11,6 +11,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type {
   CreateProductDto,
+  SellCartDto,
   SellProductDto,
   UpdateProductDto,
 } from "./products.dto.js";
@@ -136,6 +137,95 @@ export class ProductsService {
 
       return sale;
     });
+  }
+
+  /**
+   * Чек из нескольких товаров: кассир набирает корзину и пробивает её одним
+   * способом оплаты. Все позиции проходят в одной транзакции — либо весь чек,
+   * либо ничего, чтобы остаток склада и выручка смены не разошлись при сбое.
+   * Привязки к гостю и бонусов здесь нет: касса бара продаёт анонимно.
+   */
+  async sellCart(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    dto: SellCartDto,
+  ): Promise<{ total: number; items: number }> {
+    await this.access.requireClub(staff, clubId);
+
+    if (
+      dto.method !== PaymentMethod.CASH &&
+      dto.method !== PaymentMethod.CARD
+    ) {
+      throw new BadRequestException(
+        "Бар оплачивается только наличными или картой",
+      );
+    }
+
+    // Одна позиция на товар: если кассир добавил один товар дважды, складываем
+    // количества, иначе две строки спорили бы за один остаток склада.
+    const merged = new Map<string, number>();
+    for (const item of dto.items) {
+      merged.set(
+        item.productId,
+        (merged.get(item.productId) ?? 0) + item.quantity,
+      );
+    }
+
+    const products = await Promise.all(
+      [...merged.keys()].map((id) => this.requireProduct(clubId, id)),
+    );
+    const byId = new Map(products.map((p) => [p.id, p]));
+
+    for (const [productId, quantity] of merged) {
+      const product = byId.get(productId)!;
+      if (!product.isActive) {
+        throw new BadRequestException(`Товар «${product.name}» снят с продажи`);
+      }
+      if (product.stock !== null && product.stock < quantity) {
+        throw new BadRequestException(
+          `Не хватает «${product.name}»: осталось ${product.stock}`,
+        );
+      }
+    }
+
+    const total = [...merged].reduce(
+      (sum, [productId, quantity]) =>
+        sum + byId.get(productId)!.price * quantity,
+      0,
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      const shift = await tx.shift.findFirst({
+        where: { clubId, closedAt: null },
+        orderBy: { openedAt: "desc" },
+      });
+
+      for (const [productId, quantity] of merged) {
+        const product = byId.get(productId)!;
+        if (product.stock !== null) {
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { decrement: quantity } },
+          });
+        }
+        await tx.productSale.create({
+          data: {
+            clubId,
+            productId: product.id,
+            sessionId: null,
+            shiftId: shift?.id ?? null,
+            staffId: staff.id,
+            quantity,
+            priceAtSale: product.price,
+            costAtSale: product.cost,
+            total: product.price * quantity,
+            method: dto.method,
+          },
+        });
+      }
+    });
+
+    return { total, items: merged.size };
   }
 
   private async requireProduct(

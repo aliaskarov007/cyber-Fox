@@ -1,5 +1,9 @@
 import { PaymentMethod } from "@prisma/client";
+import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -7,6 +11,7 @@ import {
   IsString,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 
 export class CreateProductDto {
@@ -96,4 +101,27 @@ export class SellProductDto {
   @IsOptional()
   @IsString()
   sessionId?: string;
+}
+
+/** Одна позиция чека: товар и сколько штук. */
+export class CartItemDto {
+  @IsString()
+  productId!: string;
+
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+}
+
+/** Продажа нескольких товаров одним чеком за один способ оплаты. */
+export class SellCartDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CartItemDto)
+  items!: CartItemDto[];
+
+  @IsEnum(PaymentMethod)
+  method!: PaymentMethod;
 }

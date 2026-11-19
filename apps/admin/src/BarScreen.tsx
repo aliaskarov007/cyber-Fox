@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   type Club,
-  type Guest,
   type Product,
   type Staff,
   api,
@@ -11,20 +10,29 @@ import {
 import { ProductsSection } from "./ProductsSection.js";
 import { SeatRequests } from "./SeatRequests.js";
 
+/** Строка чека: товар и сколько штук набрал кассир. */
+type CartLine = { product: Product; quantity: number };
+
+/** Склонение «позиция/позиции/позиций» по числу. */
+function positions(n: number): string {
+  const ten = n % 10;
+  const hundred = n % 100;
+  if (ten === 1 && hundred !== 11) return "позиция";
+  if (ten >= 2 && ten <= 4 && (hundred < 10 || hundred >= 20)) return "позиции";
+  return "позиций";
+}
+
 /**
- * Бар. Продажа — самая частая операция после посадки, поэтому товар продаётся
- * в два касания: выбрать позицию, выбрать способ оплаты.
+ * Бар. Кассир набирает чек из нескольких товаров и пробивает его одной оплатой.
+ * Привязки к гостю нет — касса бара продаёт анонимно, быстро и в два касания:
+ * набрать позиции и выбрать способ оплаты.
  */
 export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
   /** Товары заводит владелец или управляющий: сервер закрывает правку ролью. */
   const canManage = staff.role === "OWNER" || staff.role === "ADMIN";
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [selected, setSelected] = useState<Product | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [guest, setGuest] = useState<Guest | null>(null);
-  const [query, setQuery] = useState("");
-  const [found, setFound] = useState<Guest[]>([]);
+  const [cart, setCart] = useState<CartLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,17 +45,6 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    if (query.trim().length === 0) {
-      setFound([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setFound(await api.searchGuests(club.id, query));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [club.id, query]);
-
   const categories = useMemo(() => {
     const grouped = new Map<string, Product[]>();
     for (const product of products.filter((p) => p.isActive)) {
@@ -57,22 +54,68 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
     return [...grouped.entries()];
   }, [products]);
 
-  async function sell(method: string): Promise<void> {
-    if (!selected) return;
+  const cartTotal = cart.reduce(
+    (sum, line) => sum + line.product.price * line.quantity,
+    0,
+  );
+
+  /** Остаток с учётом уже набранного в чек — чтобы не продать больше, чем есть. */
+  function stockLeft(product: Product): number | null {
+    if (product.stock === null) return null;
+    const inCart = cart.find((l) => l.product.id === product.id)?.quantity ?? 0;
+    return product.stock - inCart;
+  }
+
+  function addToCart(product: Product): void {
+    setDone(null);
+    setError(null);
+    const left = stockLeft(product);
+    if (left !== null && left <= 0) return;
+    setCart((prev) => {
+      const existing = prev.find((l) => l.product.id === product.id);
+      if (existing) {
+        return prev.map((l) =>
+          l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l,
+        );
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  }
+
+  function setLineQuantity(productId: string, quantity: number): void {
+    if (quantity <= 0) {
+      setCart((prev) => prev.filter((l) => l.product.id !== productId));
+      return;
+    }
+    setCart((prev) =>
+      prev.map((l) => {
+        if (l.product.id !== productId) return l;
+        // Не даём набрать больше складского остатка.
+        const capped =
+          l.product.stock === null
+            ? quantity
+            : Math.min(quantity, l.product.stock);
+        return { ...l, quantity: capped };
+      }),
+    );
+  }
+
+  async function checkout(method: string): Promise<void> {
+    if (cart.length === 0) return;
     setBusy(true);
     setError(null);
     try {
-      await api.sellProduct(club.id, {
-        productId: selected.id,
-        quantity,
+      const result = await api.sellCart(club.id, {
+        items: cart.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+        })),
         method,
-        guestId: guest?.id,
       });
       setDone(
-        `${selected.name} ×${quantity} — ${formatMoney(selected.price * quantity)}`,
+        `${result.items} ${positions(result.items)} — ${formatMoney(result.total)}`,
       );
-      setSelected(null);
-      setQuantity(1);
+      setCart([]);
       await refresh();
     } catch (cause) {
       setError((cause as Error).message);
@@ -90,7 +133,7 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
       {error && <div className="error">{error}</div>}
 
       {/* Правка товаров живёт рядом с продажей: цену меняют у стойки и в смену,
-          а не в отдельном разделе настроек, куда администратор не заходит. */}
+          а не в отдельном разделе настроек, куда кассир не заходит. */}
       {canManage && (
         <ProductsSection
           club={club}
@@ -106,17 +149,14 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
           </div>
           <div className="bar-grid">
             {items.map((product) => {
-              const out = product.stock !== null && product.stock === 0;
+              const left = stockLeft(product);
+              const out = left !== null && left <= 0;
               return (
                 <button
                   key={product.id}
                   className="bar-item"
                   disabled={out}
-                  onClick={() => {
-                    setSelected(product);
-                    setQuantity(1);
-                    setDone(null);
-                  }}
+                  onClick={() => addToCart(product)}
                 >
                   <div className="bar-thumb">
                     {product.imageUrl ? (
@@ -146,65 +186,65 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
         </section>
       ))}
 
-      {selected && (
+      {cart.length > 0 && (
         <>
           <button
             className="backdrop"
             aria-label="Закрыть"
-            onClick={() => setSelected(null)}
+            onClick={() => setCart([])}
           />
           <aside className="drawer">
             <div className="drawer-head">
-              <h2>{selected.name}</h2>
-              <span className="chip idle">{formatMoney(selected.price)}</span>
+              <h2>Чек</h2>
+              <span className="chip idle">{formatMoney(cartTotal)}</span>
             </div>
 
             {error && <div className="error">{error}</div>}
 
             <div className="section">
-              <h3>Количество</h3>
-              <div className="actions">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    aria-pressed={quantity === n}
-                    onClick={() => setQuantity(n)}
-                  >
-                    {n}
-                  </button>
+              <div className="cart-lines">
+                {cart.map((line) => (
+                  <div className="cart-line" key={line.product.id}>
+                    <span className="cart-name">{line.product.name}</span>
+                    <div className="cart-qty">
+                      <button
+                        aria-label="Меньше"
+                        onClick={() =>
+                          setLineQuantity(line.product.id, line.quantity - 1)
+                        }
+                      >
+                        −
+                      </button>
+                      <span>{line.quantity}</span>
+                      <button
+                        aria-label="Больше"
+                        disabled={
+                          line.product.stock !== null &&
+                          line.quantity >= line.product.stock
+                        }
+                        onClick={() =>
+                          setLineQuantity(line.product.id, line.quantity + 1)
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="cart-sum">
+                      {formatMoney(line.product.price * line.quantity)}
+                    </span>
+                    <button
+                      className="cart-del"
+                      aria-label="Убрать"
+                      onClick={() => setLineQuantity(line.product.id, 0)}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
               </div>
               <div className="row">
                 <span className="k">Итого</span>
-                <span>{formatMoney(selected.price * quantity)}</span>
-              </div>
-            </div>
-
-            <div className="section">
-              <h3>Гость (для бонусов)</h3>
-              <input
-                placeholder="Телефон или имя"
-                value={guest ? guest.fullName : query}
-                onChange={(e) => {
-                  setGuest(null);
-                  setQuery(e.target.value);
-                }}
-              />
-              <div className="guest-list">
-                {found.map((item) => (
-                  <button
-                    key={item.id}
-                    className="guest-item"
-                    aria-pressed={guest?.id === item.id}
-                    onClick={() => {
-                      setGuest(item);
-                      setFound([]);
-                    }}
-                  >
-                    <span>{item.fullName}</span>
-                    <span className="phone">{item.phone}</span>
-                  </button>
-                ))}
+                <span>{formatMoney(cartTotal)}</span>
               </div>
             </div>
 
@@ -214,17 +254,17 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
                 <button
                   className="primary"
                   disabled={busy}
-                  onClick={() => void sell("CASH")}
+                  onClick={() => void checkout("CASH")}
                 >
                   Наличными
                 </button>
-                <button disabled={busy} onClick={() => void sell("CARD")}>
+                <button disabled={busy} onClick={() => void checkout("CARD")}>
                   Картой
                 </button>
               </div>
             </div>
 
-            <button onClick={() => setSelected(null)}>Отмена</button>
+            <button onClick={() => setCart([])}>Очистить</button>
           </aside>
         </>
       )}

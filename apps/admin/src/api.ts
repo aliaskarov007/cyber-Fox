@@ -724,6 +724,18 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  sellCart: (
+    clubId: string,
+    body: {
+      items: Array<{ productId: string; quantity: number }>;
+      method: string;
+    },
+  ) =>
+    request<{ total: number; items: number }>(
+      `/clubs/${clubId}/products/sell-cart`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
   currentShift: (clubId: string) =>
     request<Shift | null>(`/clubs/${clubId}/shifts/current`),
 

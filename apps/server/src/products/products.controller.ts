@@ -4,7 +4,12 @@ import { StaffRole } from "@prisma/client";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
 import { Roles } from "../auth/guards.js";
-import { CreateProductDto, SellProductDto, UpdateProductDto } from "./products.dto.js";
+import {
+  CreateProductDto,
+  SellCartDto,
+  SellProductDto,
+  UpdateProductDto,
+} from "./products.dto.js";
 import { ProductsService } from "./products.service.js";
 
 @Controller("clubs/:clubId/products")
@@ -12,7 +17,10 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  list(@CurrentStaff() staff: AuthenticatedStaff, @Param("clubId") clubId: string) {
+  list(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
     return this.products.list(staff, clubId);
   }
 
@@ -45,5 +53,15 @@ export class ProductsController {
     @Body() dto: SellProductDto,
   ) {
     return this.products.sell(staff, clubId, dto);
+  }
+
+  /** Чек из нескольких товаров одной оплатой — касса бара. */
+  @Post("sell-cart")
+  sellCart(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Body() dto: SellCartDto,
+  ) {
+    return this.products.sellCart(staff, clubId, dto);
   }
 }
