@@ -2662,3 +2662,44 @@ button.link {
   font-style: normal;
   font-size: 12px;
 }
+
+/* Шапка смены: когда открыта/закрыта и сколько длится. */
+.dash-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+/* Итоговая строка блока (должно быть в кассе, всего заработано). */
+.dash-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.dash-total b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Пояснение под карточкой (пополнение ≠ выручка). */
+.dash-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Форма записи движения наличных. */
+.cash-move-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cash-move-form input {
+  flex: 1;
+  min-width: 120px;
+}
+.cash-move-form .seg {
+  flex-basis: 100%;
+}

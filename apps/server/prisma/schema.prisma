@@ -268,6 +268,7 @@ model Club {
   staff     Staff[]
   products  Product[]
   sales     ProductSale[]
+  cashMovements CashMovement[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
@@ -918,6 +919,36 @@ model ProductSale {
   @@index([orderId])
 }
 
+/// Движение наличных в кассе помимо продаж: без него касса не сходится, когда
+/// из ящика берут деньги на закупки или вносят размен.
+enum CashMovementKind {
+  DEPOSIT // внесение наличных в кассу (довнесли размен)
+  DROP // выемка / инкассация (забрали выручку)
+  EXPENSE // расход из кассы (купили воду, оплатили курьера)
+  REFUND // возврат гостю наличными
+}
+
+model CashMovement {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  kind   CashMovementKind
+  /// В тиын, всегда положительная; направление задаёт вид движения.
+  amount Int
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([shiftId])
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -1077,6 +1108,7 @@ model Staff {
   shifts   Shift[]
   payments Payment[]
   sales    ProductSale[]
+  cashMovements CashMovement[]
   passwordResets StaffPasswordReset[]
 
   createdAt DateTime @default(now())
@@ -1107,6 +1139,7 @@ model Shift {
 
   payments Payment[]
   sales    ProductSale[]
+  cashMovements CashMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

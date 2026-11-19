@@ -267,6 +267,28 @@ export interface ShiftReport {
   onlineTotal: number;
   /** Журнал действий кассира за смену: пополнения и пробитые товары, новые сверху. */
   operations: ShiftOperation[];
+  // Движение наличных помимо продаж.
+  cashDeposits: number;
+  cashDrops: number;
+  cashExpenses: number;
+  cashRefunds: number;
+  /** Наличные от продаж (пополнения + бар). */
+  cashSales: number;
+  cashMovements: CashMovement[];
+  // Время смены.
+  openedAt: string;
+  closedAt: string | null;
+  durationMinutes: number;
+}
+
+export type CashMovementKind = "DEPOSIT" | "DROP" | "EXPENSE" | "REFUND";
+
+export interface CashMovement {
+  id: string;
+  at: string;
+  kind: CashMovementKind;
+  amount: number;
+  reason: string | null;
 }
 
 export interface ShiftOperation {
@@ -738,6 +760,16 @@ export const api = {
 
   currentShift: (clubId: string) =>
     request<Shift | null>(`/clubs/${clubId}/shifts/current`),
+
+  addCashMovement: (
+    clubId: string,
+    shiftId: string,
+    body: { kind: string; amount: number; reason?: string },
+  ) =>
+    request<unknown>(`/clubs/${clubId}/shifts/${shiftId}/cash-movements`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   shifts: (clubId: string) => request<Shift[]>(`/clubs/${clubId}/shifts`),
 

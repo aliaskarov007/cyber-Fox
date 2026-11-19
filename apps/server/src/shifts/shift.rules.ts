@@ -15,6 +15,14 @@ export interface CashFlow {
   packagesCash: number;
   /** Продажа товаров за наличные. */
   productsCash: number;
+  /** Внесения наличных в кассу (довнесли размен). */
+  deposits?: number;
+  /** Выемки/инкассации наличных (забрали выручку). */
+  drops?: number;
+  /** Расходы из кассы наличными (закупки, курьер). */
+  expenses?: number;
+  /** Возвраты гостям наличными. */
+  refunds?: number;
 }
 
 export interface ShiftTotals {
@@ -45,9 +53,7 @@ export interface ShiftTotals {
  * Знак как у остальных списаний: по кошельку гостя взнос отрицателен, а приз
  * и возврат положительны, поэтому заработок зала — минус сумма движений.
  */
-export function tournamentNet(
-  transactions: Array<{ amount: number }>,
-): number {
+export function tournamentNet(transactions: Array<{ amount: number }>): number {
   return transactions.reduce((sum, t) => sum - t.amount, 0);
 }
 
@@ -63,14 +69,29 @@ export function computeShiftTotals(params: {
   tournamentNet?: number;
 }): ShiftTotals {
   const { cash } = params;
+  // Касса на закрытии: размен + принятые наличными + внесённое − изъятое,
+  // израсходованное и возвращённое. Без движений ящик никогда не сойдётся,
+  // если из него брали деньги на закупки или забирали выручку.
+  const movementsNet =
+    (cash.deposits ?? 0) -
+    (cash.drops ?? 0) -
+    (cash.expenses ?? 0) -
+    (cash.refunds ?? 0);
   const cashExpected =
-    cash.openingFloat + cash.topUpsCash + cash.packagesCash + cash.productsCash;
+    cash.openingFloat +
+    cash.topUpsCash +
+    cash.packagesCash +
+    cash.productsCash +
+    movementsNet;
 
   return {
     cashExpected,
     cardTotal: params.cardTotal,
     balanceTotal: params.balanceTotal,
-    revenue: params.sessionsRevenue + params.productsRevenue + (params.tournamentNet ?? 0),
+    revenue:
+      params.sessionsRevenue +
+      params.productsRevenue +
+      (params.tournamentNet ?? 0),
   };
 }
 

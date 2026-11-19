@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PaymentMethod, type Shift, TransactionType } from "@prisma/client";
+import {
+  CashMovementKind,
+  PaymentMethod,
+  type Shift,
+  TransactionType,
+} from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
@@ -63,6 +68,35 @@ export interface ShiftReport {
   onlineTotal: number;
   /** Журнал действий кассира за смену: пополнения и пробитые товары, новые сверху. */
   operations: ShiftOperation[];
+
+  // --- Движение наличных помимо продаж ---
+  /** Внесено наличных в кассу за смену. */
+  cashDeposits: number;
+  /** Изъято из кассы (выемки/инкассации) за смену. */
+  cashDrops: number;
+  /** Израсходовано из кассы наличными за смену. */
+  cashExpenses: number;
+  /** Возвращено гостям наличными за смену. */
+  cashRefunds: number;
+  /** Наличные, принятые от продаж (пополнения + бар). */
+  cashSales: number;
+  /** Все движения наличных строками, новые сверху. */
+  cashMovements: CashMovementRow[];
+
+  // --- Время смены ---
+  openedAt: Date;
+  closedAt: Date | null;
+  /** Длительность смены в минутах (для открытой — на текущий момент). */
+  durationMinutes: number;
+}
+
+/** Одно движение наличных в кассе помимо продаж, для журнала смены. */
+export interface CashMovementRow {
+  id: string;
+  at: Date;
+  kind: CashMovementKind;
+  amount: number;
+  reason: string | null;
 }
 
 @Injectable()
@@ -173,7 +207,7 @@ export class ShiftsService {
     const until = shift.closedAt ?? new Date();
     const window = { gte: shift.openedAt, lte: until };
 
-    const [payments, sales, staffRecord] = await Promise.all([
+    const [payments, sales, movements, staffRecord] = await Promise.all([
       this.prisma.payment.findMany({
         where: { shiftId: shift.id },
         include: { guest: { select: { fullName: true } } },
@@ -181,6 +215,10 @@ export class ShiftsService {
       this.prisma.productSale.findMany({
         where: { shiftId: shift.id },
         include: { product: { select: { name: true } } },
+      }),
+      this.prisma.cashMovement.findMany({
+        where: { shiftId: shift.id },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.staff.findUnique({ where: { id: shift.staffId } }),
     ]);
@@ -228,6 +266,16 @@ export class ShiftsService {
       0,
     );
 
+    // Движение наличных помимо продаж: без него касса не сходится.
+    const movedBy = (kind: CashMovementKind): number =>
+      movements
+        .filter((m) => m.kind === kind)
+        .reduce((sum, m) => sum + m.amount, 0);
+    const cashDeposits = movedBy(CashMovementKind.DEPOSIT);
+    const cashDrops = movedBy(CashMovementKind.DROP);
+    const cashExpenses = movedBy(CashMovementKind.EXPENSE);
+    const cashRefunds = movedBy(CashMovementKind.REFUND);
+
     const totals = computeShiftTotals({
       cash: {
         openingFloat: shift.openingFloat,
@@ -235,6 +283,10 @@ export class ShiftsService {
         topUpsCash: sumBy(PaymentMethod.CASH),
         packagesCash: 0,
         productsCash: salesBy(PaymentMethod.CASH),
+        deposits: cashDeposits,
+        drops: cashDrops,
+        expenses: cashExpenses,
+        refunds: cashRefunds,
       },
       cardTotal: sumBy(PaymentMethod.CARD) + salesBy(PaymentMethod.CARD),
       balanceTotal: salesBy(PaymentMethod.BALANCE) + sessionsRevenue,
@@ -301,7 +353,54 @@ export class ShiftsService {
       cashTotal,
       onlineTotal,
       operations,
+      // Движение наличных помимо продаж.
+      cashDeposits,
+      cashDrops,
+      cashExpenses,
+      cashRefunds,
+      cashSales: cashTotal,
+      cashMovements: movements.map((m) => ({
+        id: m.id,
+        at: m.createdAt,
+        kind: m.kind,
+        amount: m.amount,
+        reason: m.reason,
+      })),
+      // Время смены: открыта, закрыта и длительность в минутах.
+      openedAt: shift.openedAt,
+      closedAt: shift.closedAt,
+      durationMinutes: Math.max(
+        0,
+        Math.round((until.getTime() - shift.openedAt.getTime()) / 60000),
+      ),
     };
+  }
+
+  /**
+   * Движение наличных в кассе помимо продаж. Привязывается к открытой смене:
+   * вносить и изымать деньги можно только пока касса открыта.
+   */
+  async addCashMovement(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    shiftId: string,
+    dto: { kind: CashMovementKind; amount: number; reason?: string },
+  ) {
+    await this.access.requireClub(staff, clubId);
+    const shift = await this.requireShift(clubId, shiftId);
+    if (shift.closedAt) {
+      throw new BadRequestException("Смена закрыта — касса уже сверена");
+    }
+    return this.prisma.cashMovement.create({
+      data: {
+        clubId,
+        shiftId: shift.id,
+        staffId: staff.id,
+        kind: dto.kind,
+        amount: dto.amount,
+        reason: dto.reason?.trim() || null,
+      },
+    });
   }
 
   private async requireShift(clubId: string, shiftId: string): Promise<Shift> {
