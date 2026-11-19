@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   ComputerStatus,
   GuestPackageStatus,
@@ -8,7 +13,10 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-import { minutesAffordable, pickPerMinuteTariff } from "../billing/billing.rules.js";
+import {
+  minutesAffordable,
+  pickPerMinuteTariff,
+} from "../billing/billing.rules.js";
 import { SubscriptionService } from "../billing-platform/subscription.service.js";
 import { toLocalMoment } from "../common/local-time.js";
 import { findGuestByPhone } from "../guests/guest-phone.js";
@@ -24,11 +32,25 @@ const PIN_LOCK_MINUTES = 15;
 export interface GuestLoginResult {
   ok: boolean;
   reason: string | null;
-  guest: { id: string; fullName: string; balance: number } | null;
+  guest: {
+    id: string;
+    fullName: string;
+    balance: number;
+    bonusPoints: number;
+    discountPercent: number;
+  } | null;
   /** Минуты гостя в зоне этого ПК — ими можно играть прямо сейчас. */
-  packagesInZone: Array<{ id: string; minutesRemaining: number; expiresAt: Date }>;
+  packagesInZone: Array<{
+    id: string;
+    minutesRemaining: number;
+    expiresAt: Date;
+  }>;
   /** Минуты в других зонах — показываем с пометкой, что здесь не действуют. */
-  packagesElsewhere: Array<{ id: string; zoneName: string; minutesRemaining: number }>;
+  packagesElsewhere: Array<{
+    id: string;
+    zoneName: string;
+    minutesRemaining: number;
+  }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;
 }
@@ -126,7 +148,9 @@ export class AgentService {
 
     const zone = club.zones[0];
     if (!zone) {
-      throw new BadRequestException("В клубе нет ни одной зоны — заведите её перед подключением");
+      throw new BadRequestException(
+        "В клубе нет ни одной зоны — заведите её перед подключением",
+      );
     }
 
     // Лимит подписки проверяем и здесь: иначе бездисковый зал молча заводил бы
@@ -224,7 +248,11 @@ export class AgentService {
    * Счётчик попыток ведётся по аккаунту, а не по машине — перебор с соседнего
    * ПК не обходит блокировку (docs/guest-access.md, раздел 2).
    */
-  async guestLogin(computerId: string, phone: string, pin: string): Promise<GuestLoginResult> {
+  async guestLogin(
+    computerId: string,
+    phone: string,
+    pin: string,
+  ): Promise<GuestLoginResult> {
     const computer = await this.prisma.computer.findUnique({
       where: { id: computerId },
       include: { club: true, zone: true },
@@ -242,7 +270,11 @@ export class AgentService {
     };
 
     // Номер гость набирает как привык: «8 701…» должен найти «+7 701…».
-    const guest = await findGuestByPhone(this.prisma, computer.club.tenantId, phone);
+    const guest = await findGuestByPhone(
+      this.prisma,
+      computer.club.tenantId,
+      phone,
+    );
 
     if (!guest?.pinHash) {
       return { ...empty, reason: "Неверный номер или PIN" };
@@ -251,7 +283,8 @@ export class AgentService {
     if (guest.pinLockedUntil && guest.pinLockedUntil > new Date()) {
       return {
         ...empty,
-        reason: "Вход заблокирован после нескольких неверных попыток. Подойдите к администратору.",
+        reason:
+          "Вход заблокирован после нескольких неверных попыток. Подойдите к администратору.",
       };
     }
 
@@ -284,13 +317,18 @@ export class AgentService {
    * Отдельно от входа, потому что пересчитывается и без PIN — после промокода,
    * введённого прямо на этом экране: гость уже опознан, а баланс поменялся.
    */
-  async guestCard(computerId: string, guestId: string): Promise<GuestLoginResult> {
+  async guestCard(
+    computerId: string,
+    guestId: string,
+  ): Promise<GuestLoginResult> {
     const computer = await this.prisma.computer.findUnique({
       where: { id: computerId },
       include: { club: true, zone: true },
     });
     if (!computer) throw new NotFoundException("ПК не найден");
-    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
+    const guest = await this.prisma.guest.findUnique({
+      where: { id: guestId },
+    });
     if (!guest || guest.tenantId !== computer.club.tenantId) {
       throw new NotFoundException("Гость не найден");
     }
@@ -318,7 +356,10 @@ export class AgentService {
     };
 
     if (computer.status === ComputerStatus.RESERVED) {
-      return { ...empty, reason: "Место забронировано. Подойдите к администратору." };
+      return {
+        ...empty,
+        reason: "Место забронировано. Подойдите к администратору.",
+      };
     }
     if (computer.status === ComputerStatus.MAINTENANCE) {
       return { ...empty, reason: "ПК на обслуживании." };
@@ -333,19 +374,36 @@ export class AgentService {
       include: { computer: { select: { name: true } } },
     });
     if (openSession) {
-      return { ...empty, reason: `У вас уже открыта сессия на ${openSession.computer.name}` };
+      return {
+        ...empty,
+        reason: `У вас уже открыта сессия на ${openSession.computer.name}`,
+      };
     }
 
     const wallet = await this.wallets.resolveWallet(guest.id, computer.clubId);
     if (wallet.balance < 0) {
       return {
         ...empty,
-        reason: "На счету долг. Подойдите к администратору, чтобы его погасить.",
+        reason:
+          "На счету долг. Подойдите к администратору, чтобы его погасить.",
       };
     }
 
     const now = new Date();
     const moment = toLocalMoment(now, computer.club.timezone);
+
+    // Скидка и бонусы гостя — показываем на карточке входа.
+    const profile = await this.prisma.guest.findUnique({
+      where: { id: guest.id },
+      select: { bonusPoints: true, discountPercent: true },
+    });
+    const guestInfo = (balance: number) => ({
+      id: guest.id,
+      fullName: guest.fullName,
+      balance,
+      bonusPoints: profile?.bonusPoints ?? 0,
+      discountPercent: profile?.discountPercent ?? 0,
+    });
 
     const packages = await this.prisma.guestPackage.findMany({
       where: {
@@ -375,24 +433,29 @@ export class AgentService {
 
     const inZone = packages.filter((p) => p.zoneId === computer.zoneId);
     const price = perMinute?.pricePerMinute ?? 0;
-    const affordable = price > 0
-      ? minutesAffordable({ balance: wallet.balance, creditLimit: computer.club.creditLimit }, price)
-      : 0;
+    const affordable =
+      price > 0
+        ? minutesAffordable(
+            { balance: wallet.balance, creditLimit: computer.club.creditLimit },
+            price,
+          )
+        : 0;
 
     // Долг даётся, чтобы доиграть начатое, а не чтобы начать: если минут нет и
     // баланса не хватает даже на минуту, вход отклоняется.
     if (inZone.length === 0 && (price === 0 || wallet.balance < price)) {
       return {
         ...empty,
-        guest: { id: guest.id, fullName: guest.fullName, balance: wallet.balance },
-        reason: "Недостаточно средств. Подойдите к администратору, чтобы пополнить счёт.",
+        guest: guestInfo(wallet.balance),
+        reason:
+          "Недостаточно средств. Подойдите к администратору, чтобы пополнить счёт.",
       };
     }
 
     return {
       ok: true,
       reason: null,
-      guest: { id: guest.id, fullName: guest.fullName, balance: wallet.balance },
+      guest: guestInfo(wallet.balance),
       packagesInZone: inZone.map((p) => ({
         id: p.id,
         minutesRemaining: p.minutesRemaining,
@@ -400,15 +463,25 @@ export class AgentService {
       })),
       packagesElsewhere: packages
         .filter((p) => p.zoneId !== computer.zoneId)
-        .map((p) => ({ id: p.id, zoneName: p.zone.name, minutesRemaining: p.minutesRemaining })),
+        .map((p) => ({
+          id: p.id,
+          zoneName: p.zone.name,
+          minutesRemaining: p.minutesRemaining,
+        })),
       perMinutePrice: perMinute?.pricePerMinute ?? null,
       minutesAffordable: affordable,
     };
   }
 
   /** Гость подтвердил старт на экране блокировки. */
-  async startByGuest(computerId: string, guestId: string, tariffId: string | null) {
-    const computer = await this.prisma.computer.findUnique({ where: { id: computerId } });
+  async startByGuest(
+    computerId: string,
+    guestId: string,
+    tariffId: string | null,
+  ) {
+    const computer = await this.prisma.computer.findUnique({
+      where: { id: computerId },
+    });
     if (!computer) throw new NotFoundException("ПК не найден");
 
     return this.sessions.start({
@@ -422,7 +495,9 @@ export class AgentService {
 
   /** Гость закрыл сессию сам — списание останавливается сразу. */
   async stopByGuest(computerId: string, sessionId: string) {
-    const session = await this.prisma.session.findUnique({ where: { id: sessionId } });
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+    });
     if (!session || session.computerId !== computerId) {
       throw new BadRequestException("Сессия не относится к этому ПК");
     }

@@ -26,6 +26,7 @@ export interface RealtimeEvents {
     /* Панель гостя в оболочке. У анонимной посадки пусто: гостя нет. */
     guestName?: string | null;
     bonusPoints?: number | null;
+    discountPercent?: number | null;
     tariffName?: string | null;
   };
   "session.switched": SessionEvent & {

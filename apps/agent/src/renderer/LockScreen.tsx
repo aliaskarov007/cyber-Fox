@@ -169,6 +169,18 @@ export function LockScreen({
             <span className="k">Баланс</span>
             <span>{formatMoney(card.guest.balance)}</span>
           </div>
+          {card.guest.discountPercent > 0 && (
+            <div className="row">
+              <span className="k">Ваша скидка</span>
+              <span>{card.guest.discountPercent}%</span>
+            </div>
+          )}
+          {card.guest.bonusPoints > 0 && (
+            <div className="row">
+              <span className="k">Бонусы</span>
+              <span>{formatMoney(card.guest.bonusPoints)}</span>
+            </div>
+          )}
           {minutes && (
             <div className="row">
               <span className="k">Минуты в этой зоне</span>

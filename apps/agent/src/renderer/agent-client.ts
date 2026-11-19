@@ -54,7 +54,13 @@ export interface GuestScreen {
 export interface GuestLoginResult {
   ok: boolean;
   reason: string | null;
-  guest: { id: string; fullName: string; balance: number } | null;
+  guest: {
+    id: string;
+    fullName: string;
+    balance: number;
+    bonusPoints: number;
+    discountPercent: number;
+  } | null;
   packagesInZone: Array<{
     id: string;
     minutesRemaining: number;
@@ -147,6 +153,7 @@ export interface Tick {
   /** Панель гостя: кто сидит, по какому тарифу, сколько бонусов. */
   guestName?: string | null;
   bonusPoints?: number | null;
+  discountPercent?: number | null;
   tariffName?: string | null;
   packageMinutesLeft: number | null;
   balance: number;

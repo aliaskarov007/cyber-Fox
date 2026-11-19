@@ -1054,6 +1054,7 @@ export class SessionsService {
     /* Панель гостя в оболочке: кто сидит, по какому тарифу и сколько бонусов. */
     guestName: string | null;
     bonusPoints: number | null;
+    discountPercent: number | null;
     tariffName: string | null;
   } | null> {
     const session = await this.prisma.session.findUnique({
@@ -1105,6 +1106,7 @@ export class SessionsService {
       // У анонимной посадки гостя нет — панель покажет только время и остаток.
       guestName: session.guest?.fullName ?? null,
       bonusPoints: session.guest?.bonusPoints ?? null,
+      discountPercent: session.guest?.discountPercent ?? null,
       tariffName: tariff?.name ?? null,
     };
   }

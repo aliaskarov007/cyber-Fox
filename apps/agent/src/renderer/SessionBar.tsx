@@ -148,6 +148,9 @@ export function SessionBar({
 
         <div className="session-money">
           <span className="k">Баланс</span> {formatMoney(tick.balance)}
+          {tick.discountPercent ? (
+            <span className="k"> · скидка {tick.discountPercent}%</span>
+          ) : null}
           {tick.bonusPoints ? (
             <span className="k"> · бонусы {formatMoney(tick.bonusPoints)}</span>
           ) : null}
