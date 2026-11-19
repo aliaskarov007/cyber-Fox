@@ -19,6 +19,18 @@ class CloseShiftDto {
   @Min(0)
   cashCounted!: number;
 
+  /** Карта по терминалу, в тиын. Пусто — не сверяли. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  cardCounted?: number;
+
+  /** Онлайн по выписке Kaspi, в тиын. Пусто — не сверяли. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  onlineCounted?: number;
+
   @IsOptional()
   @IsString()
   note?: string;
@@ -83,7 +95,12 @@ export class ShiftsController {
     @Param("shiftId") shiftId: string,
     @Body() dto: CloseShiftDto,
   ) {
-    return this.shifts.close(staff, clubId, shiftId, dto.cashCounted, dto.note);
+    return this.shifts.close(staff, clubId, shiftId, {
+      cashCounted: dto.cashCounted,
+      note: dto.note,
+      cardCounted: dto.cardCounted,
+      onlineCounted: dto.onlineCounted,
+    });
   }
 
   /** Движение наличных в кассе: внесение, выемка, расход или возврат. */

@@ -1135,6 +1135,10 @@ model Shift {
   /// пересчитанное вводит сотрудник; разница остаётся в истории как есть.
   cashExpected Int?
   cashCounted  Int?
+  /// Сверка безнала на закрытии: карта по терминалу, онлайн по выписке Kaspi.
+  /// Пусто — сотрудник не сверял этот канал.
+  cardCounted   Int?
+  onlineCounted Int?
   note         String?
 
   payments Payment[]

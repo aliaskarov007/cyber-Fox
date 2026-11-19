@@ -275,6 +275,13 @@ export interface ShiftReport {
   /** Наличные от продаж (пополнения + бар). */
   cashSales: number;
   cashMovements: CashMovement[];
+  // Сверка безнала (вводит сотрудник на закрытии).
+  cardCounted: number | null;
+  onlineCounted: number | null;
+  // Итоги для владельца.
+  checksCount: number;
+  averageCheck: number;
+  topProducts: Array<{ name: string; quantity: number; revenue: number }>;
   // Время смены.
   openedAt: string;
   closedAt: string | null;
@@ -785,12 +792,16 @@ export const api = {
   closeShift: (
     clubId: string,
     shiftId: string,
-    cashCounted: number,
-    note?: string,
+    body: {
+      cashCounted: number;
+      note?: string;
+      cardCounted?: number;
+      onlineCounted?: number;
+    },
   ) =>
     request<ShiftReport>(`/clubs/${clubId}/shifts/${shiftId}/close`, {
       method: "POST",
-      body: JSON.stringify({ cashCounted, note }),
+      body: JSON.stringify(body),
     }),
 
   // --- Сеть клубов ---

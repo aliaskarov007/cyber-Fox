@@ -96,27 +96,30 @@ export function DashboardScreen({ club }: { club: Club }) {
 
   return (
     <main>
-      <div className="dash-meta">
-        Открыта{" "}
-        {new Date(report.openedAt).toLocaleString("ru-KZ", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-        {report.closedAt && (
-          <>
-            {" · закрыта "}
-            {new Date(report.closedAt).toLocaleString("ru-KZ", {
-              day: "2-digit",
-              month: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </>
-        )}
-        {" · "}
-        {durationText(report.durationMinutes)}
+      <div className="dash-meta-row">
+        <div className="dash-meta">
+          Открыта{" "}
+          {new Date(report.openedAt).toLocaleString("ru-KZ", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          {report.closedAt && (
+            <>
+              {" · закрыта "}
+              {new Date(report.closedAt).toLocaleString("ru-KZ", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </>
+          )}
+          {" · "}
+          {durationText(report.durationMinutes)}
+        </div>
+        <button onClick={() => window.print()}>Печать Z-отчёта</button>
       </div>
 
       <div className="dash-grid">
@@ -226,6 +229,38 @@ export function DashboardScreen({ club }: { club: Club }) {
           </div>
         </section>
 
+        {/* Чеки и средний чек. */}
+        <section className="dash-card">
+          <div className="dash-title">Чеки</div>
+          <div className="dash-rows">
+            <div className="row">
+              <span className="k">Чеков за смену</span>
+              <span>{report.checksCount}</span>
+            </div>
+            <div className="row">
+              <span className="k">Средний чек</span>
+              <b>{formatMoney(report.averageCheck)}</b>
+            </div>
+          </div>
+        </section>
+
+        {/* Топ товаров по выручке. */}
+        {report.topProducts.length > 0 && (
+          <section className="dash-card">
+            <div className="dash-title">Топ товаров</div>
+            <div className="dash-rows">
+              {report.topProducts.map((p) => (
+                <div className="row" key={p.name}>
+                  <span className="k">
+                    {p.name} <i className="dash-qty">×{p.quantity}</i>
+                  </span>
+                  <span>{formatMoney(p.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Движение наличных — запись и список. */}
         {shiftId && (
           <CashMovementCard
@@ -265,7 +300,150 @@ export function DashboardScreen({ club }: { club: Club }) {
           )}
         </section>
       </div>
+
+      <ZReport report={report} clubName={club.name} />
     </main>
+  );
+}
+
+/**
+ * Печатный бланк Z-отчёта. На экране скрыт, печатается по кнопке «Печать»:
+ * чистый лист закрытия смены со всеми блоками — его подписывают при сдаче кассы.
+ */
+function ZReport({
+  report,
+  clubName,
+}: {
+  report: ShiftReport;
+  clubName: string;
+}) {
+  const earned = report.sessionsRevenue + report.productsRevenue;
+  const fmt = (n: number): string => formatMoney(n);
+  const dt = (s: string): string =>
+    new Date(s).toLocaleString("ru-KZ", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const line = (label: string, value: string, strong = false) => (
+    <div className={`zr-line ${strong ? "zr-strong" : ""}`}>
+      <span>{label}</span>
+      <span>{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="zreport">
+      <h1 className="zr-title">Z-отчёт смены</h1>
+      <div className="zr-sub">
+        {clubName} · смену вёл {report.staffName}
+      </div>
+      <div className="zr-sub">
+        Открыта {dt(report.openedAt)}
+        {report.closedAt
+          ? ` · закрыта ${dt(report.closedAt)}`
+          : " · не закрыта"}
+        {" · "}
+        {durationText(report.durationMinutes)}
+      </div>
+
+      <h2 className="zr-h2">Касса (наличные)</h2>
+      {line("Размен на начало", fmt(report.openingFloat))}
+      {line("Продажи наличными", `+ ${fmt(report.cashSales)}`)}
+      {line("Внесения", `+ ${fmt(report.cashDeposits)}`)}
+      {line("Выемки", `− ${fmt(report.cashDrops)}`)}
+      {line("Расходы", `− ${fmt(report.cashExpenses)}`)}
+      {line("Возвраты", `− ${fmt(report.cashRefunds)}`)}
+      {line("Должно быть в кассе", fmt(report.cashExpected), true)}
+      {report.reconciliation &&
+        line("Пересчитано", fmt(report.reconciliation.counted))}
+      {report.reconciliation &&
+        line(
+          "Расхождение",
+          report.reconciliation.difference === 0
+            ? "сошлось"
+            : report.reconciliation.difference < 0
+              ? `недостача ${fmt(Math.abs(report.reconciliation.difference))}`
+              : `излишек ${fmt(report.reconciliation.difference)}`,
+          true,
+        )}
+
+      <h2 className="zr-h2">Безнал</h2>
+      {line(
+        "Карта (система)",
+        fmt(report.cardTotal) +
+          (report.cardCounted !== null
+            ? ` · по терминалу ${fmt(report.cardCounted)}`
+            : ""),
+      )}
+      {line(
+        "Онлайн / Kaspi (система)",
+        fmt(report.onlineTotal) +
+          (report.onlineCounted !== null
+            ? ` · по выписке ${fmt(report.onlineCounted)}`
+            : ""),
+      )}
+
+      <h2 className="zr-h2">Выручка (заработано)</h2>
+      {line("Игровое время", fmt(report.sessionsRevenue))}
+      {line("Бар", fmt(report.productsRevenue))}
+      {line("Маржа бара", fmt(report.productsRevenue - report.productsCost))}
+      {line("Всего заработано", fmt(earned), true)}
+
+      <h2 className="zr-h2">Предоплаты (балансы)</h2>
+      {line("Пополнено балансов", fmt(report.clubTopUps))}
+      {line("Потрачено с баланса", fmt(report.balanceTotal))}
+
+      <h2 className="zr-h2">Итоги</h2>
+      {line("Деньги в кассу", fmt(report.grandTotal), true)}
+      {line("Чеков за смену", String(report.checksCount))}
+      {line("Средний чек", fmt(report.averageCheck))}
+      {line("Сессий сыграно", String(report.sessionsCount))}
+
+      {report.cashMovements.length > 0 && (
+        <>
+          <h2 className="zr-h2">Движение наличных</h2>
+          {report.cashMovements.map((m) => (
+            <div className="zr-line" key={m.id}>
+              <span>
+                {new Date(m.at).toLocaleTimeString("ru-KZ", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                · {MOVEMENT_LABEL[m.kind] ?? m.kind}
+                {m.reason ? ` · ${m.reason}` : ""}
+              </span>
+              <span>
+                {m.kind === "DEPOSIT" ? "+" : "−"}
+                {fmt(m.amount)}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {report.topProducts.length > 0 && (
+        <>
+          <h2 className="zr-h2">Топ товаров</h2>
+          {report.topProducts.map((p) => (
+            <div className="zr-line" key={p.name}>
+              <span>
+                {p.name} ×{p.quantity}
+              </span>
+              <span>{fmt(p.revenue)}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      <div className="zr-signs">
+        <div>Кассир ____________________</div>
+        <div>Принял ____________________</div>
+      </div>
+    </div>
   );
 }
 

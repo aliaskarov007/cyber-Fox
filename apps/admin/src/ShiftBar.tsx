@@ -93,6 +93,8 @@ function ShiftPanel({
 }) {
   const [float, setFloat] = useState("5000");
   const [counted, setCounted] = useState("");
+  const [cardCounted, setCardCounted] = useState("");
+  const [onlineCounted, setOnlineCounted] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +155,42 @@ function ShiftPanel({
             </div>
           </div>
         </div>
+
+        {(result.cardCounted !== null || result.onlineCounted !== null) && (
+          <div className="section">
+            <h3>Безнал</h3>
+            <div className="rows">
+              {result.cardCounted !== null && (
+                <CashlessRow
+                  label="Карта"
+                  expected={result.cardTotal}
+                  counted={result.cardCounted}
+                />
+              )}
+              {result.onlineCounted !== null && (
+                <CashlessRow
+                  label="Kaspi / онлайн"
+                  expected={result.onlineTotal}
+                  counted={result.onlineCounted}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {result.closedAt && (
+          <div className="notice">
+            Закрыта{" "}
+            {new Date(result.closedAt).toLocaleString("ru-KZ", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            · смена длилась {Math.floor(result.durationMinutes / 60)} ч{" "}
+            {result.durationMinutes % 60} мин
+          </div>
+        )}
 
         <ReportRows report={result} canSeeMargin={canSeeMargin} />
         <button onClick={onClose}>Закрыть</button>
@@ -224,6 +262,25 @@ function ShiftPanel({
             placeholder={report ? String(report.cashExpected / 100) : ""}
           />
         </label>
+        {/* Сверка безнала — по желанию: карта по терминалу, Kaspi по выписке. */}
+        <label>
+          Карта по терминалу, ₸ (если сверяете)
+          <input
+            inputMode="decimal"
+            value={cardCounted}
+            onChange={(e) => setCardCounted(e.target.value)}
+            placeholder={report ? String(report.cardTotal / 100) : ""}
+          />
+        </label>
+        <label>
+          Онлайн по выписке Kaspi, ₸ (если сверяете)
+          <input
+            inputMode="decimal"
+            value={onlineCounted}
+            onChange={(e) => setOnlineCounted(e.target.value)}
+            placeholder={report ? String(report.onlineTotal / 100) : ""}
+          />
+        </label>
         <label>
           Комментарий
           <input value={note} onChange={(e) => setNote(e.target.value)} />
@@ -233,12 +290,16 @@ function ShiftPanel({
           disabled={busy || counted.trim() === ""}
           onClick={() =>
             void run(async () => {
-              const closed = await api.closeShift(
-                club.id,
-                shift.id,
-                toTiyn(counted),
+              const closed = await api.closeShift(club.id, shift.id, {
+                cashCounted: toTiyn(counted),
                 note,
-              );
+                cardCounted:
+                  cardCounted.trim() === "" ? undefined : toTiyn(cardCounted),
+                onlineCounted:
+                  onlineCounted.trim() === ""
+                    ? undefined
+                    : toTiyn(onlineCounted),
+              });
               setResult(closed);
             })
           }
@@ -319,6 +380,34 @@ function ReportRows({
         Выручка смены — {formatMoney(report.revenue)}. Она не равна наличным в
         кассе: время могло оплачиваться с баланса, пополненного раньше.
       </div>
+    </div>
+  );
+}
+
+/** Строка сверки безнала: пересчитано против ожидаемого, с разницей. */
+function CashlessRow({
+  label,
+  expected,
+  counted,
+}: {
+  label: string;
+  expected: number;
+  counted: number;
+}) {
+  const diff = counted - expected;
+  return (
+    <div className="row">
+      <span className="k">{label}</span>
+      <span>
+        {formatMoney(counted)}
+        <i style={{ fontStyle: "normal", color: "var(--muted)" }}>
+          {diff === 0
+            ? " · сошлось"
+            : diff < 0
+              ? ` · недостача ${formatMoney(Math.abs(diff))}`
+              : ` · излишек ${formatMoney(diff)}`}
+        </i>
+      </span>
     </div>
   );
 }

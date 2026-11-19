@@ -83,11 +83,32 @@ export interface ShiftReport {
   /** Все движения наличных строками, новые сверху. */
   cashMovements: CashMovementRow[];
 
+  // --- Сверка безнала (вводит сотрудник на закрытии) ---
+  /** Карта по терминалу; null — не сверяли. */
+  cardCounted: number | null;
+  /** Онлайн по выписке Kaspi; null — не сверяли. */
+  onlineCounted: number | null;
+
+  // --- Итоги для владельца ---
+  /** Число чеков за смену (пополнения + продажи бара). */
+  checksCount: number;
+  /** Средний чек: деньги в кассу / число чеков. */
+  averageCheck: number;
+  /** Топ товаров смены по выручке. */
+  topProducts: TopProduct[];
+
   // --- Время смены ---
   openedAt: Date;
   closedAt: Date | null;
   /** Длительность смены в минутах (для открытой — на текущий момент). */
   durationMinutes: number;
+}
+
+/** Товар в топе смены. */
+export interface TopProduct {
+  name: string;
+  quantity: number;
+  revenue: number;
 }
 
 /** Одно движение наличных в кассе помимо продаж, для журнала смены. */
@@ -144,8 +165,12 @@ export class ShiftsService {
     staff: AuthenticatedStaff,
     clubId: string,
     shiftId: string,
-    cashCounted: number,
-    note?: string,
+    input: {
+      cashCounted: number;
+      note?: string;
+      cardCounted?: number;
+      onlineCounted?: number;
+    },
   ): Promise<ShiftReport> {
     await this.access.requireClub(staff, clubId);
     const shift = await this.requireShift(clubId, shiftId);
@@ -158,15 +183,19 @@ export class ShiftsService {
       data: {
         closedAt: new Date(),
         cashExpected: report.cashExpected,
-        cashCounted,
-        note: note ?? null,
+        cashCounted: input.cashCounted,
+        cardCounted: input.cardCounted ?? null,
+        onlineCounted: input.onlineCounted ?? null,
+        note: input.note ?? null,
       },
     });
 
+    // Пересчитываем отчёт по закрытой смене — так дата закрытия, длительность и
+    // сверка безнала в ответе совпадают с сохранённым.
+    const finalReport = await this.buildReport(closed);
     return {
-      ...report,
-      shift: closed,
-      reconciliation: reconcile(report.cashExpected, cashCounted),
+      ...finalReport,
+      reconciliation: reconcile(finalReport.cashExpected, input.cashCounted),
     };
   }
 
@@ -331,6 +360,27 @@ export class ShiftsService {
       })),
     ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
+    // Число чеков и средний чек: один платёж или одна продажа бара — один чек.
+    const checksCount = payments.length + sales.length;
+    const averageCheck =
+      checksCount > 0 ? Math.round(grandTotal / checksCount) : 0;
+
+    // Топ товаров смены по выручке.
+    const byProduct = new Map<string, TopProduct>();
+    for (const s of sales) {
+      const row = byProduct.get(s.productId) ?? {
+        name: s.product.name,
+        quantity: 0,
+        revenue: 0,
+      };
+      row.quantity += s.quantity;
+      row.revenue += s.total;
+      byProduct.set(s.productId, row);
+    }
+    const topProducts = [...byProduct.values()]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
     return {
       shift,
       staffName: staffRecord?.fullName ?? "—",
@@ -366,6 +416,13 @@ export class ShiftsService {
         amount: m.amount,
         reason: m.reason,
       })),
+      // Сверка безнала.
+      cardCounted: shift.cardCounted,
+      onlineCounted: shift.onlineCounted,
+      // Итоги для владельца.
+      checksCount,
+      averageCheck,
+      topProducts,
       // Время смены: открыта, закрыта и длительность в минутах.
       openedAt: shift.openedAt,
       closedAt: shift.closedAt,
