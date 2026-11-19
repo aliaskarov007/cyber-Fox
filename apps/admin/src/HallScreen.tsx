@@ -503,8 +503,21 @@ export function HallScreen({
     await refresh();
   }
 
+  /*
+   * После перетаскивания НЕ перезагружаем весь план: это 3 лишних запроса на
+   * каждое движение, и за десяток перестановок упираемся в защиту от частых
+   * запросов. Вместо этого правим состояние локально, а на сервер шлём один
+   * тихий запрос. Полную перезагрузку делаем только если сервер отказал.
+   */
   async function saveZoneBox(id: string, b: Box): Promise<void> {
     setArrError(null);
+    setZoneList((prev) =>
+      prev.map((z) =>
+        z.id === id
+          ? { ...z, posX: b.x, posY: b.y, width: b.w, height: b.h }
+          : z,
+      ),
+    );
     try {
       await api.updateZone(club.id, id, {
         posX: b.x,
@@ -514,12 +527,19 @@ export function HallScreen({
       });
     } catch (error) {
       setArrError((error as Error).message);
+      await refresh();
     }
-    await refresh();
   }
 
   async function saveObjBox(id: string, b: Box): Promise<void> {
     setArrError(null);
+    setObjects((prev) =>
+      prev.map((o) =>
+        o.id === id
+          ? { ...o, posX: b.x, posY: b.y, width: b.w, height: b.h }
+          : o,
+      ),
+    );
     try {
       await api.updateMapObject(club.id, id, {
         posX: b.x,
@@ -529,8 +549,8 @@ export function HallScreen({
       });
     } catch (error) {
       setArrError((error as Error).message);
+      await refresh();
     }
-    await refresh();
   }
 
   /** Перенос рабочего места: позиция + зона той комнаты, куда его положили. */
@@ -538,7 +558,7 @@ export function HallScreen({
     const cell = hall.find((c) => c.computer.id === id);
     if (!cell) return;
     const center = { x: x + PC_W / 2, y: y + PC_H / 2 };
-    let zoneId = cell.computer.zone.id;
+    let zone = cell.computer.zone;
     for (const z of zoneList) {
       const b = layout.zpos.get(z.id);
       if (
@@ -548,17 +568,26 @@ export function HallScreen({
         center.y >= b.y &&
         center.y <= b.y + b.h
       ) {
-        zoneId = z.id;
+        zone = { id: z.id, name: z.name };
         break;
       }
     }
     setArrError(null);
+    setHall((prev) =>
+      prev.map((c) =>
+        c.computer.id === id
+          ? { ...c, computer: { ...c.computer, posX: x, posY: y, zone } }
+          : c,
+      ),
+    );
     try {
-      await api.arrangeComputers(club.id, [{ id, zoneId, posX: x, posY: y }]);
+      await api.arrangeComputers(club.id, [
+        { id, zoneId: zone.id, posX: x, posY: y },
+      ]);
     } catch (error) {
       setArrError((error as Error).message);
+      await refresh();
     }
-    await refresh();
   }
 
   // --- Перетаскивание и изменение размера по сетке ---
@@ -836,13 +865,10 @@ export function HallScreen({
 
       {(hall.length > 0 || objects.length > 0 || edit) && (
         <div className={`fp-wrap ${edit ? "editing" : ""}`}>
-          <div
-            className="fp"
-            ref={floorRef}
-            onPointerMove={edit ? onMove : undefined}
-            onPointerUp={edit ? endDrag : undefined}
-            onPointerCancel={edit ? endDrag : undefined}
-          >
+          {/* Обработчики перетаскивания — только на самих элементах (они
+             захватывают указатель). На холсте их нет, иначе событие всплывало
+             бы и срабатывало дважды — двойной запрос на каждое движение. */}
+          <div className="fp" ref={floorRef}>
             {/* Служебные комнаты — фоном под всем. */}
             {areas.map((o) => {
               const b = dragBox("obj", o.id, {
