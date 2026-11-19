@@ -76,7 +76,9 @@ export class UpdateClubDto {
    */
   @IsOptional()
   @IsString()
-  @Matches(/^\/api\/covers\/[\w.-]+$/, { message: "Загрузите картинку QR через настройки" })
+  @Matches(/^\/api\/covers\/[\w.-]+$/, {
+    message: "Загрузите картинку QR через настройки",
+  })
   paymentQrImageUrl?: string | null;
 
   /** Слоган под названием клуба на экране игровых ПК. Пусто — без слогана. */
@@ -121,6 +123,11 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  /** Право выдавать гостям скидку. */
+  @IsOptional()
+  @IsBoolean()
+  canDiscount?: boolean;
 }
 
 export class UpdateStaffDto {
@@ -145,6 +152,11 @@ export class UpdateStaffDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Право выдавать гостям скидку. */
+  @IsOptional()
+  @IsBoolean()
+  canDiscount?: boolean;
 
   /** WhatsApp для сброса пароля; пустая строка убирает номер. */
   @IsOptional()

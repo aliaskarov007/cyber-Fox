@@ -18,6 +18,8 @@ export interface AuthenticatedStaff {
   tenantId: string;
   clubId: string | null;
   role: StaffRole;
+  /** Может ли выдавать гостям скидку. У владельца всегда true. */
+  canDiscount: boolean;
 }
 
 declare module "express" {

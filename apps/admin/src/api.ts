@@ -10,6 +10,8 @@ export interface Staff {
   fullName: string;
   phone: string | null;
   role: "OWNER" | "ADMIN" | "STAFF";
+  /** Может ли выдавать гостям скидку. У владельца всегда true. */
+  canDiscount: boolean;
   tenant: { name: string; sharedBalance: boolean };
 }
 
@@ -786,6 +788,7 @@ export const api = {
     role: string;
     clubId?: string;
     phone?: string;
+    canDiscount?: boolean;
   }) =>
     request<StaffMember>("/network/staff", {
       method: "POST",
@@ -801,6 +804,7 @@ export const api = {
       clubId: string;
       isActive: boolean;
       phone: string;
+      canDiscount: boolean;
     }>,
   ) =>
     request<StaffMember>(`/network/staff/${staffId}`, {
@@ -1545,6 +1549,7 @@ export interface StaffMember {
   phone: string | null;
   role: "OWNER" | "ADMIN" | "STAFF";
   isActive: boolean;
+  canDiscount: boolean;
 }
 
 export interface ClubSummary {

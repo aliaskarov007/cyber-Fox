@@ -65,10 +65,16 @@ export class AuthController {
         fullName: true,
         phone: true,
         role: true,
+        canDiscount: true,
         tenant: { select: { name: true, sharedBalance: true } },
       },
     });
-    return record;
+    // Владельцу скидка разрешена всегда — отдаём фактическое право, а не голый
+    // флаг из базы, чтобы фронт верно показывал/прятал раздачу скидок.
+    return {
+      ...record,
+      canDiscount: record.role === "OWNER" || record.canDiscount,
+    };
   }
 
   /**

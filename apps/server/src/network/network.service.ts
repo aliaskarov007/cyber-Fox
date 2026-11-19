@@ -1,5 +1,15 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { type Club, StaffRole, type Tenant, TransactionType } from "@prisma/client";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  type Club,
+  StaffRole,
+  type Tenant,
+  TransactionType,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -22,6 +32,8 @@ export interface PublicStaff {
   phone: string | null;
   role: StaffRole;
   isActive: boolean;
+  /** Право выдавать скидку. У владельца всегда true. */
+  canDiscount: boolean;
 }
 
 /**
@@ -38,10 +50,15 @@ export class NetworkService {
   ) {}
 
   async tenant(staff: AuthenticatedStaff): Promise<Tenant> {
-    return this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
+    return this.prisma.tenant.findUniqueOrThrow({
+      where: { id: staff.tenantId },
+    });
   }
 
-  async createClub(staff: AuthenticatedStaff, dto: CreateClubDto): Promise<Club> {
+  async createClub(
+    staff: AuthenticatedStaff,
+    dto: CreateClubDto,
+  ): Promise<Club> {
     this.requireOwner(staff);
     return this.prisma.club.create({
       data: {
@@ -59,14 +76,17 @@ export class NetworkService {
     dto: UpdateClubDto,
   ): Promise<Club> {
     const club = await this.prisma.club.findUnique({ where: { id: clubId } });
-    if (!club || club.tenantId !== staff.tenantId) throw new NotFoundException("Клуб не найден");
+    if (!club || club.tenantId !== staff.tenantId)
+      throw new NotFoundException("Клуб не найден");
 
     // Управляющий настраивает свой зал; чужой — только владелец сети.
     if (staff.role !== StaffRole.OWNER && staff.clubId !== clubId) {
       throw new ForbiddenException("Нет доступа к этому клубу");
     }
     if (staff.role === StaffRole.STAFF) {
-      throw new ForbiddenException("Настройки клуба меняет управляющий или владелец");
+      throw new ForbiddenException(
+        "Настройки клуба меняет управляющий или владелец",
+      );
     }
 
     /*
@@ -75,17 +95,23 @@ export class NetworkService {
      * значениями, поэтому запрещена только смена, а не само поле в запросе.
      */
     const ownerOnly =
-      (dto.barOrdersFromPc !== undefined && dto.barOrdersFromPc !== club.barOrdersFromPc) ||
-      (dto.paymentQrImageUrl !== undefined && dto.paymentQrImageUrl !== club.paymentQrImageUrl);
+      (dto.barOrdersFromPc !== undefined &&
+        dto.barOrdersFromPc !== club.barOrdersFromPc) ||
+      (dto.paymentQrImageUrl !== undefined &&
+        dto.paymentQrImageUrl !== club.paymentQrImageUrl);
     if (ownerOnly && staff.role !== StaffRole.OWNER) {
-      throw new ForbiddenException("Бар с игровых ПК и QR для оплаты настраивает владелец");
+      throw new ForbiddenException(
+        "Бар с игровых ПК и QR для оплаты настраивает владелец",
+      );
     }
 
     const { slogan, shellExitPassword, ...rest } = dto;
 
     // Пароль выхода из оболочки хэшируем здесь. Пустая строка или null — снять
     // выход по паролю; иначе не короче 4 знаков, чтобы не подобрали у кассы.
-    let exitPasswordChange: { shellExitPasswordHash: string | null } | undefined;
+    let exitPasswordChange:
+      | { shellExitPasswordHash: string | null }
+      | undefined;
     if (shellExitPassword !== undefined) {
       const trimmed = shellExitPassword?.trim() ?? "";
       if (trimmed === "") {
@@ -93,7 +119,9 @@ export class NetworkService {
       } else if (trimmed.length < 4) {
         throw new BadRequestException("Пароль выхода — не меньше 4 знаков");
       } else {
-        exitPasswordChange = { shellExitPasswordHash: await bcrypt.hash(trimmed, 10) };
+        exitPasswordChange = {
+          shellExitPasswordHash: await bcrypt.hash(trimmed, 10),
+        };
       }
     }
 
@@ -130,14 +158,18 @@ export class NetworkService {
     return people.map(toPublicStaff);
   }
 
-  async createStaff(staff: AuthenticatedStaff, dto: CreateStaffDto): Promise<PublicStaff> {
+  async createStaff(
+    staff: AuthenticatedStaff,
+    dto: CreateStaffDto,
+  ): Promise<PublicStaff> {
     this.requireOwner(staff);
     const email = dto.email.toLowerCase().trim();
 
     const existing = await this.prisma.staff.findUnique({
       where: { tenantId_email: { tenantId: staff.tenantId, email } },
     });
-    if (existing) throw new BadRequestException("Сотрудник с таким адресом уже есть");
+    if (existing)
+      throw new BadRequestException("Сотрудник с таким адресом уже есть");
 
     if (dto.clubId) await this.requireOwnClub(staff.tenantId, dto.clubId);
     // Владелец сети не привязан к залу: пустой clubId открывает ему всю сеть.
@@ -154,6 +186,7 @@ export class NetworkService {
         phone: staffPhone(dto.phone),
         passwordHash: await bcrypt.hash(dto.password, 10),
         role: dto.role,
+        canDiscount: dto.canDiscount ?? false,
       },
     });
 
@@ -166,14 +199,21 @@ export class NetworkService {
     dto: UpdateStaffDto,
   ): Promise<PublicStaff> {
     this.requireOwner(staff);
-    const target = await this.prisma.staff.findUnique({ where: { id: staffId } });
+    const target = await this.prisma.staff.findUnique({
+      where: { id: staffId },
+    });
     if (!target || target.tenantId !== staff.tenantId) {
       throw new NotFoundException("Сотрудник не найден");
     }
 
     // Владелец не должен случайно разжаловать сам себя и потерять доступ к сети.
-    if (target.id === staff.id && (dto.role !== undefined || dto.isActive === false)) {
-      throw new BadRequestException("Нельзя изменить собственную роль или отключить себя");
+    if (
+      target.id === staff.id &&
+      (dto.role !== undefined || dto.isActive === false)
+    ) {
+      throw new BadRequestException(
+        "Нельзя изменить собственную роль или отключить себя",
+      );
     }
 
     if (dto.clubId) await this.requireOwnClub(staff.tenantId, dto.clubId);
@@ -197,8 +237,11 @@ export class NetworkService {
           ...(dto.phone !== undefined ? { phone: staffPhone(dto.phone) } : {}),
           role: dto.role,
           isActive: dto.isActive,
+          canDiscount: dto.canDiscount,
           clubId: dto.role === StaffRole.OWNER ? null : dto.clubId,
-          ...(dto.password ? { passwordHash: await bcrypt.hash(dto.password, 10) } : {}),
+          ...(dto.password
+            ? { passwordHash: await bcrypt.hash(dto.password, 10) }
+            : {}),
           ...(revokes ? { tokenVersion: { increment: 1 } } : {}),
         },
       }),
@@ -209,11 +252,19 @@ export class NetworkService {
    * Настройки сети. Переключение общего кошелька меняет структуру денег,
    * поэтому выполняется явно и пишется в журнал операций.
    */
-  async updateTenant(staff: AuthenticatedStaff, dto: UpdateTenantDto): Promise<Tenant> {
+  async updateTenant(
+    staff: AuthenticatedStaff,
+    dto: UpdateTenantDto,
+  ): Promise<Tenant> {
     this.requireOwner(staff);
-    const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: staff.tenantId },
+    });
 
-    if (dto.sharedBalance === undefined || dto.sharedBalance === tenant.sharedBalance) {
+    if (
+      dto.sharedBalance === undefined ||
+      dto.sharedBalance === tenant.sharedBalance
+    ) {
       return this.prisma.tenant.update({
         where: { id: tenant.id },
         data: { name: dto.name },
@@ -262,7 +313,10 @@ export class NetworkService {
               comment: "Перенос в общий кошелёк сети",
             },
           });
-          await tx.guestWallet.update({ where: { id: wallet.id }, data: { balance: 0 } });
+          await tx.guestWallet.update({
+            where: { id: wallet.id },
+            data: { balance: 0 },
+          });
         }
       }
 
@@ -302,7 +356,11 @@ export class NetworkService {
           const target =
             existing ??
             (await tx.guestWallet.create({
-              data: { guestId: wallet.guestId, clubId: targetClubId, balance: 0 },
+              data: {
+                guestId: wallet.guestId,
+                clubId: targetClubId,
+                balance: 0,
+              },
             }));
 
           const balanceAfter = target.balance + wallet.balance;
@@ -321,7 +379,10 @@ export class NetworkService {
             },
           });
         }
-        await tx.guestWallet.update({ where: { id: wallet.id }, data: { balance: 0 } });
+        await tx.guestWallet.update({
+          where: { id: wallet.id },
+          data: { balance: 0 },
+        });
       }
 
       return tx.tenant.update({
@@ -337,9 +398,13 @@ export class NetworkService {
     }
   }
 
-  private async requireOwnClub(tenantId: string, clubId: string): Promise<void> {
+  private async requireOwnClub(
+    tenantId: string,
+    clubId: string,
+  ): Promise<void> {
     const club = await this.prisma.club.findUnique({ where: { id: clubId } });
-    if (!club || club.tenantId !== tenantId) throw new NotFoundException("Клуб не найден");
+    if (!club || club.tenantId !== tenantId)
+      throw new NotFoundException("Клуб не найден");
   }
 }
 
@@ -351,7 +416,10 @@ export class NetworkService {
 function staffPhone(raw: string | undefined): string | null {
   if (!raw || raw.trim() === "") return null;
   const phone = normalizePhone(raw);
-  if (!phone) throw new BadRequestException("Номер WhatsApp не разобран — пример: +7 701 123 45 67");
+  if (!phone)
+    throw new BadRequestException(
+      "Номер WhatsApp не разобран — пример: +7 701 123 45 67",
+    );
   return phone;
 }
 
@@ -363,6 +431,7 @@ export function toPublicStaff(staff: {
   phone: string | null;
   role: StaffRole;
   isActive: boolean;
+  canDiscount: boolean;
 }): PublicStaff {
   return {
     id: staff.id,
@@ -372,5 +441,7 @@ export function toPublicStaff(staff: {
     phone: staff.phone,
     role: staff.role,
     isActive: staff.isActive,
+    // Владельцу скидка разрешена всегда, независимо от флага в базе.
+    canDiscount: staff.role === "OWNER" || staff.canDiscount,
   };
 }

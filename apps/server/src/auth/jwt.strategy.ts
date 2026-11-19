@@ -35,7 +35,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthenticatedStaff> {
     const staff = await this.prisma.staff.findUnique({
       where: { id: payload.sub },
-      select: { id: true, tenantId: true, clubId: true, role: true, isActive: true, tokenVersion: true },
+      select: {
+        id: true,
+        tenantId: true,
+        clubId: true,
+        role: true,
+        canDiscount: true,
+        isActive: true,
+        tokenVersion: true,
+      },
     });
 
     if (!staff || !staff.isActive || staff.tokenVersion !== payload.ver) {
@@ -49,6 +57,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: staff.tenantId,
       clubId: staff.clubId,
       role: staff.role,
+      // У владельца право на скидку есть всегда, флаг в базе для него не нужен.
+      canDiscount: staff.role === "OWNER" || staff.canDiscount,
     };
   }
 }

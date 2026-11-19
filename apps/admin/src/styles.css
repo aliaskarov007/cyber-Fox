@@ -1737,6 +1737,30 @@ main {
   color: var(--accent-ink);
 }
 
+/* Переключатель права сотрудника (скидки) в таблице сотрудников. */
+.perm {
+  min-width: 108px;
+}
+.perm.on {
+  background: #1f7a44;
+  border-color: #1f7a44;
+  color: #fff;
+}
+
+/* Галочка с подписью в одну строку (форма добавления сотрудника). */
+.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.checkline input {
+  width: 16px;
+  height: 16px;
+}
+
 /* Список интернет-каналов клуба в настройках. */
 .channel-list {
   display: grid;

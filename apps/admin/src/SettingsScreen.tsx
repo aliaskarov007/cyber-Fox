@@ -664,6 +664,7 @@ function StaffSection({
     password: "",
     role: "STAFF",
     clubId: clubs[0]?.id ?? "",
+    canDiscount: false,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -689,6 +690,7 @@ function StaffSection({
               <th>WhatsApp</th>
               <th>Роль</th>
               <th>Зал</th>
+              {isOwner && <th>Скидки</th>}
               {isOwner && <th />}
             </tr>
           </thead>
@@ -710,6 +712,31 @@ function StaffSection({
                 </td>
                 <td>{ROLE_LABEL[person.role]}</td>
                 <td>{clubName(person.clubId)}</td>
+                {isOwner && (
+                  <td>
+                    {person.role === "OWNER" ? (
+                      // У владельца право на скидку есть всегда и не снимается.
+                      <span style={{ color: "var(--ink-2)" }}>всегда</span>
+                    ) : (
+                      <button
+                        className={person.canDiscount ? "perm on" : "perm"}
+                        onClick={async () => {
+                          setError(null);
+                          try {
+                            await api.updateStaff(person.id, {
+                              canDiscount: !person.canDiscount,
+                            });
+                            onChanged();
+                          } catch (cause) {
+                            setError((cause as Error).message);
+                          }
+                        }}
+                      >
+                        {person.canDiscount ? "Разрешено" : "Запрещено"}
+                      </button>
+                    )}
+                  </td>
+                )}
                 {isOwner && (
                   <td>
                     <button
@@ -786,6 +813,19 @@ function StaffSection({
               ))}
             </select>
           )}
+          {/* Владельцу галочка не нужна — у него право на скидку есть всегда. */}
+          {form.role !== "OWNER" && (
+            <label className="checkline">
+              <input
+                type="checkbox"
+                checked={form.canDiscount}
+                onChange={(e) =>
+                  setForm({ ...form, canDiscount: e.target.checked })
+                }
+              />
+              Может давать скидки
+            </label>
+          )}
           <button
             className="primary"
             disabled={busy || form.email.length < 5 || form.password.length < 6}
@@ -798,6 +838,7 @@ function StaffSection({
                   fullName: form.fullName.trim(),
                   password: form.password,
                   role: form.role,
+                  canDiscount: form.canDiscount,
                   ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
                   ...(form.role === "OWNER" ? {} : { clubId: form.clubId }),
                 });
@@ -807,6 +848,7 @@ function StaffSection({
                   fullName: "",
                   phone: "",
                   password: "",
+                  canDiscount: false,
                 });
                 onChanged();
               } catch (cause) {

@@ -221,7 +221,7 @@ function ClubApp() {
         ) : tab === "bar" ? (
           <BarScreen club={club} staff={staff} />
         ) : tab === "guests" ? (
-          <GuestsScreen club={club} />
+          <GuestsScreen club={club} staff={staff} />
         ) : tab === "events" ? (
           <EventsScreen club={club} staff={staff} />
         ) : tab === "retention" ? (

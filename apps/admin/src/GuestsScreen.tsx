@@ -6,6 +6,7 @@ import {
   type Guest,
   type GuestCard,
   type GuestHistory,
+  type Staff,
   api,
   formatMoney,
   toTiyn,
@@ -29,7 +30,7 @@ const TRANSACTION_LABEL: Record<string, string> = {
   PROMO: "Промокод",
 };
 
-export function GuestsScreen({ club }: { club: Club }) {
+export function GuestsScreen({ club, staff }: { club: Club; staff: Staff }) {
   const [query, setQuery] = useState("");
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export function GuestsScreen({ club }: { club: Club }) {
           <aside className="drawer">
             <GuestCardPanel
               club={club}
+              staff={staff}
               guestId={selectedId}
               onClose={() => setSelectedId(null)}
               onChanged={() => setQuery((q) => q)}
@@ -127,11 +129,13 @@ export function GuestsScreen({ club }: { club: Club }) {
 
 function GuestCardPanel({
   club,
+  staff,
   guestId,
   onClose,
   onChanged,
 }: {
   club: Club;
+  staff: Staff;
   guestId: string;
   onClose: () => void;
   onChanged: () => void;
@@ -189,18 +193,22 @@ function GuestCardPanel({
         />
       </div>
 
-      <div className="section">
-        <h3>Скидка на игровое время</h3>
-        <GuestDiscountForm
-          club={club}
-          guestId={guestId}
-          current={card.guest.discountPercent}
-          onChanged={() => {
-            void load();
-            onChanged();
-          }}
-        />
-      </div>
+      {/* Скидку видит и меняет только сотрудник с правом (владелец — всегда).
+          Остальным секция не показывается: сервер всё равно её отклонит. */}
+      {staff.canDiscount && (
+        <div className="section">
+          <h3>Скидка на игровое время</h3>
+          <GuestDiscountForm
+            club={club}
+            guestId={guestId}
+            current={card.guest.discountPercent}
+            onChanged={() => {
+              void load();
+              onChanged();
+            }}
+          />
+        </div>
+      )}
 
       <div className="section">
         <h3>Номер телефона</h3>
@@ -259,6 +267,24 @@ function GuestCardPanel({
             }}
           >
             Наличными
+          </button>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                await api.topUp(club.id, guestId, toTiyn(amount), "CARD");
+                await load();
+                onChanged();
+              } catch (cause) {
+                setError((cause as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Картой
           </button>
           <button
             disabled={busy}

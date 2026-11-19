@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -555,6 +556,11 @@ export class GuestsService {
     percent: number,
   ): Promise<PublicGuest> {
     await this.access.requireClub(staff, clubId);
+    // Скидку выдаёт только тот, кому владелец это разрешил (у владельца право
+    // есть всегда). canDiscount уже учитывает роль — см. jwt.strategy.
+    if (!staff.canDiscount) {
+      throw new ForbiddenException("Нет права выдавать скидку");
+    }
     const guest = await this.requireGuest(staff.tenantId, guestId);
     const clamped = Math.min(100, Math.max(0, Math.round(percent)));
 
