@@ -1504,6 +1504,211 @@ main {
   flex: 1 1 240px;
 }
 
+/* --- План помещения: сеточный холст --- */
+.fp-wrap {
+  margin: 8px 0 16px;
+}
+.fp {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  aspect-ratio: 48 / 40;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: #0b1428;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size:
+    100% calc(100% / 40),
+    calc(100% / 48) 100%;
+  touch-action: none;
+}
+
+/* Общие ручки: перетащить (⠿) и размер (◢). */
+.fp-grip,
+.fp-resize {
+  touch-action: none;
+  user-select: none;
+  line-height: 1;
+  color: var(--ink-2);
+}
+.fp-grip {
+  cursor: grab;
+  font-size: 14px;
+  padding: 0 2px;
+}
+.fp-grip:active {
+  cursor: grabbing;
+}
+.fp-resize {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  padding: 2px 3px;
+  font-size: 12px;
+  cursor: nwse-resize;
+  color: var(--muted);
+}
+
+/* Зоны-комнаты. */
+.fp-zone {
+  position: absolute;
+  border: 2px solid var(--zc);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--zc) 12%, transparent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+.fp-zone.dragging {
+  z-index: 45;
+  opacity: 0.96;
+}
+.fp-head {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--zc) 28%, var(--surface));
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+.fp-zone-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fp-head .count {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.fp-head .zone-rename {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  font-size: 12px;
+  padding: 0 6px;
+}
+.fp-head .zone-add-pc {
+  padding: 1px 7px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+/* Служебные комнаты (коридор, серверная…). */
+.fp-area {
+  position: absolute;
+  z-index: 5;
+  border: 1.5px dashed #5b6a8f;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(120, 135, 170, 0.06) 0 8px,
+      transparent 8px 16px
+    ),
+    rgba(40, 54, 94, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fp-area.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.fp-area-name {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  touch-action: none;
+}
+.fp-area .fp-grip {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+}
+
+/* Стены-перегородки. */
+.fp-wall {
+  position: absolute;
+  z-index: 30;
+  background: #46587f;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+  touch-action: none;
+}
+.fp-wall.sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.fp-wall .fp-resize {
+  color: #fff;
+}
+
+/* Двери. */
+.fp-door {
+  position: absolute;
+  z-index: 31;
+  background: rgba(225, 82, 28, 0.35);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  cursor: grab;
+  touch-action: none;
+}
+.fp-door.sel {
+  outline: 2px solid #fff;
+}
+
+/* Подписи-мебель. */
+.fp-label {
+  position: absolute;
+  z-index: 31;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-2);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.fp-label.sel {
+  outline: 2px solid var(--accent);
+}
+
+/* Рабочие места на плане. */
+.fp-pc {
+  position: absolute;
+  z-index: 20;
+}
+.fp-pc.editing {
+  cursor: grab;
+  touch-action: none;
+}
+.fp-pc .pc-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 8px 8px 0 0;
+  background: var(--zc);
+}
+
 /* Сегментный переключатель (способ оплаты и т.п.). */
 .seg {
   display: inline-flex;
