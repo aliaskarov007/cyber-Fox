@@ -67,14 +67,20 @@ export interface Zone {
   sortOrder: number;
   posX: number | null;
   posY: number | null;
+  /** Размер зоны-комнаты в клетках сетки. */
+  width: number | null;
+  height: number | null;
   layout: "GRID" | "RING";
   defaultPerMinuteTariffId: string | null;
 }
 
-/** Декор плана клуба: подпись (ресепшн, уборная, диваны) или перегородка. */
+/** Тип объекта на плане: подпись/мебель, стена, служебная область, дверь. */
+export type MapObjectKind = "LABEL" | "WALL" | "AREA" | "DOOR";
+
+/** Объект плана клуба: мебель-подпись, стена-перегородка, служебная область, дверь. */
 export interface MapObject {
   id: string;
-  kind: "LABEL" | "WALL";
+  kind: MapObjectKind;
   text: string | null;
   posX: number;
   posY: number;
@@ -83,7 +89,7 @@ export interface MapObject {
 }
 
 export interface MapObjectInput {
-  kind: "LABEL" | "WALL";
+  kind: MapObjectKind;
   text?: string;
   posX: number;
   posY: number;
@@ -443,6 +449,8 @@ export const api = {
       sortOrder: number;
       posX: number;
       posY: number;
+      width: number;
+      height: number;
       layout: "GRID" | "RING";
       defaultPerMinuteTariffId: string;
     }>,
@@ -877,7 +885,11 @@ export const api = {
   disconnectKaspi: () =>
     request<KaspiChannel>("/network/kaspi", { method: "DELETE" }),
   kaspiProvider: () => request<KaspiProvider>("/network/kaspi-provider"),
-  saveKaspiProvider: (update: { enabled: boolean; bin?: string; payLink?: string }) =>
+  saveKaspiProvider: (update: {
+    enabled: boolean;
+    bin?: string;
+    payLink?: string;
+  }) =>
     request<KaspiProvider>("/network/kaspi-provider", {
       method: "PUT",
       body: JSON.stringify(update),

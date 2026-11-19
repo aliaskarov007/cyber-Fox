@@ -36,7 +36,7 @@ export class UpdateZoneDto {
   @IsInt()
   sortOrder?: number;
 
-  /** Положение зала на плане клуба (px). */
+  /** Положение зала на плане клуба (клетки сетки). */
   @IsOptional()
   @IsInt()
   posX?: number;
@@ -44,6 +44,15 @@ export class UpdateZoneDto {
   @IsOptional()
   @IsInt()
   posY?: number;
+
+  /** Размер зоны-комнаты на плане (клетки сетки). */
+  @IsOptional()
+  @IsInt()
+  width?: number;
+
+  @IsOptional()
+  @IsInt()
+  height?: number;
 
   /** Форма раскладки машин внутри зала. */
   @IsOptional()
