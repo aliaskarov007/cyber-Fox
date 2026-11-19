@@ -125,7 +125,7 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
   }
 
   return (
-    <main>
+    <main className={cart.length > 0 ? "with-cart" : ""}>
       {/* Заказы с игровых ПК — первым делом: они уже оплачены и ждут, пока их отнесут. */}
       <SeatRequests club={club} />
 
@@ -188,12 +188,9 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
 
       {cart.length > 0 && (
         <>
-          <button
-            className="backdrop"
-            aria-label="Закрыть"
-            onClick={() => setCart([])}
-          />
-          <aside className="drawer">
+          {/* Чек — боковая панель без подложки: сетка товаров остаётся
+              кликабельной, чтобы в один чек добавлять несколько позиций. */}
+          <aside className="drawer cart-drawer">
             <div className="drawer-head">
               <h2>Чек</h2>
               <span className="chip idle">{formatMoney(cartTotal)}</span>
