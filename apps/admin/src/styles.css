@@ -2902,3 +2902,13 @@ button.link {
 .res-form .res-note {
   grid-column: 1 / -1;
 }
+
+/* Выбор времени брони: часы:минуты, 24 часа. */
+.time-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.time-field select {
+  flex: 1;
+}

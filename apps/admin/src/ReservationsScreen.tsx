@@ -266,22 +266,8 @@ function NewReservation({
             </optgroup>
           </select>
         </label>
-        <label>
-          С
-          <input
-            type="time"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-          />
-        </label>
-        <label>
-          До
-          <input
-            type="time"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-          />
-        </label>
+        <TimeField label="С" value={start} onChange={setStart} />
+        <TimeField label="До" value={end} onChange={setEnd} />
         <label>
           Гость
           <input
@@ -329,5 +315,58 @@ function NewReservation({
         Забронировать
       </button>
     </form>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES = Array.from({ length: 12 }, (_, i) =>
+  String(i * 5).padStart(2, "0"),
+);
+
+/**
+ * Выбор времени в 24-часовом виде (часы + минуты). Заменяет <input type="time">,
+ * который в некоторых браузерах показывает AM/PM по локали ПК и путает.
+ */
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [h, m] = value.split(":");
+  const hour = h ?? "00";
+  const minute = m ?? "00";
+  return (
+    <label>
+      {label}
+      <div className="time-field">
+        <select
+          value={hour}
+          onChange={(e) => onChange(`${e.target.value}:${minute}`)}
+          aria-label={`${label} — часы`}
+        >
+          {HOURS.map((x) => (
+            <option key={x} value={x}>
+              {x}
+            </option>
+          ))}
+        </select>
+        <span>:</span>
+        <select
+          value={minute}
+          onChange={(e) => onChange(`${hour}:${e.target.value}`)}
+          aria-label={`${label} — минуты`}
+        >
+          {MINUTES.map((x) => (
+            <option key={x} value={x}>
+              {x}
+            </option>
+          ))}
+        </select>
+      </div>
+    </label>
   );
 }
