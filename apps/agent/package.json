@@ -1,6 +1,6 @@
 {
   "name": "@cyberfox/agent",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "private": true,
   "description": "Блокировка игровой машины Cyber-Fox",
   "author": "Cyber-Fox",

@@ -22,7 +22,10 @@ import { GuestSignupService } from "../whatsapp/guest-signup.service.js";
 import { PromosService } from "../promos/promos.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
 import { KaspiProviderService } from "../payments/kaspi-provider.service.js";
-import { BarOrdersService } from "../products/bar-orders.service.js";
+import {
+  type BarPayMethod,
+  BarOrdersService,
+} from "../products/bar-orders.service.js";
 import { ScreenService } from "../screen/screen.service.js";
 import { UplinksService } from "../uplinks/uplinks.service.js";
 import { RealtimeBus } from "./realtime.bus.js";
@@ -523,7 +526,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         ok: false,
         reason: "Заказать можно во время игры по своему аккаунту",
       };
-    const method: TopUpMethod = body.method === "phone" ? "phone" : "qr";
+    // Оплата с баланса — основной путь; Kaspi (qr/phone) остаётся, если подключён.
+    const method: BarPayMethod =
+      body.method === "balance"
+        ? "balance"
+        : body.method === "phone"
+          ? "phone"
+          : "qr";
     return this.barOrders.place(computerId, guestId, body.items, method);
   }
 

@@ -128,6 +128,8 @@ export type BarOrderResult =
       phoneMasked: string | null;
       expiresAt: string;
     }
+  /** Оплата с баланса: деньги списаны сразу, ждать нечего. */
+  | { ok: true; orderId: string; total: number; mode: "balance" }
   | { ok: false; reason: string };
 
 export type TopUpStart =
@@ -324,10 +326,10 @@ export class AgentClient {
     return this.request("bar.menu", {});
   }
 
-  /** Заказ из бара: гость оплачивает картой онлайн (QR или счёт в Kaspi на номер). */
+  /** Заказ из бара: оплата с баланса аккаунта или онлайн через Kaspi (QR/счёт). */
   barOrder(
     items: Array<{ productId: string; quantity: number }>,
-    method: "qr" | "phone" = "qr",
+    method: "balance" | "qr" | "phone" = "balance",
   ): Promise<BarOrderResult> {
     return this.request("bar.order", { items, method });
   }

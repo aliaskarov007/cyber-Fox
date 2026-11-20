@@ -10,18 +10,20 @@ import { Qr } from "./QrCode.js";
 
 type Product = BarMenu["products"][number];
 type Method = "qr" | "phone";
+/** Онлайн-счёт Kaspi — только у него есть intentId и QR. */
+type OnlinePayment = Extract<BarOrderResult, { ok: true; intentId: string }>;
 
 type Step =
   | { kind: "cart" }
   | { kind: "loading" }
-  | { kind: "waiting"; payment: Extract<BarOrderResult, { ok: true }> }
+  | { kind: "waiting"; payment: OnlinePayment }
   | { kind: "paid" };
 
 /**
- * Заказ из бара с игрового ПК. Оплата — картой онлайн: гость платит со своего
- * телефона (QR или счёт в приложение Kaspi на его номер), и как только оплата
- * проходит, администратору падает заказ «отнести». Экран ждёт оплаты и
- * закрывается сам.
+ * Заказ из бара с игрового ПК. Основная оплата — с баланса аккаунта: списывается
+ * сразу, и администратору тут же падает заказ «отнести». Если баланса не хватает,
+ * а клуб подключил Kaspi, можно оплатить картой онлайн (QR или счёт в приложение
+ * Kaspi на номер) — тогда экран ждёт оплаты и закрывается сам.
  *
  * Меню перечитывается при каждом открытии: цены и остатки меняются в смену, а
  * корзина по вчерашнему прайсу закончилась бы отказом сервера.
@@ -105,17 +107,25 @@ export function BarPanel({
     });
   }
 
-  async function order(): Promise<void> {
+  async function order(payMethod: "balance" | Method): Promise<void> {
     setError(null);
     setStep({ kind: "loading" });
     try {
       const result = await client.barOrder(
         lines.map((p) => ({ productId: p.id, quantity: cart[p.id] ?? 0 })),
-        kaspi ? method : "qr",
+        payMethod,
       );
       if (!result.ok) {
         setError(result.reason);
         setStep({ kind: "cart" });
+        return;
+      }
+      // Оплата с баланса проходит сразу — ждать онлайн-оплаты не нужно.
+      if (result.mode === "balance") {
+        setStep({ kind: "paid" });
+        onOrdered(
+          "Оплачено с баланса — администратор уже несёт. Приятного аппетита!",
+        );
         return;
       }
       setStep({ kind: "waiting", payment: result });
@@ -244,46 +254,53 @@ export function BarPanel({
             Итого <b>{formatMoney(total)}</b>
           </span>
 
-          {/* Номер гостя подтверждён — счёт на него удобнее QR: ничего сканировать не нужно. */}
-          {kaspi && (
-            <div
-              className="topup-methods"
-              role="radiogroup"
-              aria-label="Способ оплаты"
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={method === "phone"}
-                className={method === "phone" ? "primary" : ""}
-                onClick={() => setMethod("phone")}
-              >
-                Счёт на мой Kaspi
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={method === "qr"}
-                className={method === "qr" ? "primary" : ""}
-                onClick={() => setMethod("qr")}
-              >
-                QR-код
-              </button>
-            </div>
-          )}
-
+          {/* Основная оплата — с баланса аккаунта: списывается сразу, ничего сканировать не нужно. */}
           <button
             className="primary"
             type="button"
             disabled={busy}
-            onClick={() => void order()}
+            onClick={() => void order("balance")}
           >
-            {step.kind === "loading"
-              ? "Готовим счёт…"
-              : kaspi && method === "phone"
-                ? "Оплатить картой"
-                : "Оплатить по QR"}
+            {step.kind === "loading" ? "Оформляем…" : "Оплатить с баланса"}
           </button>
+
+          {/* Kaspi — запасной способ, если баланса не хватает и клуб его подключил. */}
+          {kaspi && (
+            <>
+              <div
+                className="topup-methods"
+                role="radiogroup"
+                aria-label="Оплата через Kaspi"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={method === "phone"}
+                  className={method === "phone" ? "primary" : ""}
+                  onClick={() => setMethod("phone")}
+                >
+                  Счёт на мой Kaspi
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={method === "qr"}
+                  className={method === "qr" ? "primary" : ""}
+                  onClick={() => setMethod("qr")}
+                >
+                  QR-код
+                </button>
+              </div>
+              <button
+                className="ghost"
+                type="button"
+                disabled={busy}
+                onClick={() => void order(method)}
+              >
+                Оплатить через Kaspi
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

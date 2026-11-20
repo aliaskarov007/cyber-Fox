@@ -9,14 +9,21 @@ import {
   BarOrderStatus,
   type Prisma,
   PaymentIntentStatus,
+  PaymentMethod,
   SessionStatus,
+  TransactionType,
 } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
+import { WalletService } from "../guests/wallet.service.js";
 import { KaspiService, type TopUpMethod } from "../payments/kaspi.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RealtimeBus } from "../realtime/realtime.bus.js";
+import { bonusFor } from "../shifts/shift.rules.js";
+
+/** Способ оплаты заказа из бара: с баланса аккаунта или онлайн через Kaspi. */
+export type BarPayMethod = "balance" | TopUpMethod;
 import {
   type OrderItemSnapshot,
   normalizeOrderLines,
@@ -53,6 +60,8 @@ export type PlaceOrderResult =
       phoneMasked: string | null;
       expiresAt: Date;
     }
+  /** Оплата с баланса: деньги списаны сразу, ждать нечего — заказ уже у кассы. */
+  | { ok: true; orderId: string; total: number; mode: "balance" }
   | { ok: false; reason: string };
 
 /**
@@ -74,6 +83,7 @@ export class BarOrdersService {
     private readonly access: ClubAccessService,
     private readonly kaspi: KaspiService,
     private readonly bus: RealtimeBus,
+    private readonly wallets: WalletService,
   ) {}
 
   /** Меню для экрана гостя: то, что есть в наличии. */
@@ -114,7 +124,7 @@ export class BarOrdersService {
     computerId: string,
     guestId: string,
     rawLines: unknown,
-    method: TopUpMethod,
+    method: BarPayMethod,
   ): Promise<PlaceOrderResult> {
     const computer = await this.prisma.computer.findUnique({
       where: { id: computerId },
@@ -136,6 +146,12 @@ export class BarOrdersService {
       select: { id: true },
     });
     if (!session) return { ok: false, reason: "Заказать можно во время игры" };
+
+    // Оплата с баланса: списываем сразу и оформляем заказ готовым — ждать
+    // онлайн-оплаты не нужно.
+    if (method === "balance") {
+      return this.placeFromBalance(computer, session.id, guestId, parsed.lines);
+    }
 
     // Бронь склада и сам заказ — одной транзакцией. Деньги здесь не трогаем:
     // позиции станут продажами при подтверждении оплаты.
@@ -226,6 +242,153 @@ export class BarOrdersService {
       qrImageUrl: checkout.qrImageUrl,
       phoneMasked: checkout.phoneMasked,
       expiresAt: checkout.expiresAt,
+    };
+  }
+
+  /**
+   * Заказ с оплатой с баланса аккаунта. Всё одной транзакцией: бронь склада,
+   * списание с баланса, продажи бара, бонус-кэшбэк и сам заказ сразу в статусе
+   * «нести». Не хватает на балансе — ничего не списываем и не оформляем.
+   */
+  private async placeFromBalance(
+    computer: {
+      id: string;
+      clubId: string;
+      name: string;
+      club: { tenantId: string; bonusPercent: number };
+    },
+    sessionId: string,
+    guestId: string,
+    lines: Array<{ productId: string; quantity: number }>,
+  ): Promise<PlaceOrderResult> {
+    let created: { id: string; total: number };
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
+        const items: OrderItemSnapshot[] = [];
+        const costById = new Map<string, number>();
+        for (const line of lines) {
+          const product = await tx.product.findUnique({
+            where: { id: line.productId },
+          });
+          if (
+            !product ||
+            product.clubId !== computer.clubId ||
+            !product.isActive
+          ) {
+            throw new BadRequestException(
+              "Одной из позиций больше нет в меню — обновите корзину",
+            );
+          }
+          if (product.stock !== null) {
+            const taken = await tx.product.updateMany({
+              where: { id: product.id, stock: { gte: line.quantity } },
+              data: { stock: { decrement: line.quantity } },
+            });
+            if (taken.count === 0) {
+              throw new BadRequestException(
+                `«${product.name}» закончился или осталось меньше`,
+              );
+            }
+          }
+          costById.set(product.id, product.cost);
+          items.push({
+            productId: product.id,
+            name: product.name,
+            quantity: line.quantity,
+            price: product.price,
+          });
+        }
+
+        const sum = orderTotal(items);
+
+        // Списываем с баланса. В долг бар не продаём: не хватает — отказ.
+        const wallet = await this.wallets.resolveWallet(
+          guestId,
+          computer.clubId,
+          tx,
+        );
+        if (wallet.balance < sum) {
+          throw new BadRequestException("Недостаточно средств на балансе");
+        }
+        await this.wallets.record(tx, {
+          walletId: wallet.id,
+          clubId: computer.clubId,
+          amount: -sum,
+          type: TransactionType.PRODUCT_SALE,
+          sessionId,
+        });
+
+        const shift = await tx.shift.findFirst({
+          where: { clubId: computer.clubId, closedAt: null },
+          orderBy: { openedAt: "desc" },
+        });
+
+        // Заказ сразу «нести»: оплата уже прошла.
+        const order = await tx.barOrder.create({
+          data: {
+            tenantId: computer.club.tenantId,
+            clubId: computer.clubId,
+            guestId,
+            sessionId,
+            computerId: computer.id,
+            computerName: computer.name,
+            status: BarOrderStatus.NEW,
+            total: sum,
+            bonusAccrued: 0,
+            items: items as unknown as Prisma.InputJsonValue,
+          },
+        });
+        for (const item of items) {
+          await tx.productSale.create({
+            data: {
+              clubId: computer.clubId,
+              productId: item.productId,
+              guestId,
+              sessionId,
+              shiftId: shift?.id ?? null,
+              staffId: null,
+              quantity: item.quantity,
+              priceAtSale: item.price,
+              costAtSale: costById.get(item.productId) ?? 0,
+              total: item.price * item.quantity,
+              method: PaymentMethod.BALANCE,
+              orderId: order.id,
+            },
+          });
+        }
+
+        const bonus = bonusFor(sum, computer.club.bonusPercent);
+        if (bonus > 0) {
+          await tx.guest.update({
+            where: { id: guestId },
+            data: { bonusPoints: { increment: bonus } },
+          });
+          await tx.barOrder.update({
+            where: { id: order.id },
+            data: { bonusAccrued: bonus },
+          });
+        }
+
+        return { id: order.id, total: sum };
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException)
+        return { ok: false, reason: error.message };
+      this.logger.error("Заказ с баланса не оформился", error as Error);
+      return { ok: false, reason: "Не удалось оформить заказ" };
+    }
+
+    // Кассе — новый заказ «нести».
+    this.bus.emit("bar.order.placed", {
+      clubId: computer.clubId,
+      orderId: created.id,
+      computerName: computer.name,
+    });
+    return {
+      ok: true,
+      orderId: created.id,
+      total: created.total,
+      mode: "balance",
     };
   }
 
