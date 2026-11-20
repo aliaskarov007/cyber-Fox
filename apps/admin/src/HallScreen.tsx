@@ -222,10 +222,13 @@ export function HallScreen({
   club,
   staff,
   onGoTo,
+  onOpenGuest,
 }: {
   club: Club;
   staff: Staff;
   onGoTo: (tab: Tab) => void;
+  /** Открыть карточку гостя, сидящего за этим ПК (переход во вкладку «Гости»). */
+  onOpenGuest: (guestId: string) => void;
 }) {
   const [hall, setHall] = useState<HallCell[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
@@ -1112,6 +1115,7 @@ export function HallScreen({
                 club={club}
                 cell={selected}
                 freeComputers={freeComputers}
+                onOpenGuest={onOpenGuest}
                 onDone={() => {
                   setSelectedId(null);
                   void refresh();

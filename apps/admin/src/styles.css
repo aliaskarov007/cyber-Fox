@@ -2254,6 +2254,17 @@ button.link {
   font: inherit;
 }
 
+/* Имя машины с кнопкой правки и поле ввода при переименовании — в одну строку. */
+.name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.name-cell input {
+  width: 140px;
+}
+
 .message-preview {
   white-space: pre-wrap;
   background: #1b2b22;

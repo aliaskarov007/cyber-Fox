@@ -80,7 +80,14 @@ export function ComputersSection({ club }: { club: Club }) {
           <tbody>
             {computers.map((computer) => (
               <tr key={computer.id}>
-                <td>{computer.name}</td>
+                <td>
+                  <ComputerNameCell
+                    club={club}
+                    computer={computer}
+                    onRenamed={() => void load()}
+                    onError={setError}
+                  />
+                </td>
                 <td>
                   {/*
                    * Зона машины меняется прямо здесь: после первой загрузки
@@ -143,5 +150,88 @@ export function ComputersSection({ club }: { club: Club }) {
         <div className="notice">Сначала заведите зону — машина всегда стоит в какой-то зоне.</div>
       )}
     </section>
+  );
+}
+
+/**
+ * Имя машины с правкой на месте: клик по «Переименовать» превращает ячейку в
+ * поле ввода. Имя уникально в клубе — сервер вернёт ошибку при совпадении.
+ */
+function ComputerNameCell({
+  club,
+  computer,
+  onRenamed,
+  onError,
+}: {
+  club: Club;
+  computer: Computer;
+  onRenamed: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(computer.name);
+  const [busy, setBusy] = useState(false);
+
+  async function save(): Promise<void> {
+    const next = name.trim();
+    if (next === "" || next === computer.name) {
+      setEditing(false);
+      setName(computer.name);
+      return;
+    }
+    setBusy(true);
+    onError(null);
+    try {
+      await api.updateComputer(club.id, computer.id, { name: next });
+      setEditing(false);
+      onRenamed();
+    } catch (cause) {
+      onError((cause as Error).message);
+      setName(computer.name);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span className="name-cell">
+        {computer.name}
+        <button type="button" className="link" onClick={() => setEditing(true)}>
+          Переименовать
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="name-cell">
+      <input
+        autoFocus
+        value={name}
+        disabled={busy}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void save();
+          if (e.key === "Escape") {
+            setEditing(false);
+            setName(computer.name);
+          }
+        }}
+      />
+      <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
+        ОК
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setEditing(false);
+          setName(computer.name);
+        }}
+      >
+        Отмена
+      </button>
+    </span>
   );
 }

@@ -15,11 +15,14 @@ export function SessionPanel({
   cell,
   freeComputers,
   onDone,
+  onOpenGuest,
 }: {
   club: Club;
   cell: HallCell;
   freeComputers: HallCell[];
   onDone: () => void;
+  /** Открыть карточку гостя, сидящего за этим ПК. */
+  onOpenGuest: (guestId: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,8 +71,23 @@ export function SessionPanel({
         <div className="rows">
           <div className="row">
             <span className="k">Гость</span>
-            <span>{session.guest?.fullName ?? "Без аккаунта"}</span>
+            <span>
+              {session.guest
+                ? `${session.guest.fullName} · ${session.guest.phone}`
+                : "Без аккаунта"}
+            </span>
           </div>
+          {session.guest && (
+            <div className="row">
+              <span className="k">Аккаунт</span>
+              <button
+                className="link"
+                onClick={() => onOpenGuest(session.guest!.id)}
+              >
+                Открыть аккаунт и историю
+              </button>
+            </div>
+          )}
           <div className="row">
             <span className="k">Идёт</span>
             <span>{formatDuration(session.startedAt)}</span>

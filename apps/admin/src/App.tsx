@@ -108,6 +108,8 @@ function ClubApp() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [clubId, setClubId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
+  // Гость, чью карточку открыть при переходе в «Гости» (из зала — «Открыть аккаунт»).
+  const [focusGuestId, setFocusGuestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingUp, setSigningUp] = useState(false);
   const [forgot, setForgot] = useState(false);
@@ -269,11 +271,24 @@ function ClubApp() {
         ) : tab === "reservations" ? (
           <ReservationsScreen club={club} />
         ) : tab === "hall" ? (
-          <HallScreen club={club} staff={staff} onGoTo={setTab} />
+          <HallScreen
+            club={club}
+            staff={staff}
+            onGoTo={setTab}
+            onOpenGuest={(id) => {
+              setFocusGuestId(id);
+              setTab("guests");
+            }}
+          />
         ) : tab === "bar" ? (
           <BarScreen club={club} staff={staff} />
         ) : tab === "guests" ? (
-          <GuestsScreen club={club} staff={staff} />
+          <GuestsScreen
+            club={club}
+            staff={staff}
+            focusGuestId={focusGuestId}
+            onFocusConsumed={() => setFocusGuestId(null)}
+          />
         ) : tab === "events" ? (
           <EventsScreen club={club} staff={staff} />
         ) : tab === "retention" ? (

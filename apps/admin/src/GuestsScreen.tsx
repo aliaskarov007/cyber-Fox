@@ -37,7 +37,18 @@ const PACKAGE_STATUS: Record<string, string> = {
   REFUNDED: "возврат",
 };
 
-export function GuestsScreen({ club, staff }: { club: Club; staff: Staff }) {
+export function GuestsScreen({
+  club,
+  staff,
+  focusGuestId,
+  onFocusConsumed,
+}: {
+  club: Club;
+  staff: Staff;
+  /** Открыть карточку этого гостя сразу — переход из зала «Открыть аккаунт». */
+  focusGuestId?: string | null;
+  onFocusConsumed?: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,6 +59,14 @@ export function GuestsScreen({ club, staff }: { club: Club; staff: Staff }) {
     }, 200);
     return () => clearTimeout(timer);
   }, [club.id, query]);
+
+  // Пришли из зала с конкретным гостем — открываем его карточку и гасим запрос.
+  useEffect(() => {
+    if (focusGuestId) {
+      setSelectedId(focusGuestId);
+      onFocusConsumed?.();
+    }
+  }, [focusGuestId, onFocusConsumed]);
 
   return (
     <main>
