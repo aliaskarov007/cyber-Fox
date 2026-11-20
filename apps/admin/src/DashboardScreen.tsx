@@ -43,18 +43,27 @@ export function DashboardScreen({ club }: { club: Club }) {
   const [report, setReport] = useState<ShiftReport | null>(null);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [hasShift, setHasShift] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const shift = await api.currentShift(club.id);
-    if (!shift) {
-      setHasShift(false);
-      setReport(null);
-      setShiftId(null);
-      return;
+    try {
+      const shift = await api.currentShift(club.id);
+      if (!shift) {
+        setHasShift(false);
+        setReport(null);
+        setShiftId(null);
+        setLoadError(null);
+        return;
+      }
+      setHasShift(true);
+      setShiftId(shift.id);
+      setReport(await api.shiftReport(club.id, shift.id));
+      setLoadError(null);
+    } catch (cause) {
+      // Не зависаем на «Загрузка…»: показываем ошибку и кнопку «Обновить»,
+      // а автоповтор раз в 20с сам поднимет экран, когда связь вернётся.
+      setLoadError((cause as Error).message);
     }
-    setHasShift(true);
-    setShiftId(shift.id);
-    setReport(await api.shiftReport(club.id, shift.id));
   }, [club.id]);
 
   useEffect(() => {
@@ -63,6 +72,16 @@ export function DashboardScreen({ club }: { club: Club }) {
     return () => clearInterval(timer);
   }, [refresh]);
 
+  if (!report && loadError) {
+    return (
+      <main>
+        <div className="error">Не удалось загрузить смену: {loadError}</div>
+        <button className="primary" onClick={() => void refresh()}>
+          Обновить
+        </button>
+      </main>
+    );
+  }
   if (!hasShift) {
     return (
       <main>

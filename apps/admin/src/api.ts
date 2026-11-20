@@ -400,14 +400,30 @@ export function setToken(token: string | null): void {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  });
+  // Таймаут: без него зависший запрос держит экран на «Загрузка…» навсегда.
+  // По истечении — отменяем, бросаем ошибку, и следующий автоповтор (раз в 20с)
+  // поднимет экран, когда связь вернётся.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...init,
+      signal: init.signal ?? controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+    });
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      throw new Error("Сервер не ответил вовремя — проверьте связь.");
+    }
+    throw cause instanceof Error ? cause : new Error("Нет связи с сервером");
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {

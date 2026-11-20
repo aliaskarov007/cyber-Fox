@@ -236,6 +236,7 @@ export function HallScreen({
   const [zoneList, setZoneList] = useState<Zone[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const canArrange = staff.role === "OWNER" || staff.role === "ADMIN";
   const [edit, setEdit] = useState(false);
@@ -256,15 +257,22 @@ export function HallScreen({
   const [drag, setDrag] = useState<DragState | null>(null);
 
   const refresh = useCallback(async () => {
-    const [nextHall, nextObjects, nextZones] = await Promise.all([
-      api.hall(club.id),
-      api.mapObjects(club.id),
-      api.zones(club.id),
-    ]);
-    setHall(nextHall);
-    setObjects(nextObjects);
-    setZoneList(nextZones);
-    setLoaded(true);
+    try {
+      const [nextHall, nextObjects, nextZones] = await Promise.all([
+        api.hall(club.id),
+        api.mapObjects(club.id),
+        api.zones(club.id),
+      ]);
+      setHall(nextHall);
+      setObjects(nextObjects);
+      setZoneList(nextZones);
+      setLoaded(true);
+      setLoadError(null);
+    } catch (cause) {
+      // Не оставляем карту клуба пустой навсегда: показываем ошибку и «Обновить»,
+      // автоповтор раз в 20с сам поднимет карту, когда связь вернётся.
+      setLoadError((cause as Error).message);
+    }
   }, [club.id]);
 
   useEffect(() => {
@@ -727,6 +735,19 @@ export function HallScreen({
   const areas = objects.filter((o) => o.kind === "AREA");
   const walls = objects.filter((o) => o.kind === "WALL");
   const marks = objects.filter((o) => o.kind === "LABEL" || o.kind === "DOOR");
+
+  // Карта ещё ни разу не загрузилась, а связь оборвалась — показываем ошибку и
+  // «Обновить», а не пустое поле. Как связь вернётся, автоповтор поднимет карту.
+  if (!loaded && loadError) {
+    return (
+      <main>
+        <div className="error">Не удалось загрузить карту клуба: {loadError}</div>
+        <button className="primary" onClick={() => void refresh()}>
+          Обновить
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main>
