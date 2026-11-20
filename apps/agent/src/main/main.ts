@@ -1,6 +1,6 @@
 import { BrowserWindow, app, globalShortcut, ipcMain, shell } from "electron";
-import { exec, spawn } from "node:child_process";
-import { join } from "node:path";
+import { exec, execFile, spawn } from "node:child_process";
+import { basename, join } from "node:path";
 
 import { type AgentSettings, isConfigured } from "../shared/settings.js";
 import {
@@ -47,6 +47,19 @@ let quitting = false;
  * новый, запертый). Пока флаг стоит, страховки не возвращают блокировку.
  */
 let servicing = false;
+
+/**
+ * Игры, запущенные в этой сессии: дерево процессов (по PID) и имена .exe.
+ *
+ * Закрытие сессии должно не только поднять экран блокировки, но и закрыть саму
+ * игру. Иначе она продолжает работать под блокировкой, и гость возвращается в
+ * неё одним Alt+Tab — время кончилось, а он играет. Храним и PID (убить дерево,
+ * которое мы сами породили), и имя .exe (убить игру, перезапустившую себя иным
+ * процессом с тем же именем — так делают многие лаунчеры). Игры по steam:// и
+ * прочим URI идут мимо: их настоящая изоляция — в образе машины.
+ */
+const launchedPids = new Set<number>();
+const launchedImages = new Set<string>();
 
 function createLockWindow(): void {
   lockWindow = new BrowserWindow({
@@ -235,7 +248,11 @@ ipcMain.handle(
       if (app.kind === "URI") {
         await shell.openExternal(app.target);
       } else {
-        await spawnGame(app.target, app.args ?? []);
+        const pid = await spawnGame(app.target, app.args ?? []);
+        // Запоминаем, что закрыть при блокировке: наш процесс и имя .exe.
+        if (pid) launchedPids.add(pid);
+        const image = basename(app.target);
+        if (/\.exe$/i.test(image)) launchedImages.add(image);
       }
       /*
        * Полка не сворачивается, а остаётся самым нижним окном во весь экран —
@@ -262,16 +279,17 @@ ipcMain.handle(
  * понимала, почему у гостя ничего не открылось. Путь к игре набирают руками в
  * кассе, так что промах по пути — случай обычный, а не редкий.
  */
-function spawnGame(target: string, args: string[]): Promise<void> {
+function spawnGame(target: string, args: string[]): Promise<number | undefined> {
   return new Promise((resolve, reject) => {
     const child = spawn(target, args, { detached: true, stdio: "ignore" });
+    const pid = child.pid;
 
     const settle = setTimeout(() => {
       // Ошибки не было — игра пошла. Отвязываем: закрытая игра не должна
       // держать агента, а перезапуск агента — убивать игру.
       child.removeAllListeners("error");
       child.unref();
-      resolve();
+      resolve(pid);
     }, 400);
 
     child.once("error", (error) => {
@@ -279,6 +297,27 @@ function spawnGame(target: string, args: string[]): Promise<void> {
       reject(error);
     });
   });
+}
+
+/**
+ * Закрыть все игры сессии. Зовётся при блокировке: экран заблокирован, а игра
+ * под ним — нет, значит её надо завершить, иначе Alt+Tab возвращает гостя в неё.
+ *
+ * /T — вместе с дочерними процессами (игра часто порождает свои), /F —
+ * принудительно: игра не спрашивает «сохранить?» у запертой машины. Ошибка
+ * (процесс уже закрыт) — обычное дело, молча идём дальше.
+ */
+function killLaunchedGames(): void {
+  if (process.platform === "win32") {
+    for (const pid of launchedPids) {
+      execFile("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => {});
+    }
+    for (const image of launchedImages) {
+      execFile("taskkill.exe", ["/IM", image, "/T", "/F"], { windowsHide: true }, () => {});
+    }
+  }
+  launchedPids.clear();
+  launchedImages.clear();
 }
 
 /** Время кончилось: возвращаем блокировку поверх игры. */
@@ -292,6 +331,9 @@ ipcMain.handle("agent:lock", () => {
     return;
   unlocked = false;
   setPlaying(false);
+  // Сначала закрываем игру, потом поднимаем блокировку: под ней не должно
+  // остаться ничего, во что можно вернуться Alt+Tab.
+  killLaunchedGames();
   holdShortcuts();
   void releaseLockdown();
   holdLockOnTop();
@@ -354,6 +396,7 @@ function relock(): void {
   servicing = false;
   unlocked = false;
   setPlaying(false);
+  killLaunchedGames();
   releaseShortcuts(["Control+Alt+Shift+L"]);
   holdShortcuts();
   void applyGuard();
