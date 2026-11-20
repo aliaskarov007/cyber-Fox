@@ -271,6 +271,7 @@ model Club {
   cashMovements CashMovement[]
   goodsReceipts GoodsReceipt[]
   reservations  Reservation[]
+  expenses      Expense[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
@@ -1016,6 +1017,37 @@ model Reservation {
   @@index([clubId, startsAt])
 }
 
+/// Расход клуба для P&L: аренда, зарплаты, коммуналка, закупки и прочее.
+enum ExpenseCategory {
+  RENT // аренда
+  SALARY // зарплаты
+  UTILITIES // коммуналка
+  PURCHASE // закупки товара и оборудования
+  MARKETING // реклама
+  REPAIR // ремонт и обслуживание
+  OTHER // прочее
+}
+
+model Expense {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  category ExpenseCategory
+  /// В тиын.
+  amount   Int
+  note     String?
+  /// Дата, к которой относится расход (для P&L за период).
+  spentAt  DateTime
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([clubId, spentAt])
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -1178,6 +1210,7 @@ model Staff {
   cashMovements CashMovement[]
   goodsReceipts GoodsReceipt[]
   reservations  Reservation[]
+  expenses      Expense[]
   passwordResets StaffPasswordReset[]
 
   createdAt DateTime @default(now())

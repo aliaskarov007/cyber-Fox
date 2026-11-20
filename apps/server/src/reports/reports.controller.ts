@@ -65,6 +65,16 @@ export class ReportsController {
     return this.reports.computers(staff, clubId, parsePeriod(from, to));
   }
 
+  @Get("clubs/:clubId/pnl")
+  pnl(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.reports.pnl(staff, clubId, parsePeriod(from, to));
+  }
+
   @Get("clubs/:clubId/daily")
   daily(
     @CurrentStaff() staff: AuthenticatedStaff,

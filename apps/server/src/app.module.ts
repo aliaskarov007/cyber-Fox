@@ -32,6 +32,7 @@ import { ShiftsModule } from "./shifts/shifts.module.js";
 import { SignupModule } from "./signup/signup.module.js";
 import { UploadsModule } from "./uploads/uploads.module.js";
 import { EventsModule } from "./events/events.module.js";
+import { ExpensesModule } from "./expenses/expenses.module.js";
 import { TournamentsModule } from "./tournaments/tournaments.module.js";
 import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
 
@@ -84,6 +85,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     RealtimeModule,
     WhatsAppModule,
     EventsModule,
+    ExpensesModule,
     TournamentsModule,
   ],
   providers: [

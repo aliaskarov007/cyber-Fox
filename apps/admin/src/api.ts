@@ -804,6 +804,31 @@ export const api = {
       closedAt: string;
     } | null>(`/clubs/${clubId}/shifts/handover`),
 
+  // --- Расходы и P&L ---
+  expenses: (clubId: string, fromISO: string, toISO: string) =>
+    request<Expense[]>(
+      `/clubs/${clubId}/expenses?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`,
+    ),
+  createExpense: (
+    clubId: string,
+    body: {
+      category: string;
+      amount: number;
+      spentAt: string;
+      note?: string;
+    },
+  ) =>
+    request<Expense>(`/clubs/${clubId}/expenses`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteExpense: (clubId: string, id: string) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/expenses/${id}`, {
+      method: "DELETE",
+    }),
+  pnl: (clubId: string, days: number) =>
+    request<Pnl>(`/reports/clubs/${clubId}/pnl?from=${sinceDays(days)}`),
+
   // --- Бронирование ---
   reservations: (clubId: string, fromISO: string, toISO: string) =>
     request<Reservation[]>(
@@ -1740,6 +1765,33 @@ export interface DailyPoint {
   date: string;
   revenue: number;
   sessions: number;
+}
+
+export type ExpenseCategory =
+  | "RENT"
+  | "SALARY"
+  | "UTILITIES"
+  | "PURCHASE"
+  | "MARKETING"
+  | "REPAIR"
+  | "OTHER";
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  amount: number;
+  note: string | null;
+  spentAt: string;
+}
+
+export interface Pnl {
+  timeRevenue: number;
+  barRevenue: number;
+  barCost: number;
+  grossProfit: number;
+  expenses: Array<{ category: ExpenseCategory; amount: number }>;
+  expensesTotal: number;
+  netProfit: number;
 }
 
 export type ReservationStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";

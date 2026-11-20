@@ -1,5 +1,9 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { StaffRole, TransactionType } from "@prisma/client";
+import {
+  type ExpenseCategory,
+  StaffRole,
+  TransactionType,
+} from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
@@ -312,6 +316,68 @@ export class ReportsService {
         sessions: e.sessions.size,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * Отчёт о прибыли (P&L) за период: выручка (время + бар) − себестоимость
+   * бара = валовая прибыль; минус расходы по статьям = чистая прибыль.
+   * Пополнения балансов сюда не входят — это предоплата, а не выручка.
+   */
+  async pnl(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    period: Period,
+  ): Promise<{
+    timeRevenue: number;
+    barRevenue: number;
+    barCost: number;
+    grossProfit: number;
+    expenses: Array<{ category: ExpenseCategory; amount: number }>;
+    expensesTotal: number;
+    netProfit: number;
+  }> {
+    await this.access.requireClub(staff, clubId);
+
+    const [charges, sales, expenses] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          clubId,
+          type: TransactionType.SESSION_CHARGE,
+          createdAt: { gte: period.from, lte: period.to },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.productSale.findMany({
+        where: { clubId, createdAt: { gte: period.from, lte: period.to } },
+        select: { total: true, costAtSale: true, quantity: true },
+      }),
+      this.prisma.expense.groupBy({
+        by: ["category"],
+        where: { clubId, spentAt: { gte: period.from, lte: period.to } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Списания за время записаны отрицательными — выручка это их модуль.
+    const timeRevenue = Math.abs(charges._sum.amount ?? 0);
+    const barRevenue = sales.reduce((s, x) => s + x.total, 0);
+    const barCost = sales.reduce((s, x) => s + x.costAtSale * x.quantity, 0);
+    const grossProfit = timeRevenue + barRevenue - barCost;
+
+    const byCategory = expenses
+      .map((e) => ({ category: e.category, amount: e._sum.amount ?? 0 }))
+      .sort((a, b) => b.amount - a.amount);
+    const expensesTotal = byCategory.reduce((s, e) => s + e.amount, 0);
+
+    return {
+      timeRevenue,
+      barRevenue,
+      barCost,
+      grossProfit,
+      expenses: byCategory,
+      expensesTotal,
+      netProfit: grossProfit - expensesTotal,
+    };
   }
 
   /**

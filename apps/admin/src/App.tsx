@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { AnalyticsScreen } from "./AnalyticsScreen.js";
 import { BarScreen } from "./BarScreen.js";
+import { FinanceScreen } from "./FinanceScreen.js";
 import { ReservationsScreen } from "./ReservationsScreen.js";
 import { DashboardScreen } from "./DashboardScreen.js";
 import { EventsScreen } from "./EventsScreen.js";
@@ -27,6 +28,7 @@ import { TariffsScreen } from "./TariffsScreen.js";
 export type Tab =
   | "dashboard"
   | "analytics"
+  | "finance"
   | "hall"
   | "bar"
   | "guests"
@@ -66,6 +68,7 @@ const TABS: Array<{
   { id: "dashboard", label: "Смена" },
   // Аналитика по периоду — забота владельца и управляющего, не кассира.
   { id: "analytics", label: "Аналитика", manageOnly: true },
+  { id: "finance", label: "Финансы", manageOnly: true },
   { id: "hall", label: "Карта клуба" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
@@ -261,6 +264,8 @@ function ClubApp() {
           <DashboardScreen club={club} />
         ) : tab === "analytics" ? (
           <AnalyticsScreen club={club} clubs={clubs} />
+        ) : tab === "finance" ? (
+          <FinanceScreen club={club} />
         ) : tab === "reservations" ? (
           <ReservationsScreen club={club} />
         ) : tab === "hall" ? (
