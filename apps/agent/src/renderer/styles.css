@@ -1082,3 +1082,36 @@ button:disabled {
   opacity: 0.5;
   cursor: default;
 }
+
+/* Купленные пакеты гостя на экране входа: название, остаток, срок. */
+.packages {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.packages-title {
+  font-size: 14px;
+  opacity: 0.6;
+}
+.package {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.package-name {
+  font-weight: 700;
+  flex: 1 1 auto;
+}
+.package-left {
+  font-variant-numeric: tabular-nums;
+}
+.package-until {
+  flex-basis: 100%;
+  font-size: 13px;
+  opacity: 0.6;
+}

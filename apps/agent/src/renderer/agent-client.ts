@@ -63,13 +63,16 @@ export interface GuestLoginResult {
   } | null;
   packagesInZone: Array<{
     id: string;
+    name: string;
     minutesRemaining: number;
     expiresAt: string;
   }>;
   packagesElsewhere: Array<{
     id: string;
+    name: string;
     zoneName: string;
     minutesRemaining: number;
+    expiresAt: string;
   }>;
   perMinutePrice: number | null;
   minutesAffordable: number | null;

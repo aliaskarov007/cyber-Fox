@@ -5,7 +5,26 @@ import {
   type BuyablePackage,
   type GuestLoginResult,
   formatMoney,
+  formatRemaining,
 } from "./agent-client.js";
+
+/** «осталось 1 ч 30 мин» — компактно, словами. */
+function remainingText(minutes: number): string {
+  const r = formatRemaining(minutes);
+  return r.unit ? `${r.value} ${r.unit}` : r.value;
+}
+
+/** «ещё 2 дня» по сроку действия пакета. */
+function daysLeftText(iso: string): string {
+  const days = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return "истекает сегодня";
+  const t10 = days % 10;
+  const t100 = days % 100;
+  let word = "дней";
+  if (t10 === 1 && t100 !== 11) word = "день";
+  else if (t10 >= 2 && t10 <= 4 && (t100 < 10 || t100 >= 20)) word = "дня";
+  return `ещё ${days} ${word}`;
+}
 import { PromoField } from "./PromoField.js";
 import { TopUpPanel } from "./TopUpPanel.js";
 import { SignupScreen } from "./SignupScreen.js";
@@ -157,7 +176,8 @@ export function LockScreen({
   }
 
   if (card?.guest) {
-    const minutes = card.packagesInZone[0];
+    const hasPackage = card.packagesInZone.length > 0;
+    const firstPackage = card.packagesInZone[0];
     return (
       <div className="card">
         <h1>Здравствуйте, {card.guest.fullName}</h1>
@@ -181,19 +201,13 @@ export function LockScreen({
               <span>{formatMoney(card.guest.bonusPoints)}</span>
             </div>
           )}
-          {minutes && (
-            <div className="row">
-              <span className="k">Минуты в этой зоне</span>
-              <span>{minutes.minutesRemaining} мин</span>
-            </div>
-          )}
           {card.perMinutePrice !== null && (
             <div className="row">
               <span className="k">Поминутно</span>
               <span>{formatMoney(card.perMinutePrice)}/мин</span>
             </div>
           )}
-          {card.minutesAffordable !== null && !minutes && (
+          {card.minutesAffordable !== null && !hasPackage && (
             <div className="row">
               <span className="k">Хватит на</span>
               <span>{card.minutesAffordable} мин</span>
@@ -201,22 +215,45 @@ export function LockScreen({
           )}
         </div>
 
-        {card.packagesElsewhere.length > 0 && (
-          <div className="banner info">
-            У вас есть минуты в другой зоне — здесь они не действуют:{" "}
-            {card.packagesElsewhere
-              .map((p) => `${p.zoneName} — ${p.minutesRemaining} мин`)
-              .join(", ")}
+        {/* Купленные пакеты гостя в этой зоне: остаток и срок действия. */}
+        {hasPackage && (
+          <div className="packages">
+            <div className="packages-title">Мои пакеты</div>
+            {card.packagesInZone.map((p) => (
+              <div className="package" key={p.id}>
+                <span className="package-name">{p.name}</span>
+                <span className="package-left">
+                  осталось {remainingText(p.minutesRemaining)}
+                </span>
+                <span className="package-until">
+                  действует {daysLeftText(p.expiresAt)}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
-        {minutes ? (
+        {card.packagesElsewhere.length > 0 && (
+          <div className="banner info">
+            У вас есть пакеты в другой зоне — здесь они не действуют:{" "}
+            {card.packagesElsewhere
+              .map(
+                (p) =>
+                  `${p.name} (${p.zoneName}) — осталось ${remainingText(
+                    p.minutesRemaining,
+                  )}, действует ${daysLeftText(p.expiresAt)}`,
+              )
+              .join("; ")}
+          </div>
+        )}
+
+        {firstPackage ? (
           <button
             className="primary"
             disabled={busy || !card.ok}
             onClick={() => void start()}
           >
-            Играть на минутах пакета ({minutes.minutesRemaining} мин)
+            Играть на минутах пакета ({firstPackage.minutesRemaining} мин)
           </button>
         ) : (
           <button

@@ -413,7 +413,10 @@ export class AgentService {
         minutesRemaining: { gt: 0 },
         expiresAt: { gt: now },
       },
-      include: { zone: { select: { name: true } } },
+      include: {
+        zone: { select: { name: true } },
+        sourceTariff: { select: { name: true } },
+      },
       orderBy: { expiresAt: "asc" },
     });
 
@@ -458,6 +461,7 @@ export class AgentService {
       guest: guestInfo(wallet.balance),
       packagesInZone: inZone.map((p) => ({
         id: p.id,
+        name: p.sourceTariff.name,
         minutesRemaining: p.minutesRemaining,
         expiresAt: p.expiresAt,
       })),
@@ -465,8 +469,10 @@ export class AgentService {
         .filter((p) => p.zoneId !== computer.zoneId)
         .map((p) => ({
           id: p.id,
+          name: p.sourceTariff.name,
           zoneName: p.zone.name,
           minutesRemaining: p.minutesRemaining,
+          expiresAt: p.expiresAt,
         })),
       perMinutePrice: perMinute?.pricePerMinute ?? null,
       minutesAffordable: affordable,
