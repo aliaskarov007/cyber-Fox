@@ -6,6 +6,7 @@ import {
   api,
   formatDuration,
   formatMoney,
+  toTiyn,
 } from "./api.js";
 import { PcMessageBox } from "./PcMessageBox.js";
 
@@ -27,6 +28,7 @@ export function SessionPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [moveTo, setMoveTo] = useState("");
+  const [amount, setAmount] = useState("1000");
 
   const session = cell.session!;
 
@@ -186,6 +188,52 @@ export function SessionPanel({
           Пересадить
         </button>
       </div>
+
+      {/* Пополнение счёта прямо из сессии: кассиру не нужно идти в «Гости». */}
+      {session.guest && (
+        <div className="section">
+          <h3>Пополнить счёт</h3>
+          <div className="actions">
+            <input
+              style={{ width: 120 }}
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              aria-label="Сумма пополнения в тенге"
+            />
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(() =>
+                  api.topUp(
+                    club.id,
+                    session.guest!.id,
+                    toTiyn(amount),
+                    "CASH",
+                  ),
+                )
+              }
+            >
+              Наличными
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(() =>
+                  api.topUp(
+                    club.id,
+                    session.guest!.id,
+                    toTiyn(amount),
+                    "CARD",
+                  ),
+                )
+              }
+            >
+              Картой
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="section">
         <h3>Сообщение на экран</h3>
