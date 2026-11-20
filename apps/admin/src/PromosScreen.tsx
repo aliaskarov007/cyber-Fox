@@ -161,7 +161,8 @@ function PromoForm({
   onCreated: () => void;
 }) {
   const [code, setCode] = useState("");
-  const [kind, setKind] = useState<PromoKind>("BALANCE");
+  // По умолчанию промокод даёт бонусы: деньги на счёт — отдельный выбор.
+  const [kind, setKind] = useState<PromoKind>("BONUS");
   const [amount, setAmount] = useState("500");
   const [maxUses, setMaxUses] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -231,8 +232,8 @@ function PromoForm({
         <label>
           Что даёт
           <select value={kind} onChange={(e) => setKind(e.target.value as PromoKind)}>
-            <option value="BALANCE">{KIND_LABEL.BALANCE}</option>
             <option value="BONUS">{KIND_LABEL.BONUS}</option>
+            <option value="BALANCE">{KIND_LABEL.BALANCE}</option>
           </select>
         </label>
         <label>
