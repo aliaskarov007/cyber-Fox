@@ -91,8 +91,10 @@ export function DashboardScreen({ club }: { club: Club }) {
   const share = (part: number): number =>
     report.grandTotal > 0 ? Math.round((part / report.grandTotal) * 100) : 0;
 
-  const earned = report.sessionsRevenue + report.productsRevenue;
   const barMargin = report.productsRevenue - report.productsCost;
+  // Чистый доход за смену: заработок с компьютеров плюс только маржа бара
+  // (не вся выручка бара — в ней сидит себестоимость товара).
+  const earned = report.sessionsRevenue + barMargin;
 
   return (
     <main>
@@ -119,7 +121,16 @@ export function DashboardScreen({ club }: { club: Club }) {
           {" · "}
           {durationText(report.durationMinutes)}
         </div>
-        <button onClick={() => window.print()}>Печать Z-отчёта</button>
+        <div className="dash-actions">
+          {shiftId && (
+            <ShiftOrderButton
+              clubId={club.id}
+              shiftId={shiftId}
+              onChanged={() => void refresh()}
+            />
+          )}
+          <button onClick={() => window.print()}>Печать Z-отчёта</button>
+        </div>
       </div>
 
       <div className="dash-grid">
@@ -153,7 +164,7 @@ export function DashboardScreen({ club }: { club: Club }) {
           <div className="dash-title">Касса (наличные)</div>
           <div className="dash-rows">
             <div className="row">
-              <span className="k">Размен на начало</span>
+              <span className="k">Сумма на начало смены</span>
               <span>{formatMoney(report.openingFloat)}</span>
             </div>
             <div className="row">
@@ -177,7 +188,7 @@ export function DashboardScreen({ club }: { club: Club }) {
               <span>{formatMoney(report.cashRefunds)}</span>
             </div>
             <div className="row dash-total">
-              <span className="k">Должно быть в кассе</span>
+              <span className="k">Остаток в кассе наличными</span>
               <b>{formatMoney(report.cashExpected)}</b>
             </div>
           </div>
@@ -317,7 +328,8 @@ function ZReport({
   report: ShiftReport;
   clubName: string;
 }) {
-  const earned = report.sessionsRevenue + report.productsRevenue;
+  const earned =
+    report.sessionsRevenue + (report.productsRevenue - report.productsCost);
   const fmt = (n: number): string => formatMoney(n);
   const dt = (s: string): string =>
     new Date(s).toLocaleString("ru-KZ", {
@@ -351,13 +363,13 @@ function ZReport({
       </div>
 
       <h2 className="zr-h2">Касса (наличные)</h2>
-      {line("Размен на начало", fmt(report.openingFloat))}
+      {line("Сумма на начало смены", fmt(report.openingFloat))}
       {line("Продажи наличными", `+ ${fmt(report.cashSales)}`)}
       {line("Внесения", `+ ${fmt(report.cashDeposits)}`)}
       {line("Выемки", `− ${fmt(report.cashDrops)}`)}
       {line("Расходы", `− ${fmt(report.cashExpenses)}`)}
       {line("Возвраты", `− ${fmt(report.cashRefunds)}`)}
-      {line("Должно быть в кассе", fmt(report.cashExpected), true)}
+      {line("Остаток в кассе наличными", fmt(report.cashExpected), true)}
       {report.reconciliation &&
         line("Пересчитано", fmt(report.reconciliation.counted))}
       {report.reconciliation &&
@@ -444,6 +456,120 @@ function ZReport({
         <div>Принял ____________________</div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Кнопка «+ Ордер» в шапке смены: быстрый приходный или расходный кассовый
+ * ордер. Расход — деньги взяли из кассы (минус наличные смены); приход —
+ * внесли в кассу (плюс). Обе записи — обычное движение наличных.
+ */
+function ShiftOrderButton({
+  clubId,
+  shiftId,
+  onChanged,
+}: {
+  clubId: string;
+  shiftId: string;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<"DEPOSIT" | "EXPENSE">("EXPENSE");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function close(): void {
+    setOpen(false);
+    setAmount("");
+    setReason("");
+    setError(null);
+    setBusy(false);
+  }
+
+  async function save(): Promise<void> {
+    const sum = toTiyn(amount);
+    if (sum <= 0) {
+      setError("Укажите сумму");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.addCashMovement(clubId, shiftId, {
+        kind,
+        amount: sum,
+        reason: reason.trim() || undefined,
+      });
+      onChanged();
+      close();
+    } catch (cause) {
+      setError((cause as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        className="dash-plus"
+        title="Приходный / расходный ордер"
+        onClick={() => setOpen(true)}
+      >
+        + Ордер
+      </button>
+      {open && (
+        <div className="order-backdrop" onClick={close}>
+          <div className="order-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="dash-title">Кассовый ордер</div>
+            {error && <div className="error">{error}</div>}
+            <div className="seg">
+              <button
+                className={kind === "EXPENSE" ? "on" : ""}
+                onClick={() => setKind("EXPENSE")}
+              >
+                Расходный (из кассы)
+              </button>
+              <button
+                className={kind === "DEPOSIT" ? "on" : ""}
+                onClick={() => setKind("DEPOSIT")}
+              >
+                Приходный (в кассу)
+              </button>
+            </div>
+            <input
+              inputMode="numeric"
+              placeholder="Сумма, ₸"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <input
+              placeholder={
+                kind === "EXPENSE" ? "За что (напр. закупка воды)" : "Основание"
+              }
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <div className="order-hint">
+              {kind === "EXPENSE"
+                ? "Деньги взяли из кассы — минус из наличных смены."
+                : "Деньги внесли в кассу — плюс к наличным смены."}
+            </div>
+            <div className="order-actions">
+              <button onClick={close}>Отмена</button>
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() => void save()}
+              >
+                Провести
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -2679,6 +2679,48 @@ button.link {
 .dash-meta-row .dash-meta {
   margin-bottom: 0;
 }
+.dash-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.dash-plus {
+  white-space: nowrap;
+}
+.order-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 28, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+.order-pop {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.order-pop input {
+  width: 100%;
+}
+.order-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+.order-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .dash-qty {
   font-style: normal;
   color: var(--muted);

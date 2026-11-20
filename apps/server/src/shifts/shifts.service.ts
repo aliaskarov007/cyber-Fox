@@ -266,12 +266,16 @@ export class ShiftsService {
     const window = { gte: shift.openedAt, lte: until };
 
     const [payments, sales, movements, staffRecord] = await Promise.all([
+      // Деньги привязываем к смене по времени, а не по shiftId: если платёж
+      // записался без смены или на чужую (касса пробила до открытия смены,
+      // смену забыли открыть), по shiftId он терялся — и наличные «не считались».
+      // Смены по времени не пересекаются, поэтому окно однозначно.
       this.prisma.payment.findMany({
-        where: { shiftId: shift.id },
+        where: { clubId: shift.clubId, createdAt: window },
         include: { guest: { select: { fullName: true } } },
       }),
       this.prisma.productSale.findMany({
-        where: { shiftId: shift.id },
+        where: { clubId: shift.clubId, createdAt: window },
         include: { product: { select: { name: true } } },
       }),
       this.prisma.cashMovement.findMany({
@@ -359,10 +363,15 @@ export class ShiftsService {
       .filter((p) => p.method !== PaymentMethod.BONUS)
       .reduce((sum, p) => sum + p.amount, 0);
     const barSales = productsRevenue;
-    const grandTotal = clubTopUps + barSales;
-    const cashTotal = sumBy(PaymentMethod.CASH) + salesBy(PaymentMethod.CASH);
+    // «Деньги в кассу за смену» — только то, что физически пришло этой сменой:
+    // наличные + карта + онлайн. Оплата бара с баланса сюда не идёт (деньги
+    // пришли прошлой сменой при пополнении). Возврат наличными уменьшает итог.
+    const cashReceived =
+      sumBy(PaymentMethod.CASH) + salesBy(PaymentMethod.CASH);
+    const cashTotal = cashReceived - cashRefunds;
     const onlineTotal =
       sumBy(PaymentMethod.ONLINE) + salesBy(PaymentMethod.ONLINE);
+    const grandTotal = cashTotal + totals.cardTotal + onlineTotal;
 
     // Журнал действий: каждое пополнение и каждый пробитый товар отдельной
     // строкой, новые сверху. Бонусные списания — не деньги кассы, их не берём.
@@ -437,7 +446,7 @@ export class ShiftsService {
       cashDrops,
       cashExpenses,
       cashRefunds,
-      cashSales: cashTotal,
+      cashSales: cashReceived,
       cashMovements: movements.map((m) => ({
         id: m.id,
         at: m.createdAt,
