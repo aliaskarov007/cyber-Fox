@@ -806,6 +806,22 @@ export const api = {
       closedAt: string;
     } | null>(`/clubs/${clubId}/shifts/handover`),
 
+  // --- Бонус за пополнение (пороги) ---
+  bonusTiers: (clubId: string) =>
+    request<BonusTier[]>(`/clubs/${clubId}/bonus-tiers`),
+  createBonusTier: (
+    clubId: string,
+    body: { minTopUp: number; bonus: number },
+  ) =>
+    request<BonusTier>(`/clubs/${clubId}/bonus-tiers`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteBonusTier: (clubId: string, id: string) =>
+    request<{ ok: boolean }>(`/clubs/${clubId}/bonus-tiers/${id}`, {
+      method: "DELETE",
+    }),
+
   // --- Расходы и P&L ---
   expenses: (clubId: string, fromISO: string, toISO: string) =>
     request<Expense[]>(
@@ -1768,6 +1784,12 @@ export interface DailyPoint {
   date: string;
   revenue: number;
   sessions: number;
+}
+
+export interface BonusTier {
+  id: string;
+  minTopUp: number;
+  bonus: number;
 }
 
 export type ExpenseCategory =

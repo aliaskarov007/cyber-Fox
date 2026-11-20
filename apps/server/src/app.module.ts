@@ -7,6 +7,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { ApiThrottlerGuard } from "./common/throttler.guard.js";
 
 import { AuthModule } from "./auth/auth.module.js";
+import { BonusModule } from "./bonus/bonus.module.js";
 import { SubscriptionModule } from "./billing-platform/subscription.module.js";
 import { JwtAuthGuard, RolesGuard } from "./auth/guards.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
@@ -63,6 +64,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
     HealthModule,
     SubscriptionModule,
     AuthModule,
+    BonusModule,
     CatalogModule,
     UplinksModule,
     PcMessagesModule,

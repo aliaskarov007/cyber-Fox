@@ -24,6 +24,7 @@ import { WalletService } from "../guests/wallet.service.js";
 import type { OrderItemSnapshot } from "../products/bar-order.rules.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { RealtimeBus } from "../realtime/realtime.bus.js";
+import { pickTopUpBonus } from "../billing/bonus.rules.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import { HmacPaymentProvider } from "./payment.provider.js";
 import {
@@ -413,6 +414,18 @@ export class PaymentsService {
             method: PaymentMethod.ONLINE,
           },
         });
+
+        // Бонус за пополнение по порогам — как и при пополнении на кассе.
+        const tiers = await tx.topUpBonusTier.findMany({
+          where: { clubId: intent.clubId },
+        });
+        const bonus = pickTopUpBonus(tiers, intent.amount);
+        if (bonus > 0) {
+          await tx.guest.update({
+            where: { id: intent.guestId },
+            data: { bonusPoints: { increment: bonus } },
+          });
+        }
         return true;
       }
 

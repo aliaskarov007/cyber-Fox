@@ -275,6 +275,7 @@ model Club {
   goodsReceipts GoodsReceipt[]
   reservations  Reservation[]
   expenses      Expense[]
+  bonusTiers    TopUpBonusTier[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
@@ -1054,6 +1055,21 @@ model Expense {
   createdAt DateTime @default(now())
 
   @@index([clubId, spentAt])
+}
+
+/// Порог бонуса за пополнение: пополнил не меньше minTopUp — получил bonus на
+/// бонусный счёт. Применяется самый высокий подходящий порог.
+model TopUpBonusTier {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// Порог пополнения в тиын.
+  minTopUp Int
+  /// Начисляемый бонус в тиын.
+  bonus    Int
+
+  @@index([clubId])
 }
 
 enum PaymentMethod {

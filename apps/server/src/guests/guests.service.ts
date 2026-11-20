@@ -18,6 +18,7 @@ import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { discountedPrice } from "../billing/billing.rules.js";
+import { pickTopUpBonus } from "../billing/bonus.rules.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
 import { WalletService } from "./wallet.service.js";
@@ -315,6 +316,16 @@ export class GuestsService {
           shiftId: await this.currentShiftId(tx, clubId),
         },
       });
+
+      // Бонус за пополнение по порогам: начисляется на бонусный счёт гостя.
+      const tiers = await tx.topUpBonusTier.findMany({ where: { clubId } });
+      const bonus = pickTopUpBonus(tiers, dto.amount);
+      if (bonus > 0) {
+        await tx.guest.update({
+          where: { id: guest.id },
+          data: { bonusPoints: { increment: bonus } },
+        });
+      }
 
       return { balance: updated.balance };
     });

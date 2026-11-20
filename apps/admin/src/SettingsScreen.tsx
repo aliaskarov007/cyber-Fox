@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
+  type BonusTier,
   type Club,
   type Staff,
   type StaffMember,
@@ -148,6 +149,8 @@ export function SettingsScreen({
           onSaved={(msg) => void run(async () => onClubsChanged(), msg)}
         />
       )}
+
+      {isOwner && <BonusTiersSettings club={club} />}
 
       {/*
        * Зоны и машины правит владелец или управляющий: сервер закрывает эти
@@ -972,5 +975,112 @@ function StaffPhone({
         Отмена
       </button>
     </span>
+  );
+}
+
+/** Пороги бонуса за пополнение: пополнил ≥ X — получил Y бонусами. */
+function BonusTiersSettings({ club }: { club: Club }) {
+  const [tiers, setTiers] = useState<BonusTier[]>([]);
+  const [minTopUp, setMinTopUp] = useState("");
+  const [bonus, setBonus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function reload(): Promise<void> {
+    setTiers(await api.bonusTiers(club.id));
+  }
+
+  useEffect(() => {
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [club.id]);
+
+  async function add(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    const min = minTopUp.trim() === "" ? 0 : toTiyn(minTopUp);
+    const bon = bonus.trim() === "" ? 0 : toTiyn(bonus);
+    if (min <= 0 || bon <= 0) {
+      setError("Укажите порог и бонус");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.createBonusTier(club.id, { minTopUp: min, bonus: bon });
+      setMinTopUp("");
+      setBonus("");
+      await reload();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    setError(null);
+    try {
+      await api.deleteBonusTier(club.id, id);
+      await reload();
+    } catch (cause) {
+      setError((cause as Error).message);
+    }
+  }
+
+  return (
+    <section className="zone-block">
+      <div className="zone-head">
+        <h2>Бонус за пополнение</h2>
+      </div>
+      {error && <div className="error">{error}</div>}
+
+      <div className="section">
+        <p className="hint">
+          Пополнил на сумму не меньше порога — на бонусный счёт падает бонус.
+          Применяется самый высокий подходящий порог. Бонусами гость оплачивает
+          игровое время.
+        </p>
+
+        <div className="rows">
+          {tiers.map((t) => (
+            <div className="row" key={t.id}>
+              <span className="k">
+                Пополнил ≥ {formatMoney(t.minTopUp)} → +{formatMoney(t.bonus)}{" "}
+                бонусом
+              </span>
+              <button onClick={() => void remove(t.id)}>Удалить</button>
+            </div>
+          ))}
+          {tiers.length === 0 && (
+            <div className="row">
+              <span className="k">
+                Порогов нет — бонус за пополнение выключен.
+              </span>
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={add}
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}
+        >
+          <input
+            inputMode="decimal"
+            placeholder="Порог, ₸"
+            value={minTopUp}
+            onChange={(e) => setMinTopUp(e.target.value)}
+          />
+          <input
+            inputMode="decimal"
+            placeholder="Бонус, ₸"
+            value={bonus}
+            onChange={(e) => setBonus(e.target.value)}
+          />
+          <button className="primary" type="submit" disabled={busy}>
+            Добавить порог
+          </button>
+        </form>
+      </div>
+    </section>
   );
 }
