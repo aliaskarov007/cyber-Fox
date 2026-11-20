@@ -687,6 +687,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  writeOffStock: (
+    clubId: string,
+    productId: string,
+    body: { quantity: number },
+  ) =>
+    request<Product>(`/clubs/${clubId}/products/${productId}/write-off`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   /** PIN гостя для самостоятельного входа за игровым ПК. Хранится хешем. */
   setGuestPin: (clubId: string, guestId: string, pin: string) =>
     request<{ ok: true }>(`/clubs/${clubId}/guests/${guestId}/pin`, {

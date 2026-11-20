@@ -15,6 +15,7 @@ import type {
   SellCartDto,
   SellProductDto,
   UpdateProductDto,
+  WriteOffStockDto,
 } from "./products.dto.js";
 
 @Injectable()
@@ -109,6 +110,49 @@ export class ProductsService {
       return tx.product.update({
         where: { id: product.id },
         data: { stock: newStock, cost: newCost },
+      });
+    });
+  }
+
+  /**
+   * Списание товара со склада: бой, порча, недостача. Уменьшает остаток, но не
+   * меняет себестоимость — списываем единицы по их текущей цене. Пишем в тот же
+   * журнал приёмок отрицательным количеством: приход и расход склада в одном
+   * месте. Только для товаров с учётом остатков — у безучётных списывать нечего.
+   */
+  async writeOffStock(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    productId: string,
+    dto: WriteOffStockDto,
+  ): Promise<Product> {
+    await this.access.requireClub(staff, clubId);
+    const product = await this.requireProduct(clubId, productId);
+
+    if (product.stock === null) {
+      throw new BadRequestException(
+        "У товара не ведётся учёт остатков — списывать нечего",
+      );
+    }
+    if (dto.quantity > product.stock) {
+      throw new BadRequestException(
+        `Нельзя списать больше, чем на складе: осталось ${product.stock}`,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.goodsReceipt.create({
+        data: {
+          clubId,
+          productId: product.id,
+          staffId: staff.id,
+          quantity: -dto.quantity,
+          unitCost: product.cost,
+        },
+      });
+      return tx.product.update({
+        where: { id: product.id },
+        data: { stock: { decrement: dto.quantity } },
       });
     });
   }

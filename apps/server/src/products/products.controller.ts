@@ -10,6 +10,7 @@ import {
   SellCartDto,
   SellProductDto,
   UpdateProductDto,
+  WriteOffStockDto,
 } from "./products.dto.js";
 import { ProductsService } from "./products.service.js";
 
@@ -56,6 +57,18 @@ export class ProductsController {
     @Body() dto: ReceiveStockDto,
   ) {
     return this.products.receiveStock(staff, clubId, productId, dto);
+  }
+
+  /** Списание товара со склада (бой, порча, недостача). Только владелец/админ. */
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Post(":productId/write-off")
+  writeOffStock(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("productId") productId: string,
+    @Body() dto: WriteOffStockDto,
+  ) {
+    return this.products.writeOffStock(staff, clubId, productId, dto);
   }
 
   /** Продажа доступна любому сотруднику: это основная операция смены. */

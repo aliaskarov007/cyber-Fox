@@ -115,6 +115,13 @@ export class ReceiveStockDto {
   unitCost!: number;
 }
 
+/** Списание товара со склада: бой, порча, недостача. */
+export class WriteOffStockDto {
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+}
+
 /** Одна позиция чека: товар и сколько штук. */
 export class CartItemDto {
   @IsString()

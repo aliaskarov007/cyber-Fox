@@ -27,6 +27,7 @@ export function ProductsSection({
 }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [receiving, setReceiving] = useState<Product | null>(null);
+  const [writingOff, setWritingOff] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +88,19 @@ export function ProductsSection({
           onClose={() => setReceiving(null)}
           onSaved={() => {
             setReceiving(null);
+            onChanged();
+          }}
+        />
+      )}
+
+      {writingOff && (
+        <WriteOffForm
+          key={writingOff.id}
+          club={club}
+          product={writingOff}
+          onClose={() => setWritingOff(null)}
+          onSaved={() => {
+            setWritingOff(null);
             onChanged();
           }}
         />
@@ -158,6 +172,18 @@ export function ProductsSection({
                   </button>
                   <button
                     type="button"
+                    disabled={busy || product.stock === null}
+                    title={
+                      product.stock === null
+                        ? "У товара не ведётся учёт остатков"
+                        : undefined
+                    }
+                    onClick={() => setWritingOff(product)}
+                  >
+                    Списать
+                  </button>
+                  <button
+                    type="button"
                     disabled={busy}
                     onClick={() => {
                       setEditing(product);
@@ -212,6 +238,11 @@ function ProductForm({
   const [price, setPrice] = useState(
     editing ? String(editing.price / 100) : "",
   );
+  // Себестоимость правится только у существующего товара: у нового она берётся
+  // из первого оприходования. Пустое поле при правке — не трогаем себестоимость.
+  const [cost, setCost] = useState(
+    editing && editing.cost > 0 ? String(editing.cost / 100) : "",
+  );
   const [stock, setStock] = useState(
     editing?.stock === null ? "" : String(editing?.stock ?? ""),
   );
@@ -244,6 +275,8 @@ function ProductForm({
         name: name.trim(),
         price: toTiyn(price),
         ...(category.trim() === "" ? {} : { category: category.trim() }),
+        // Себестоимость правим только при редактировании и только если её ввели.
+        ...(editing && cost.trim() !== "" ? { cost: toTiyn(cost) } : {}),
         ...(stock.trim() === "" ? {} : { stock: Number(stock) }),
         imageUrl,
       };
@@ -295,10 +328,29 @@ function ProductForm({
           value={stock}
           onChange={(e) => setStock(e.target.value)}
         />
-        <span className="note">
-          Себестоимость не вводится здесь — она берётся из оприходования.
-        </span>
       </label>
+
+      {editing ? (
+        <label>
+          Себестоимость, ₸ (ручная правка)
+          <input
+            inputMode="decimal"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="180"
+          />
+          <span className="note">
+            Обычно себестоимость берётся из оприходования. Здесь её можно
+            поправить вручную — например, если товар завели без неё и в смене не
+            сходилась маржа. Пусто — оставить как есть.
+          </span>
+        </label>
+      ) : (
+        <span className="note" style={{ gridColumn: "1 / -1" }}>
+          Себестоимость появится после первого оприходования — или впишите её
+          вручную позже через «Править».
+        </span>
+      )}
 
       <label>
         Картинка товара
@@ -442,6 +494,85 @@ function ReceiveForm({
       <div className="actions">
         <button className="primary" type="submit" disabled={busy}>
           Оприходовать
+        </button>
+        <button type="button" onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Списание товара со склада: бой, порча, недостача. Уменьшает остаток, но не
+ * трогает себестоимость. Только для товаров с учётом остатков.
+ */
+function WriteOffForm({
+  club,
+  product,
+  onClose,
+  onSaved,
+}: {
+  club: Club;
+  product: Product;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [quantity, setQuantity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const qty = Number(quantity) || 0;
+  const left = product.stock ?? 0;
+  const after = Math.max(0, left - qty);
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (qty <= 0) {
+      setError("Укажите количество");
+      return;
+    }
+    if (qty > left) {
+      setError(`Нельзя списать больше, чем на складе: осталось ${left}`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.writeOffStock(club.id, product.id, { quantity: qty });
+      onSaved();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="settings-grid" onSubmit={submit}>
+      <h3 style={{ gridColumn: "1 / -1", margin: 0 }}>
+        Списание: {product.name}
+      </h3>
+      {error && <div className="error">{error}</div>}
+
+      <label>
+        Сколько списать, шт
+        <input
+          inputMode="numeric"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          placeholder="1"
+        />
+      </label>
+
+      <div className="note" style={{ gridColumn: "1 / -1" }}>
+        Сейчас на складе {left} · после списания {after}. Себестоимость не
+        меняется, выручка не затрагивается — это убыль склада.
+      </div>
+
+      <div className="actions">
+        <button className="primary" type="submit" disabled={busy}>
+          Списать
         </button>
         <button type="button" onClick={onClose}>
           Отмена
