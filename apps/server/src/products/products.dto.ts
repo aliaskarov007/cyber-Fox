@@ -103,6 +103,18 @@ export class SellProductDto {
   sessionId?: string;
 }
 
+/** Оприходование (приёмка) товара: сколько принято и по какой себестоимости. */
+export class ReceiveStockDto {
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  /** Себестоимость за единицу в этой приёмке, в тиын. */
+  @IsInt()
+  @Min(0)
+  unitCost!: number;
+}
+
 /** Одна позиция чека: товар и сколько штук. */
 export class CartItemDto {
   @IsString()

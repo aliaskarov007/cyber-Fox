@@ -269,6 +269,7 @@ model Club {
   products  Product[]
   sales     ProductSale[]
   cashMovements CashMovement[]
+  goodsReceipts GoodsReceipt[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
@@ -870,7 +871,8 @@ model Product {
 
   isActive Boolean @default(true)
 
-  sales ProductSale[]
+  sales    ProductSale[]
+  receipts GoodsReceipt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -947,6 +949,29 @@ model CashMovement {
   createdAt DateTime @default(now())
 
   @@index([shiftId])
+}
+
+/// Оприходование (приход) товара: себестоимость фиксируется на каждой приёмке,
+/// из приёмок считается средневзвешенная себестоимость товара для маржи.
+model GoodsReceipt {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  /// Сколько единиц принято.
+  quantity Int
+  /// Себестоимость за единицу в этой приёмке, в тиын.
+  unitCost Int
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
 }
 
 enum PaymentMethod {
@@ -1109,6 +1134,7 @@ model Staff {
   payments Payment[]
   sales    ProductSale[]
   cashMovements CashMovement[]
+  goodsReceipts GoodsReceipt[]
   passwordResets StaffPasswordReset[]
 
   createdAt DateTime @default(now())

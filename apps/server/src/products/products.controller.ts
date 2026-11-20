@@ -6,6 +6,7 @@ import { CurrentStaff } from "../auth/current-staff.decorator.js";
 import { Roles } from "../auth/guards.js";
 import {
   CreateProductDto,
+  ReceiveStockDto,
   SellCartDto,
   SellProductDto,
   UpdateProductDto,
@@ -43,6 +44,18 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.products.update(staff, clubId, productId, dto);
+  }
+
+  /** Оприходование товара: приход с себестоимостью этой партии. */
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Post(":productId/receipt")
+  receiveStock(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("productId") productId: string,
+    @Body() dto: ReceiveStockDto,
+  ) {
+    return this.products.receiveStock(staff, clubId, productId, dto);
   }
 
   /** Продажа доступна любому сотруднику: это основная операция смены. */

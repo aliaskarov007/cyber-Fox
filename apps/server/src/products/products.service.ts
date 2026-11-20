@@ -11,6 +11,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type {
   CreateProductDto,
+  ReceiveStockDto,
   SellCartDto,
   SellProductDto,
   UpdateProductDto,
@@ -59,6 +60,57 @@ export class ProductsService {
     await this.access.requireClub(staff, clubId);
     await this.requireProduct(clubId, productId);
     return this.prisma.product.update({ where: { id: productId }, data: dto });
+  }
+
+  /**
+   * Оприходование товара. Себестоимость вводится на каждой приёмке, а
+   * себестоимость товара становится средневзвешенной по остатку и приходу —
+   * так маржа считается честно, даже если закупочная цена менялась.
+   *
+   * Для товара без учёта остатков усреднять не по чему: берём себестоимость
+   * последней приёмки.
+   */
+  async receiveStock(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    productId: string,
+    dto: ReceiveStockDto,
+  ): Promise<Product> {
+    await this.access.requireClub(staff, clubId);
+    const product = await this.requireProduct(clubId, productId);
+
+    let newCost: number;
+    let newStock: number | null;
+    if (product.stock === null) {
+      newCost = dto.unitCost;
+      newStock = null;
+    } else {
+      const newQty = product.stock + dto.quantity;
+      newCost =
+        newQty > 0
+          ? Math.round(
+              (product.stock * product.cost + dto.quantity * dto.unitCost) /
+                newQty,
+            )
+          : dto.unitCost;
+      newStock = newQty;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.goodsReceipt.create({
+        data: {
+          clubId,
+          productId: product.id,
+          staffId: staff.id,
+          quantity: dto.quantity,
+          unitCost: dto.unitCost,
+        },
+      });
+      return tx.product.update({
+        where: { id: product.id },
+        data: { stock: newStock, cost: newCost },
+      });
+    });
   }
 
   /**

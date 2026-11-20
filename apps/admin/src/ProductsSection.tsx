@@ -26,6 +26,7 @@ export function ProductsSection({
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState<Product | null>(null);
+  const [receiving, setReceiving] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +79,19 @@ export function ProductsSection({
         />
       )}
 
+      {receiving && (
+        <ReceiveForm
+          key={receiving.id}
+          club={club}
+          product={receiving}
+          onClose={() => setReceiving(null)}
+          onSaved={() => {
+            setReceiving(null);
+            onChanged();
+          }}
+        />
+      )}
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -86,6 +100,7 @@ export function ProductsSection({
               <th>Категория</th>
               <th>Цена</th>
               <th>Себестоимость</th>
+              <th>Маржа</th>
               <th>Остаток</th>
               <th />
             </tr>
@@ -120,9 +135,27 @@ export function ProductsSection({
                 <td className="num">{formatMoney(product.price)}</td>
                 <td className="num">{formatMoney(product.cost)}</td>
                 <td className="num">
+                  {formatMoney(product.price - product.cost)}
+                  <i className="dash-qty">
+                    {" "}
+                    ·{" "}
+                    {product.price > 0
+                      ? Math.round((1 - product.cost / product.price) * 100)
+                      : 0}
+                    %
+                  </i>
+                </td>
+                <td className="num">
                   {product.stock === null ? "без учёта" : product.stock}
                 </td>
                 <td className="actions">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setReceiving(product)}
+                  >
+                    Оприходовать
+                  </button>
                   <button
                     type="button"
                     disabled={busy}
@@ -151,7 +184,7 @@ export function ProductsSection({
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   Товаров нет. Пока их нет, бар в смене продавать нечего.
                 </td>
               </tr>
@@ -179,7 +212,6 @@ function ProductForm({
   const [price, setPrice] = useState(
     editing ? String(editing.price / 100) : "",
   );
-  const [cost, setCost] = useState(editing ? String(editing.cost / 100) : "");
   const [stock, setStock] = useState(
     editing?.stock === null ? "" : String(editing?.stock ?? ""),
   );
@@ -212,7 +244,6 @@ function ProductForm({
         name: name.trim(),
         price: toTiyn(price),
         ...(category.trim() === "" ? {} : { category: category.trim() }),
-        ...(cost.trim() === "" ? {} : { cost: toTiyn(cost) }),
         ...(stock.trim() === "" ? {} : { stock: Number(stock) }),
         imageUrl,
       };
@@ -258,21 +289,15 @@ function ProductForm({
       </label>
 
       <label>
-        Себестоимость, ₸ (для маржи в отчёте)
-        <input
-          inputMode="decimal"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-        />
-      </label>
-
-      <label>
         Остаток (пусто — без учёта)
         <input
           inputMode="numeric"
           value={stock}
           onChange={(e) => setStock(e.target.value)}
         />
+        <span className="note">
+          Себестоимость не вводится здесь — она берётся из оприходования.
+        </span>
       </label>
 
       <label>
@@ -311,6 +336,112 @@ function ProductForm({
       <div className="actions">
         <button className="primary" type="submit" disabled={busy || uploading}>
           {editing ? "Сохранить" : "Добавить"}
+        </button>
+        <button type="button" onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Оприходование товара: количество и себестоимость партии. Себестоимость товара
+ * пересчитывается в средневзвешенную — здесь же показан предпросмотр.
+ */
+function ReceiveForm({
+  club,
+  product,
+  onClose,
+  onSaved,
+}: {
+  club: Club;
+  product: Product;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const qty = Number(quantity) || 0;
+  const cost = unitCost.trim() === "" ? 0 : toTiyn(unitCost);
+  // Предпросмотр средневзвешенной себестоимости и нового остатка.
+  const preview =
+    product.stock === null
+      ? { stock: null as number | null, cost }
+      : (() => {
+          const newQty = product.stock + qty;
+          return {
+            stock: newQty,
+            cost:
+              newQty > 0
+                ? Math.round(
+                    (product.stock * product.cost + qty * cost) / newQty,
+                  )
+                : cost,
+          };
+        })();
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (qty <= 0) {
+      setError("Укажите количество");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.receiveStock(club.id, product.id, {
+        quantity: qty,
+        unitCost: cost,
+      });
+      onSaved();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="settings-grid" onSubmit={submit}>
+      <h3 style={{ gridColumn: "1 / -1", margin: 0 }}>
+        Оприходование: {product.name}
+      </h3>
+      {error && <div className="error">{error}</div>}
+
+      <label>
+        Количество, шт
+        <input
+          inputMode="numeric"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          placeholder="24"
+        />
+      </label>
+
+      <label>
+        Себестоимость за единицу, ₸
+        <input
+          inputMode="decimal"
+          value={unitCost}
+          onChange={(e) => setUnitCost(e.target.value)}
+          placeholder="180"
+        />
+      </label>
+
+      <div className="note" style={{ gridColumn: "1 / -1" }}>
+        Сейчас: остаток {product.stock === null ? "без учёта" : product.stock} ·
+        себестоимость {formatMoney(product.cost)}. После приёмки: остаток{" "}
+        {preview.stock === null ? "без учёта" : preview.stock} · себестоимость{" "}
+        {formatMoney(preview.cost)}.
+      </div>
+
+      <div className="actions">
+        <button className="primary" type="submit" disabled={busy}>
+          Оприходовать
         </button>
         <button type="button" onClick={onClose}>
           Отмена
