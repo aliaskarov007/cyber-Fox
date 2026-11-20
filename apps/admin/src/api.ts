@@ -804,6 +804,22 @@ export const api = {
       closedAt: string;
     } | null>(`/clubs/${clubId}/shifts/handover`),
 
+  // --- Аналитика владельца (reports) ---
+  reportNetwork: (days: number) =>
+    request<ClubSummary[]>(`/reports/network?from=${sinceDays(days)}`),
+  reportDaily: (clubId: string, days: number) =>
+    request<DailyPoint[]>(
+      `/reports/clubs/${clubId}/daily?from=${sinceDays(days)}`,
+    ),
+  reportHours: (clubId: string, days: number) =>
+    request<HourlyPoint[]>(
+      `/reports/clubs/${clubId}/hours?from=${sinceDays(days)}`,
+    ),
+  reportComputers: (clubId: string, days: number) =>
+    request<ComputerPerformance[]>(
+      `/reports/clubs/${clubId}/computers?from=${sinceDays(days)}`,
+    ),
+
   addCashMovement: (
     clubId: string,
     shiftId: string,
@@ -1654,6 +1670,11 @@ export interface StaffMember {
   canDiscount: boolean;
 }
 
+/** ISO-дата «N дней назад» для фильтра отчётов по периоду. */
+function sinceDays(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
 export interface ClubSummary {
   clubId: string;
   clubName: string;
@@ -1682,6 +1703,12 @@ export interface ComputerPerformance {
 
 export interface HourlyPoint {
   hour: number;
+  revenue: number;
+  sessions: number;
+}
+
+export interface DailyPoint {
+  date: string;
   revenue: number;
   sessions: number;
 }

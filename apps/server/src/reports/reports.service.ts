@@ -68,48 +68,61 @@ export class ReportsService {
   ) {}
 
   /** Сводка по всем залам сети: то, ради чего владельцу нужна облачная версия. */
-  async network(staff: AuthenticatedStaff, period: Period): Promise<ClubSummary[]> {
+  async network(
+    staff: AuthenticatedStaff,
+    period: Period,
+  ): Promise<ClubSummary[]> {
     const clubs = await this.access.listAccessibleClubs(staff);
-    const periodMinutes = Math.max(1, (period.to.getTime() - period.from.getTime()) / 60_000);
+    const periodMinutes = Math.max(
+      1,
+      (period.to.getTime() - period.from.getTime()) / 60_000,
+    );
 
     return Promise.all(
       clubs.map(async (club) => {
-        const [charges, sales, segments, computers, tournamentMoves] = await Promise.all([
-          this.prisma.transaction.findMany({
-            where: {
-              clubId: club.id,
-              type: TransactionType.SESSION_CHARGE,
-              createdAt: { gte: period.from, lte: period.to },
-            },
-            select: { amount: true, sessionId: true },
-          }),
-          this.prisma.productSale.findMany({
-            where: { clubId: club.id, createdAt: { gte: period.from, lte: period.to } },
-            select: { total: true, costAtSale: true, quantity: true },
-          }),
-          this.prisma.sessionSegment.findMany({
-            where: {
-              session: { clubId: club.id },
-              startedAt: { gte: period.from, lte: period.to },
-            },
-            select: { minutesUsed: true, charged: true, sessionId: true },
-          }),
-          this.prisma.computer.count({ where: { clubId: club.id } }),
-          this.prisma.transaction.findMany({
-            where: {
-              clubId: club.id,
-              type: { in: TOURNAMENT_TYPES },
-              createdAt: { gte: period.from, lte: period.to },
-            },
-            select: { amount: true },
-          }),
-        ]);
+        const [charges, sales, segments, computers, tournamentMoves] =
+          await Promise.all([
+            this.prisma.transaction.findMany({
+              where: {
+                clubId: club.id,
+                type: TransactionType.SESSION_CHARGE,
+                createdAt: { gte: period.from, lte: period.to },
+              },
+              select: { amount: true, sessionId: true },
+            }),
+            this.prisma.productSale.findMany({
+              where: {
+                clubId: club.id,
+                createdAt: { gte: period.from, lte: period.to },
+              },
+              select: { total: true, costAtSale: true, quantity: true },
+            }),
+            this.prisma.sessionSegment.findMany({
+              where: {
+                session: { clubId: club.id },
+                startedAt: { gte: period.from, lte: period.to },
+              },
+              select: { minutesUsed: true, charged: true, sessionId: true },
+            }),
+            this.prisma.computer.count({ where: { clubId: club.id } }),
+            this.prisma.transaction.findMany({
+              where: {
+                clubId: club.id,
+                type: { in: TOURNAMENT_TYPES },
+                createdAt: { gte: period.from, lte: period.to },
+              },
+              select: { amount: true },
+            }),
+          ]);
 
         // Выручка от времени берётся по списаниям, а минуты — по отрезкам:
         // минуты пакета денег не двигают, но машину занимают.
         const sessionsRevenue = charges.reduce((sum, t) => sum - t.amount, 0);
         const productsRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-        const productsCost = sales.reduce((sum, s) => sum + s.costAtSale * s.quantity, 0);
+        const productsCost = sales.reduce(
+          (sum, s) => sum + s.costAtSale * s.quantity,
+          0,
+        );
         const busyMinutes = segments.reduce((sum, s) => sum + s.minutesUsed, 0);
         const tournaments = tournamentNet(tournamentMoves);
 
@@ -125,7 +138,9 @@ export class ReportsService {
           busyMinutes,
           computers,
           occupancy:
-            computers > 0 ? Math.min(1, busyMinutes / (computers * periodMinutes)) : 0,
+            computers > 0
+              ? Math.min(1, busyMinutes / (computers * periodMinutes))
+              : 0,
         };
       }),
     );
@@ -138,7 +153,10 @@ export class ReportsService {
     period: Period,
   ): Promise<ComputerPerformance[]> {
     await this.access.requireClub(staff, clubId);
-    const periodMinutes = Math.max(1, (period.to.getTime() - period.from.getTime()) / 60_000);
+    const periodMinutes = Math.max(
+      1,
+      (period.to.getTime() - period.from.getTime()) / 60_000,
+    );
 
     const sessions = await this.prisma.session.findMany({
       where: { clubId, startedAt: { gte: period.from, lte: period.to } },
@@ -152,7 +170,13 @@ export class ReportsService {
 
     const byComputer = new Map<
       string,
-      { computerName: string; zoneName: string; revenue: number; minutes: number; sessions: number }
+      {
+        computerName: string;
+        zoneName: string;
+        revenue: number;
+        minutes: number;
+        sessions: number;
+      }
     >();
 
     for (const session of sessions) {
@@ -172,7 +196,10 @@ export class ReportsService {
     }
 
     return rankComputers(
-      [...byComputer.entries()].map(([computerId, e]) => ({ computerId, ...e })),
+      [...byComputer.entries()].map(([computerId, e]) => ({
+        computerId,
+        ...e,
+      })),
       periodMinutes,
     );
   }
@@ -194,12 +221,20 @@ export class ReportsService {
       select: { amount: true, sessionId: true, createdAt: true },
     });
 
-    const byHour = new Map<number, { revenue: number; sessions: Set<string> }>();
+    const byHour = new Map<
+      number,
+      { revenue: number; sessions: Set<string> }
+    >();
     for (const charge of charges) {
       // Час считается по времени зала, а не сервера: иначе пик уезжает
       // на разницу поясов и отчёт врёт.
-      const hour = Math.floor(toLocalMoment(charge.createdAt, club.timezone).minuteOfDay / 60);
-      const entry = byHour.get(hour) ?? { revenue: 0, sessions: new Set<string>() };
+      const hour = Math.floor(
+        toLocalMoment(charge.createdAt, club.timezone).minuteOfDay / 60,
+      );
+      const entry = byHour.get(hour) ?? {
+        revenue: 0,
+        sessions: new Set<string>(),
+      };
       entry.revenue -= charge.amount;
       if (charge.sessionId) entry.sessions.add(charge.sessionId);
       byHour.set(hour, entry);
@@ -215,6 +250,71 @@ export class ReportsService {
   }
 
   /**
+   * Выручка по дням: тренд за период для графика. День считается по времени
+   * зала, а не сервера, иначе сутки «сползают» на разницу поясов.
+   */
+  async daily(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    period: Period,
+  ): Promise<Array<{ date: string; revenue: number; sessions: number }>> {
+    const club = await this.access.requireClub(staff, clubId);
+
+    const [charges, sales] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where: {
+          clubId,
+          type: TransactionType.SESSION_CHARGE,
+          createdAt: { gte: period.from, lte: period.to },
+        },
+        select: { amount: true, sessionId: true, createdAt: true },
+      }),
+      this.prisma.productSale.findMany({
+        where: { clubId, createdAt: { gte: period.from, lte: period.to } },
+        select: { total: true, createdAt: true },
+      }),
+    ]);
+
+    // Локальная дата зала в виде YYYY-MM-DD — так она и сортируется.
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: club.timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const byDay = new Map<string, { revenue: number; sessions: Set<string> }>();
+    const slot = (date: string) => {
+      const e = byDay.get(date) ?? { revenue: 0, sessions: new Set<string>() };
+      byDay.set(date, e);
+      return e;
+    };
+    // Все дни периода — чтобы в графике были и пустые сутки.
+    for (
+      let t = period.from.getTime();
+      t <= period.to.getTime();
+      t += 86_400_000
+    ) {
+      slot(fmt.format(new Date(t)));
+    }
+    for (const c of charges) {
+      const e = slot(fmt.format(c.createdAt));
+      e.revenue -= c.amount;
+      if (c.sessionId) e.sessions.add(c.sessionId);
+    }
+    for (const s of sales) {
+      slot(fmt.format(s.createdAt)).revenue += s.total;
+    }
+
+    return [...byDay.entries()]
+      .map(([date, e]) => ({
+        date,
+        revenue: e.revenue,
+        sessions: e.sessions.size,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
    * Взаимозачёт между залами. Имеет смысл только при общем кошельке: иначе
    * пополнение и расход всегда в одном клубе и разницы не возникает.
    */
@@ -226,8 +326,12 @@ export class ReportsService {
       throw new ForbiddenException("Взаимозачёт по сети видит владелец");
     }
 
-    const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: staff.tenantId } });
-    const clubs = await this.prisma.club.findMany({ where: { tenantId: staff.tenantId } });
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: staff.tenantId },
+    });
+    const clubs = await this.prisma.club.findMany({
+      where: { tenantId: staff.tenantId },
+    });
 
     const flows: ClubMoneyFlow[] = await Promise.all(
       clubs.map(async (club) => {

@@ -2799,3 +2799,88 @@ button.link {
   font-size: 24px;
   margin-bottom: 10px;
 }
+
+/* --- Экран «Аналитика» --- */
+.an-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.an-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.an-tile {
+  background: var(--card, #121a33);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.an-tile-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.an-tile-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.an-card {
+  background: var(--card, #121a33);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.an-title {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.an-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 160px;
+}
+.an-bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  position: relative;
+  min-width: 3px;
+}
+.an-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent, #3b82f6);
+  border-radius: 3px 3px 0 0;
+}
+.an-hours .an-bar {
+  background: #6366f1;
+}
+.an-hlabel {
+  position: absolute;
+  bottom: -18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.an-hours {
+  margin-bottom: 20px;
+}
+.an-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}

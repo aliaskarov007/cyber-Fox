@@ -1,7 +1,15 @@
-import { BadRequestException, Controller, Get, Param, Query } from "@nestjs/common";
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  Query,
+} from "@nestjs/common";
+import { StaffRole } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
+import { Roles } from "../auth/guards.js";
 import { type Period, ReportsService } from "./reports.service.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -9,7 +17,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Период отчёта. По умолчанию — последние сутки: смена уже закрыта, данные полные. */
 function parsePeriod(from?: string, to?: string): Period {
   const parsedTo = to ? new Date(to) : new Date();
-  const parsedFrom = from ? new Date(from) : new Date(parsedTo.getTime() - DAY_MS);
+  const parsedFrom = from
+    ? new Date(from)
+    : new Date(parsedTo.getTime() - DAY_MS);
 
   if (Number.isNaN(parsedFrom.getTime()) || Number.isNaN(parsedTo.getTime())) {
     throw new BadRequestException("Неверные даты периода");
@@ -21,6 +31,8 @@ function parsePeriod(from?: string, to?: string): Period {
   return { from: parsedFrom, to: parsedTo };
 }
 
+// Аналитика и взаиморасчёты — забота владельца и управляющего, не кассира.
+@Roles(StaffRole.OWNER, StaffRole.ADMIN)
 @Controller("reports")
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
@@ -51,6 +63,16 @@ export class ReportsController {
     @Query("to") to?: string,
   ) {
     return this.reports.computers(staff, clubId, parsePeriod(from, to));
+  }
+
+  @Get("clubs/:clubId/daily")
+  daily(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.reports.daily(staff, clubId, parsePeriod(from, to));
   }
 
   @Get("clubs/:clubId/hours")

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
+import { AnalyticsScreen } from "./AnalyticsScreen.js";
 import { BarScreen } from "./BarScreen.js";
 import { DashboardScreen } from "./DashboardScreen.js";
 import { EventsScreen } from "./EventsScreen.js";
@@ -24,6 +25,7 @@ import { TariffsScreen } from "./TariffsScreen.js";
  *  туда, где продолжается начатое: «заведите машины» → «Настройки». */
 export type Tab =
   | "dashboard"
+  | "analytics"
   | "hall"
   | "bar"
   | "guests"
@@ -59,6 +61,8 @@ const TABS: Array<{
   manageOnly?: boolean;
 }> = [
   { id: "dashboard", label: "Смена" },
+  // Аналитика по периоду — забота владельца и управляющего, не кассира.
+  { id: "analytics", label: "Аналитика", manageOnly: true },
   { id: "hall", label: "Карта клуба" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
@@ -251,6 +255,8 @@ function ClubApp() {
           </main>
         ) : tab === "dashboard" ? (
           <DashboardScreen club={club} />
+        ) : tab === "analytics" ? (
+          <AnalyticsScreen club={club} clubs={clubs} />
         ) : tab === "hall" ? (
           <HallScreen club={club} staff={staff} onGoTo={setTab} />
         ) : tab === "bar" ? (
