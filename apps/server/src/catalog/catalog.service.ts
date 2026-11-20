@@ -311,7 +311,7 @@ export class CatalogService {
   ): Promise<Tariff[]> {
     await this.access.requireClub(staff, clubId);
     return this.prisma.tariff.findMany({
-      where: { clubId },
+      where: { clubId, deletedAt: null },
       orderBy: [{ zoneId: "asc" }, { name: "asc" }],
     });
   }
@@ -358,6 +358,39 @@ export class CatalogService {
     this.validateTariff(dto, club.creditLimit);
 
     return this.prisma.tariff.update({ where: { id: tariffId }, data: dto });
+  }
+
+  /**
+   * Удалить тариф. Если на него ещё никто не ссылается (нет купленных пакетов,
+   * сыгранных отрезков, тарифов-продолжений) — сносим физически. Если ссылки
+   * есть — историю терять нельзя, поэтому помечаем удалённым и прячем из списка.
+   */
+  async deleteTariff(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    tariffId: string,
+  ): Promise<{ ok: true }> {
+    await this.access.requireClub(staff, clubId);
+    const tariff = await this.prisma.tariff.findUnique({
+      where: { id: tariffId },
+    });
+    if (!tariff || tariff.clubId !== clubId || tariff.deletedAt)
+      throw new NotFoundException("Тариф не найден");
+
+    try {
+      await this.prisma.tariff.delete({ where: { id: tariffId } });
+    } catch (error) {
+      // P2003 — на тариф ссылается история: прячем, а не сносим.
+      if ((error as { code?: string }).code === "P2003") {
+        await this.prisma.tariff.update({
+          where: { id: tariffId },
+          data: { deletedAt: new Date(), isActive: false },
+        });
+      } else {
+        throw error;
+      }
+    }
+    return { ok: true };
   }
 
   /**

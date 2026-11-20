@@ -186,4 +186,14 @@ export class CatalogController {
   ) {
     return this.catalog.updateTariff(staff, clubId, tariffId, dto);
   }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Delete("clubs/:clubId/tariffs/:tariffId")
+  deleteTariff(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("tariffId") tariffId: string,
+  ) {
+    return this.catalog.deleteTariff(staff, clubId, tariffId);
+  }
 }

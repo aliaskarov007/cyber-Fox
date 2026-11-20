@@ -617,6 +617,9 @@ model Tariff {
   daysOfWeek Int[]
 
   isActive Boolean @default(true)
+  /// Удалён. Тариф с купленными пакетами или сыгранными отрезками нельзя снести
+  /// физически, не потеряв историю, поэтому помечаем удалённым и прячем.
+  deletedAt DateTime?
 
   defaultForZone Zone?          @relation("ZoneDefaultTariff")
   packages       GuestPackage[]
@@ -1221,6 +1224,9 @@ model Staff {
   pinHash  String?
   role     StaffRole
   isActive Boolean   @default(true)
+  /// Удалён владельцем. Строку с историей смен нельзя снести физически, поэтому
+  /// помечаем удалённой и прячем из списка; адрес при этом освобождается.
+  deletedAt DateTime?
 
   /// Право выдавать гостям личную скидку. У владельца оно есть всегда; кому из
   /// администраторов и управляющих его дать — решает владелец. По умолчанию нет.

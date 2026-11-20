@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import { StaffRole } from "@prisma/client";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -53,6 +61,15 @@ export class NetworkController {
   @Post("staff")
   createStaff(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: CreateStaffDto) {
     return this.network.createStaff(staff, dto);
+  }
+
+  @Roles(StaffRole.OWNER)
+  @Delete("staff/:staffId")
+  deleteStaff(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("staffId") staffId: string,
+  ) {
+    return this.network.deleteStaff(staff, staffId);
   }
 
   @Roles(StaffRole.OWNER)

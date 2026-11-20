@@ -149,6 +149,7 @@ export class NetworkService {
     const people = await this.prisma.staff.findMany({
       where: {
         tenantId: staff.tenantId,
+        deletedAt: null,
         // Управляющий видит только своих сотрудников.
         ...(staff.role === StaffRole.OWNER ? {} : { clubId: staff.clubId }),
       },
@@ -246,6 +247,48 @@ export class NetworkService {
         },
       }),
     );
+  }
+
+  /**
+   * Полностью удалить сотрудника. Без смен — убираем строку совсем и
+   * освобождаем адрес. Со сменами строку сносить нельзя (на неё ссылается
+   * история смен), поэтому помечаем удалённой, гасим доступ и освобождаем адрес,
+   * чтобы под ним можно было зарегистрироваться заново. Из списка исчезает в
+   * обоих случаях.
+   */
+  async deleteStaff(
+    staff: AuthenticatedStaff,
+    staffId: string,
+  ): Promise<{ ok: true }> {
+    this.requireOwner(staff);
+    const target = await this.prisma.staff.findUnique({
+      where: { id: staffId },
+    });
+    if (!target || target.tenantId !== staff.tenantId || target.deletedAt) {
+      throw new NotFoundException("Сотрудник не найден");
+    }
+    if (target.id === staff.id) {
+      throw new BadRequestException("Нельзя удалить самого себя");
+    }
+
+    const shiftCount = await this.prisma.shift.count({
+      where: { staffId: target.id },
+    });
+    if (shiftCount === 0) {
+      await this.prisma.staff.delete({ where: { id: target.id } });
+    } else {
+      await this.prisma.staff.update({
+        where: { id: target.id },
+        data: {
+          deletedAt: new Date(),
+          isActive: false,
+          // Адрес освобождаем, чтобы под ним можно было зарегистрироваться снова.
+          email: `deleted:${target.id}:${target.email}`,
+          tokenVersion: { increment: 1 },
+        },
+      });
+    }
+    return { ok: true };
   }
 
   /**

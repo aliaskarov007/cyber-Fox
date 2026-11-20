@@ -499,6 +499,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  deleteTariff: (clubId: string, tariffId: string) =>
+    request<{ ok: true }>(`/clubs/${clubId}/tariffs/${tariffId}`, {
+      method: "DELETE",
+    }),
+
   createZone: (clubId: string, body: { name: string; sortOrder?: number }) =>
     request<Zone>(`/clubs/${clubId}/zones`, {
       method: "POST",
@@ -1013,6 +1018,11 @@ export const api = {
     request<StaffMember>(`/network/staff/${staffId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
+    }),
+
+  deleteStaff: (staffId: string) =>
+    request<{ ok: true }>(`/network/staff/${staffId}`, {
+      method: "DELETE",
     }),
 
   // --- Отчёты ---

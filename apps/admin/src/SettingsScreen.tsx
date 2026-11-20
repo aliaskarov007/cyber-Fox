@@ -195,6 +195,7 @@ export function SettingsScreen({
         people={people}
         clubs={clubs}
         isOwner={isOwner}
+        currentId={staff.id}
         onChanged={() => void load()}
       />
     </main>
@@ -684,11 +685,13 @@ function StaffSection({
   people,
   clubs,
   isOwner,
+  currentId,
   onChanged,
 }: {
   people: StaffMember[];
   clubs: Club[];
   isOwner: boolean;
+  currentId: string;
   onChanged: () => void;
 }) {
   const [form, setForm] = useState({
@@ -772,7 +775,7 @@ function StaffSection({
                   </td>
                 )}
                 {isOwner && (
-                  <td>
+                  <td className="actions">
                     <button
                       onClick={async () => {
                         setError(null);
@@ -788,6 +791,28 @@ function StaffSection({
                     >
                       {person.isActive ? "Отключить" : "Включить"}
                     </button>
+                    {person.id !== currentId && (
+                      <button
+                        className="danger"
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              `Удалить сотрудника ${person.fullName}? Аккаунт исчезнет из списка, а адрес освободится для новой регистрации.`,
+                            )
+                          )
+                            return;
+                          setError(null);
+                          try {
+                            await api.deleteStaff(person.id);
+                            onChanged();
+                          } catch (cause) {
+                            setError((cause as Error).message);
+                          }
+                        }}
+                      >
+                        Удалить
+                      </button>
+                    )}
                   </td>
                 )}
               </tr>

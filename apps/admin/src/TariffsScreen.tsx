@@ -61,6 +61,24 @@ export function TariffsScreen({ club, staff }: { club: Club; staff: Staff }) {
     }
   }
 
+  async function remove(tariff: Tariff): Promise<void> {
+    if (
+      !window.confirm(
+        `Удалить тариф «${tariff.name}»? Он исчезнет из списка. Купленные по нему пакеты и история останутся.`,
+      )
+    )
+      return;
+    setError(null);
+    setDone(null);
+    try {
+      await api.deleteTariff(club.id, tariff.id);
+      await load();
+      setDone(`Тариф «${tariff.name}» удалён`);
+    } catch (cause) {
+      setError((cause as Error).message);
+    }
+  }
+
   function openForm(tariff: Tariff | null): void {
     setEditing(tariff);
     setFormOpen(true);
@@ -162,6 +180,13 @@ export function TariffsScreen({ club, staff }: { club: Club; staff: Staff }) {
                       </button>
                       <button type="button" onClick={() => void toggle(tariff)}>
                         {tariff.isActive ? "Выключить" : "Включить"}
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => void remove(tariff)}
+                      >
+                        Удалить
                       </button>
                     </td>
                   )}
