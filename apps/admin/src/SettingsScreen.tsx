@@ -349,7 +349,11 @@ function SeatPaymentSettings({
   const [error, setError] = useState<string | null>(null);
 
   async function save(
-    body: { barOrdersFromPc?: boolean; paymentQrImageUrl?: string | null },
+    body: {
+      barOrdersFromPc?: boolean;
+      reservationAutoLock?: boolean;
+      paymentQrImageUrl?: string | null;
+    },
     message: string,
   ): Promise<void> {
     setBusy(true);
@@ -407,6 +411,33 @@ function SeatPaymentSettings({
           Деньги списываются сразу при заказе, заказ появляется на кассе сверху
           экрана «Зал» и «Бар». Отмена возвращает деньги на счёт и товар на
           склад.
+        </p>
+      </div>
+
+      <div className="section">
+        <h3>Бронирование</h3>
+        <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={club.reservationAutoLock}
+            disabled={busy}
+            onChange={(e) =>
+              void save(
+                { reservationAutoLock: e.target.checked },
+                e.target.checked
+                  ? "Авто-блокировка брони включена"
+                  : "Авто-блокировка брони выключена",
+              )
+            }
+          />
+          Освобождать ПК при наступлении брони (авто-блокировка)
+        </label>
+        <p className="hint">
+          За 10 минут до брони занятый ПК получает предупреждение. Когда время
+          настало: при включённой авто-блокировке чужая сессия завершается и ПК
+          блокируется под бронь; при выключенной — ПК только предупреждается, а
+          решение остаётся за кассиром.
         </p>
       </div>
 

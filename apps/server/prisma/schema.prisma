@@ -232,6 +232,9 @@ model Club {
   lowBalanceWarnMinutes Int @default(10)
   /// Сколько процентов от потраченного возвращается бонусами. 0 — программа выключена.
   bonusPercent Int @default(0)
+  /// Когда время брони настало, а ПК занят: true — завершить сессию и
+  /// заблокировать ПК; false — только предупредить (решает кассир).
+  reservationAutoLock Boolean @default(false)
   /// Гость может заказать из бара прямо с игрового ПК и оплатить с баланса.
   /// Выключено по умолчанию: включает владелец, когда готов носить заказы к местам.
   barOrdersFromPc Boolean @default(false)
@@ -1008,6 +1011,11 @@ model Reservation {
   /// Предоплата в тиын, 0 — без предоплаты.
   prepaid Int               @default(0)
   note    String?
+
+  /// Когда отправлено предупреждение за 10 минут — чтобы не слать повторно.
+  warnedAt DateTime?
+  /// Когда отработано наступление брони (предупреждение/блокировка) — однократно.
+  enforcedAt DateTime?
 
   staffId String?
   staff   Staff?  @relation(fields: [staffId], references: [id])

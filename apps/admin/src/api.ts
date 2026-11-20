@@ -55,6 +55,8 @@ export interface Club {
   bonusPercent: number;
   /** Гость заказывает из бара с игрового ПК и платит с баланса. */
   barOrdersFromPc: boolean;
+  /** Авто-блокировка занятого ПК при наступлении брони. */
+  reservationAutoLock: boolean;
   /** Статический QR клуба для пополнения с игрового ПК, пока банк не подключён. */
   paymentQrImageUrl: string | null;
   /** Слоган под названием клуба на экране блокировки игровых ПК. */
@@ -940,6 +942,7 @@ export const api = {
       lowBalanceWarnMinutes: number;
       bonusPercent: number;
       barOrdersFromPc: boolean;
+      reservationAutoLock: boolean;
       paymentQrImageUrl: string | null;
       slogan: string | null;
       /** Пароль выхода из оболочки (Ctrl+Alt+Shift+S на ПК). Пусто — не менять. */

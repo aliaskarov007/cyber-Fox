@@ -70,6 +70,11 @@ export class UpdateClubDto {
   @IsBoolean()
   barOrdersFromPc?: boolean;
 
+  /** Авто-блокировка занятого ПК при наступлении брони. */
+  @IsOptional()
+  @IsBoolean()
+  reservationAutoLock?: boolean;
+
   /**
    * Картинка статического QR клуба для пополнения с игрового ПК. Адрес
    * загруженного файла; null — убрать.
