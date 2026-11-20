@@ -5,9 +5,10 @@ import {
   Get,
   Patch,
   Post,
+  Query,
 } from "@nestjs/common";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
-import { IsEmail, IsString, MinLength } from "class-validator";
+import { IsEmail, IsString, Matches, MinLength } from "class-validator";
 
 import { PrismaService } from "../prisma/prisma.service.js";
 import { normalizePhone } from "../whatsapp/whatsapp.rules.js";
@@ -31,6 +32,19 @@ class LoginDto {
   password!: string;
 }
 
+class SetPinDto {
+  @Matches(/^\d{4}$/, { message: "ПИН — четыре цифры" })
+  pin!: string;
+}
+
+class PinLoginDto {
+  @IsString()
+  staffId!: string;
+
+  @Matches(/^\d{4}$/, { message: "ПИН — четыре цифры" })
+  pin!: string;
+}
+
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -51,6 +65,33 @@ export class AuthController {
   @Post("login")
   login(@Body() dto: LoginDto): Promise<LoginResult> {
     return this.auth.login(dto.email, dto.password);
+  }
+
+  /** Быстрый вход кассира по ПИН на кассовом ПК. */
+  @SkipThrottle({ general: true })
+  @Throttle({ login: { ttl: 60_000, limit: 30 } })
+  @Public()
+  @Post("pin-login")
+  pinLogin(@Body() dto: PinLoginDto): Promise<LoginResult> {
+    return this.auth.pinLogin(dto.staffId, dto.pin);
+  }
+
+  /** Кассиры клуба с заданным ПИН — для списка быстрого входа. */
+  @Public()
+  @Get("cashiers")
+  cashiers(@Query("clubId") clubId: string) {
+    if (!clubId) throw new BadRequestException("Не указан клуб");
+    return this.auth.cashiers(clubId);
+  }
+
+  /** Сотрудник задаёт себе ПИН для быстрого входа. */
+  @Post("me/pin")
+  async setMyPin(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Body() dto: SetPinDto,
+  ) {
+    await this.auth.setPin(staff.id, dto.pin);
+    return { ok: true };
   }
 
   @Get("me")

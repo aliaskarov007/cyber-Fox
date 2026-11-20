@@ -2774,3 +2774,28 @@ button.link {
 .cash-move-form .seg {
   flex-basis: 100%;
 }
+
+/* Быстрый вход по ПИН: список кассиров и ввод кода. */
+.pin-cashiers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.pin-cashier {
+  padding: 14px;
+  font-size: 16px;
+}
+.pin-who {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.pin-input {
+  width: 100%;
+  text-align: center;
+  letter-spacing: 10px;
+  font-size: 24px;
+  margin-bottom: 10px;
+}

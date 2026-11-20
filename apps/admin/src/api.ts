@@ -428,6 +428,24 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  /** Кассиры клуба с заданным ПИН — для быстрого входа на кассовом ПК. */
+  cashiers: (clubId: string) =>
+    request<Array<{ id: string; fullName: string; role: string }>>(
+      `/auth/cashiers?clubId=${encodeURIComponent(clubId)}`,
+    ),
+
+  pinLogin: (staffId: string, pin: string) =>
+    request<{ accessToken: string; staff: Staff }>("/auth/pin-login", {
+      method: "POST",
+      body: JSON.stringify({ staffId, pin }),
+    }),
+
+  setMyPin: (pin: string) =>
+    request<{ ok: boolean }>("/auth/me/pin", {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    }),
+
   me: () => request<Staff>("/auth/me"),
 
   setMyPhone: (phone: string) =>

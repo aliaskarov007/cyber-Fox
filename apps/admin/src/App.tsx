@@ -101,6 +101,7 @@ function ClubApp() {
   const [signingUp, setSigningUp] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [pinOpen, setPinOpen] = useState(false);
 
   async function load(): Promise<void> {
     if (!getToken()) {
@@ -112,6 +113,12 @@ function ClubApp() {
       setStaff(me);
       setClubs(list);
       setClubId((current) => current ?? list[0]?.id ?? null);
+      // Запоминаем клуб на этом ПК — для быстрого входа кассиров по ПИН.
+      try {
+        if (me.clubId) localStorage.setItem("fx_pin_club", me.clubId);
+      } catch {
+        // Хранилище недоступно — быстрый вход просто не появится.
+      }
     } catch {
       // Просроченный токен не должен запирать экран: возвращаем форму входа.
       setToken(null);
@@ -225,6 +232,7 @@ function ClubApp() {
             <br />
             {staff.tenant.name}
           </span>
+          <button onClick={() => setPinOpen(true)}>ПИН</button>
           <button
             onClick={() => {
               setToken(null);
@@ -234,6 +242,8 @@ function ClubApp() {
             Выйти
           </button>
         </header>
+
+        {pinOpen && <PinSetter onClose={() => setPinOpen(false)} />}
 
         {club === null ? (
           <main>
@@ -271,5 +281,73 @@ function ClubApp() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Диалог установки своего ПИН для быстрого входа на кассе. */
+function PinSetter({ onClose }: { onClose: () => void }) {
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function save(): Promise<void> {
+    if (pin.length !== 4) {
+      setError("ПИН — четыре цифры");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.setMyPin(pin);
+      setDone(true);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="backdrop" aria-label="Закрыть" onClick={onClose} />
+      <aside className="drawer">
+        <div className="drawer-head">
+          <h2>Мой ПИН</h2>
+        </div>
+        <div className="section">
+          <div className="notice">
+            ПИН нужен для быстрого входа на кассовом ПК: выбрал имя — ввёл
+            четыре цифры. Почта и пароль продолжают работать.
+          </div>
+          {error && <div className="error">{error}</div>}
+          {done ? (
+            <div className="notice">ПИН сохранён.</div>
+          ) : (
+            <>
+              <input
+                className="pin-input"
+                inputMode="numeric"
+                maxLength={4}
+                value={pin}
+                onChange={(e) =>
+                  setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+                }
+                placeholder="● ● ● ●"
+                aria-label="Новый ПИН"
+              />
+              <button
+                className="primary"
+                disabled={busy || pin.length !== 4}
+                onClick={() => void save()}
+              >
+                Сохранить ПИН
+              </button>
+            </>
+          )}
+        </div>
+        <button onClick={onClose}>Закрыть</button>
+      </aside>
+    </>
   );
 }

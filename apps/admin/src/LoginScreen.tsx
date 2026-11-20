@@ -1,7 +1,24 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
 import { api, setToken } from "./api.js";
 import { AuthLogo, AuthShell } from "./AuthShell.js";
+
+/** Клуб, привязанный к этому ПК после первого входа — для быстрого входа по ПИН. */
+const PIN_CLUB_KEY = "fx_pin_club";
+function rememberedClub(): string | null {
+  try {
+    return localStorage.getItem(PIN_CLUB_KEY);
+  } catch {
+    return null;
+  }
+}
+function rememberClub(clubId: string | null): void {
+  try {
+    if (clubId) localStorage.setItem(PIN_CLUB_KEY, clubId);
+  } catch {
+    // Приватный режим или заблокированное хранилище — быстрый вход просто не появится.
+  }
+}
 
 export function LoginScreen({
   notice,
@@ -13,6 +30,45 @@ export function LoginScreen({
   onDone: () => void;
   onSignup: () => void;
   onForgot: () => void;
+}) {
+  const club = rememberedClub();
+  const [mode, setMode] = useState<"pin" | "password">(
+    club ? "pin" : "password",
+  );
+
+  if (mode === "pin" && club) {
+    return (
+      <PinLogin
+        clubId={club}
+        onDone={onDone}
+        onPassword={() => setMode("password")}
+      />
+    );
+  }
+
+  return (
+    <PasswordLogin
+      notice={notice}
+      onDone={onDone}
+      onSignup={onSignup}
+      onForgot={onForgot}
+      onPin={club ? () => setMode("pin") : undefined}
+    />
+  );
+}
+
+function PasswordLogin({
+  notice,
+  onDone,
+  onSignup,
+  onForgot,
+  onPin,
+}: {
+  notice?: string | null;
+  onDone: () => void;
+  onSignup: () => void;
+  onForgot: () => void;
+  onPin?: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +83,8 @@ export function LoginScreen({
     try {
       const result = await api.login(email, password);
       setToken(result.accessToken);
+      // Запоминаем клуб на этом ПК — чтобы кассиры могли входить по ПИН.
+      rememberClub(result.staff?.clubId ?? null);
       onDone();
     } catch (cause) {
       setError((cause as Error).message);
@@ -45,6 +103,12 @@ export function LoginScreen({
 
         {notice && !error && <div className="fx-notice">{notice}</div>}
         {error && <div className="error">{error}</div>}
+
+        {onPin && (
+          <button type="button" className="fx-forgot" onClick={onPin}>
+            ← Быстрый вход по ПИН
+          </button>
+        )}
 
         <label className="fx-field">
           Логин
@@ -126,6 +190,138 @@ export function LoginScreen({
           <small>Первые 2 недели — БЕСПЛАТНО</small>
         </div>
       </form>
+    </AuthShell>
+  );
+}
+
+/** Быстрый вход кассира: список кассиров клуба → имя → 4 цифры ПИН. */
+function PinLogin({
+  clubId,
+  onDone,
+  onPassword,
+}: {
+  clubId: string;
+  onDone: () => void;
+  onPassword: () => void;
+}) {
+  const [cashiers, setCashiers] = useState<
+    Array<{ id: string; fullName: string }>
+  >([]);
+  const [selected, setSelected] = useState<{
+    id: string;
+    fullName: string;
+  } | null>(null);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .cashiers(clubId)
+      .then((list) => {
+        if (alive) setCashiers(list);
+      })
+      .catch(() => {
+        // Клуб недоступен — остаёмся без списка, можно войти по паролю.
+      })
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [clubId]);
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!selected || pin.length !== 4) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.pinLogin(selected.id, pin);
+      setToken(result.accessToken);
+      onDone();
+    } catch (cause) {
+      setError((cause as Error).message);
+      setPin("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthShell>
+      <div className="fx-login-card">
+        <AuthLogo />
+        <h1 className="fx-login-title">Быстрый вход</h1>
+
+        {error && <div className="error">{error}</div>}
+
+        {loaded && cashiers.length === 0 && (
+          <div className="fx-notice">
+            Ни у кого ещё не задан ПИН. Войдите по паролю и задайте ПИН в шапке.
+          </div>
+        )}
+
+        {!selected ? (
+          <div className="pin-cashiers">
+            {cashiers.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="pin-cashier"
+                onClick={() => {
+                  setSelected(c);
+                  setPin("");
+                  setError(null);
+                }}
+              >
+                {c.fullName}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div className="pin-who">{selected.fullName}</div>
+            <input
+              className="pin-input"
+              inputMode="numeric"
+              autoFocus
+              maxLength={4}
+              value={pin}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              placeholder="● ● ● ●"
+              aria-label="ПИН"
+            />
+            <button
+              className="fx-login-go"
+              type="submit"
+              disabled={busy || pin.length !== 4}
+            >
+              {busy ? "Входим…" : "Войти"}
+            </button>
+            <button
+              type="button"
+              className="fx-forgot"
+              onClick={() => {
+                setSelected(null);
+                setPin("");
+                setError(null);
+              }}
+            >
+              ← Другой кассир
+            </button>
+          </form>
+        )}
+
+        <button type="button" className="fx-forgot" onClick={onPassword}>
+          Вход по паролю
+        </button>
+      </div>
     </AuthShell>
   );
 }
