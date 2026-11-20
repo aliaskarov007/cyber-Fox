@@ -274,6 +274,7 @@ export interface ShiftReport {
   cashDrops: number;
   cashExpenses: number;
   cashRefunds: number;
+  cardRefunds: number;
   /** Наличные от продаж (пополнения + бар). */
   cashSales: number;
   cashMovements: CashMovement[];
@@ -296,6 +297,7 @@ export interface CashMovement {
   id: string;
   at: string;
   kind: CashMovementKind;
+  method: "CASH" | "CARD" | "ONLINE" | "BALANCE" | "BONUS";
   amount: number;
   reason: string | null;
 }
@@ -905,7 +907,7 @@ export const api = {
   addCashMovement: (
     clubId: string,
     shiftId: string,
-    body: { kind: string; amount: number; reason?: string },
+    body: { kind: string; amount: number; reason?: string; method?: string },
   ) =>
     request<unknown>(`/clubs/${clubId}/shifts/${shiftId}/cash-movements`, {
       method: "POST",

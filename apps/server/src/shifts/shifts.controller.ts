@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { CashMovementKind } from "@prisma/client";
+import { CashMovementKind, PaymentMethod } from "@prisma/client";
 import { IsEnum, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
@@ -48,6 +48,11 @@ class CashMovementDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  /** Способ возврата: наличные или карта. Для прочих движений игнорируется. */
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
 }
 
 @Controller("clubs/:clubId/shifts")

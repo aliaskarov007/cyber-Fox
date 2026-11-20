@@ -78,6 +78,8 @@ export interface ShiftReport {
   cashExpenses: number;
   /** Возвращено гостям наличными за смену. */
   cashRefunds: number;
+  /** Возвращено гостям картой за смену (по чеку через пост-терминал). */
+  cardRefunds: number;
   /** Наличные, принятые от продаж (пополнения + бар). */
   cashSales: number;
   /** Все движения наличных строками, новые сверху. */
@@ -116,6 +118,7 @@ export interface CashMovementRow {
   id: string;
   at: Date;
   kind: CashMovementKind;
+  method: PaymentMethod;
   amount: number;
   reason: string | null;
 }
@@ -336,7 +339,13 @@ export class ShiftsService {
     const cashDeposits = movedBy(CashMovementKind.DEPOSIT);
     const cashDrops = movedBy(CashMovementKind.DROP);
     const cashExpenses = movedBy(CashMovementKind.EXPENSE);
-    const cashRefunds = movedBy(CashMovementKind.REFUND);
+    // Возврат наличными уменьшает наличные и ящик; возврат картой — безнал.
+    const refundBy = (method: PaymentMethod): number =>
+      movements
+        .filter((m) => m.kind === CashMovementKind.REFUND && m.method === method)
+        .reduce((sum, m) => sum + m.amount, 0);
+    const cashRefunds = refundBy(PaymentMethod.CASH);
+    const cardRefunds = refundBy(PaymentMethod.CARD);
 
     const totals = computeShiftTotals({
       cash: {
@@ -350,7 +359,10 @@ export class ShiftsService {
         expenses: cashExpenses,
         refunds: cashRefunds,
       },
-      cardTotal: sumBy(PaymentMethod.CARD) + salesBy(PaymentMethod.CARD),
+      cardTotal:
+        sumBy(PaymentMethod.CARD) +
+        salesBy(PaymentMethod.CARD) -
+        cardRefunds,
       balanceTotal: salesBy(PaymentMethod.BALANCE) + sessionsRevenue,
       sessionsRevenue,
       productsRevenue,
@@ -446,11 +458,13 @@ export class ShiftsService {
       cashDrops,
       cashExpenses,
       cashRefunds,
+      cardRefunds,
       cashSales: cashReceived,
       cashMovements: movements.map((m) => ({
         id: m.id,
         at: m.createdAt,
         kind: m.kind,
+        method: m.method,
         amount: m.amount,
         reason: m.reason,
       })),
@@ -479,19 +493,31 @@ export class ShiftsService {
     staff: AuthenticatedStaff,
     clubId: string,
     shiftId: string,
-    dto: { kind: CashMovementKind; amount: number; reason?: string },
+    dto: {
+      kind: CashMovementKind;
+      amount: number;
+      reason?: string;
+      method?: PaymentMethod;
+    },
   ) {
     await this.access.requireClub(staff, clubId);
     const shift = await this.requireShift(clubId, shiftId);
     if (shift.closedAt) {
       throw new BadRequestException("Смена закрыта — касса уже сверена");
     }
+    // Способ важен только для возврата (нал/карта). Внесения, выемки и расходы
+    // всегда наличные — для них способ принудительно CASH.
+    const method =
+      dto.kind === CashMovementKind.REFUND && dto.method === PaymentMethod.CARD
+        ? PaymentMethod.CARD
+        : PaymentMethod.CASH;
     return this.prisma.cashMovement.create({
       data: {
         clubId,
         shiftId: shift.id,
         staffId: staff.id,
         kind: dto.kind,
+        method,
         amount: dto.amount,
         reason: dto.reason?.trim() || null,
       },

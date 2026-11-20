@@ -950,6 +950,9 @@ model CashMovement {
   staff   Staff?  @relation(fields: [staffId], references: [id])
 
   kind   CashMovementKind
+  /// Способ. Важен для возврата: картой он уменьшает безнал, а не наличные в
+  /// ящике. Внесения, выемки и расходы — всегда наличные.
+  method PaymentMethod   @default(CASH)
   /// В тиын, всегда положительная; направление задаёт вид движения.
   amount Int
   reason String?
