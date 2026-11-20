@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { type Club, type Staff, api, getToken, setToken } from "./api.js";
 import { AnalyticsScreen } from "./AnalyticsScreen.js";
 import { BarScreen } from "./BarScreen.js";
+import { ReservationsScreen } from "./ReservationsScreen.js";
 import { DashboardScreen } from "./DashboardScreen.js";
 import { EventsScreen } from "./EventsScreen.js";
 import { PlatformLogin, PlatformScreen } from "./PlatformScreen.js";
@@ -29,6 +30,7 @@ export type Tab =
   | "hall"
   | "bar"
   | "guests"
+  | "reservations"
   | "events"
   | "promos"
   | "retention"
@@ -50,6 +52,7 @@ const CASHIER_TABS: Tab[] = [
   "hall",
   "bar",
   "guests",
+  "reservations",
   "promos",
   "tariffs",
 ];
@@ -66,6 +69,7 @@ const TABS: Array<{
   { id: "hall", label: "Карта клуба" },
   { id: "bar", label: "Бар" },
   { id: "guests", label: "Гости" },
+  { id: "reservations", label: "Бронь" },
   { id: "events", label: "Ивенты" },
   { id: "promos", label: "Промокоды" },
   // Отчёт — список номеров с тратами, рассылка раздаёт деньги: сервер закрывает ролью.
@@ -257,6 +261,8 @@ function ClubApp() {
           <DashboardScreen club={club} />
         ) : tab === "analytics" ? (
           <AnalyticsScreen club={club} clubs={clubs} />
+        ) : tab === "reservations" ? (
+          <ReservationsScreen club={club} />
         ) : tab === "hall" ? (
           <HallScreen club={club} staff={staff} onGoTo={setTab} />
         ) : tab === "bar" ? (

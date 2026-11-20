@@ -270,6 +270,7 @@ model Club {
   sales     ProductSale[]
   cashMovements CashMovement[]
   goodsReceipts GoodsReceipt[]
+  reservations  Reservation[]
   paymentIntents PaymentIntent[]
   apps      ClubApp[]
   appSuggestions AppSuggestion[]
@@ -416,6 +417,7 @@ model Zone {
   packages  GuestPackage[]
   sessions  Session[]
   apps      ClubApp[]
+  reservations Reservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -563,6 +565,7 @@ model Computer {
 
   sessions          Session[]
   offlineOperations OfflineOperation[]
+  reservations      Reservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -974,6 +977,45 @@ model GoodsReceipt {
   @@index([productId])
 }
 
+/// Бронь ресурса на время: либо зоны целиком, либо конкретной машины.
+enum ReservationStatus {
+  BOOKED // забронировано, гость ещё не пришёл
+  ARRIVED // гость пришёл / посажен
+  CANCELLED // отменена
+  NO_SHOW // не пришёл
+}
+
+model Reservation {
+  id     String @id @default(uuid())
+  clubId String
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  /// Бронируют либо зону целиком, либо конкретную машину — ровно одно из двух.
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  computerId String?
+  computer   Computer? @relation(fields: [computerId], references: [id], onDelete: SetNull)
+
+  guestName  String
+  guestPhone String?
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  status  ReservationStatus @default(BOOKED)
+  /// Предоплата в тиын, 0 — без предоплаты.
+  prepaid Int               @default(0)
+  note    String?
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([clubId, startsAt])
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -1135,6 +1177,7 @@ model Staff {
   sales    ProductSale[]
   cashMovements CashMovement[]
   goodsReceipts GoodsReceipt[]
+  reservations  Reservation[]
   passwordResets StaffPasswordReset[]
 
   createdAt DateTime @default(now())

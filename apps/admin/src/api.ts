@@ -804,6 +804,35 @@ export const api = {
       closedAt: string;
     } | null>(`/clubs/${clubId}/shifts/handover`),
 
+  // --- Бронирование ---
+  reservations: (clubId: string, fromISO: string, toISO: string) =>
+    request<Reservation[]>(
+      `/clubs/${clubId}/reservations?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`,
+    ),
+  createReservation: (
+    clubId: string,
+    body: {
+      zoneId?: string;
+      computerId?: string;
+      guestName: string;
+      guestPhone?: string;
+      startsAt: string;
+      endsAt: string;
+      prepaid?: number;
+      prepaidMethod?: string;
+      note?: string;
+    },
+  ) =>
+    request<Reservation>(`/clubs/${clubId}/reservations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setReservationStatus: (clubId: string, id: string, status: string) =>
+    request<Reservation>(`/clubs/${clubId}/reservations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
   // --- Аналитика владельца (reports) ---
   reportNetwork: (days: number) =>
     request<ClubSummary[]>(`/reports/network?from=${sinceDays(days)}`),
@@ -1711,6 +1740,22 @@ export interface DailyPoint {
   date: string;
   revenue: number;
   sessions: number;
+}
+
+export type ReservationStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";
+
+export interface Reservation {
+  id: string;
+  zoneId: string | null;
+  computerId: string | null;
+  resource: string;
+  guestName: string;
+  guestPhone: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: ReservationStatus;
+  prepaid: number;
+  note: string | null;
 }
 
 export interface Settlement {
