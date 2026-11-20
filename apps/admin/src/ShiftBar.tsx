@@ -99,6 +99,28 @@ function ShiftPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ShiftReport | null>(null);
+  const [handover, setHandover] = useState<{
+    suggestedFloat: number;
+    fromStaff: string;
+  } | null>(null);
+
+  // Пересменка: когда смена не открыта, подставляем разменом пересчёт прошлой.
+  useEffect(() => {
+    if (shift) return;
+    let alive = true;
+    void api.shiftHandover(club.id).then((h) => {
+      if (alive && h) {
+        setHandover({
+          suggestedFloat: h.suggestedFloat,
+          fromStaff: h.fromStaff,
+        });
+        setFloat(String(h.suggestedFloat / 100));
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [shift, club.id]);
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -211,6 +233,14 @@ function ShiftPanel({
           Пока смена не открыта, платежи не привяжутся к кассе, и сверить её на
           закрытии не выйдет.
         </div>
+
+        {handover && (
+          <div className="notice">
+            Принято из прошлой смены (пересчёт кассира {handover.fromStaff}):{" "}
+            <b>{formatMoney(handover.suggestedFloat)}</b>. Подставлено разменом
+            — поправьте, если забрали часть.
+          </div>
+        )}
 
         <div className="section">
           <h3>Размен в кассе</h3>

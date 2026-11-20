@@ -70,6 +70,15 @@ export class ShiftsController {
     return this.shifts.list(staff, clubId);
   }
 
+  /** Подсказка размена для пересменки: пересчёт наличных прошлой смены. */
+  @Get("handover")
+  handover(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+  ) {
+    return this.shifts.handover(staff, clubId);
+  }
+
   @Post("open")
   open(
     @CurrentStaff() staff: AuthenticatedStaff,

@@ -779,6 +779,13 @@ export const api = {
   currentShift: (clubId: string) =>
     request<Shift | null>(`/clubs/${clubId}/shifts/current`),
 
+  shiftHandover: (clubId: string) =>
+    request<{
+      suggestedFloat: number;
+      fromStaff: string;
+      closedAt: string;
+    } | null>(`/clubs/${clubId}/shifts/handover`),
+
   addCashMovement: (
     clubId: string,
     shiftId: string,

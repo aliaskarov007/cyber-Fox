@@ -139,6 +139,35 @@ export class ShiftsService {
     });
   }
 
+  /**
+   * Подсказка для пересменки: сколько наличных пересчитал прошлый кассир на
+   * закрытии. Эта сумма физически осталась в ящике — её и предлагаем разменом
+   * следующей смены, чтобы деньги передавались из рук в руки без пересчёта.
+   */
+  async handover(
+    staff: AuthenticatedStaff,
+    clubId: string,
+  ): Promise<{
+    suggestedFloat: number;
+    fromStaff: string;
+    closedAt: Date;
+  } | null> {
+    await this.access.requireClub(staff, clubId);
+    const last = await this.prisma.shift.findFirst({
+      where: { clubId, closedAt: { not: null }, cashCounted: { not: null } },
+      orderBy: { closedAt: "desc" },
+      include: { staff: { select: { fullName: true } } },
+    });
+    if (!last || last.cashCounted === null || last.closedAt === null) {
+      return null;
+    }
+    return {
+      suggestedFloat: last.cashCounted,
+      fromStaff: last.staff.fullName,
+      closedAt: last.closedAt,
+    };
+  }
+
   async open(
     staff: AuthenticatedStaff,
     clubId: string,
