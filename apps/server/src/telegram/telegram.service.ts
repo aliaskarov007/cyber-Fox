@@ -149,3 +149,15 @@ export class TelegramService {
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** Тиын → строка для уведомления, например «1 500 ₸». */
+export function tgMoney(tiyn: number): string {
+  return `${Math.round(tiyn / 100).toLocaleString("ru-RU")} ₸`;
+}
+
+/** Кто сделал действие — по роли (имени у токена сессии нет). */
+export function tgRole(role: string): string {
+  if (role === "OWNER") return "владелец";
+  if (role === "ADMIN") return "управляющий";
+  return "кассир";
+}

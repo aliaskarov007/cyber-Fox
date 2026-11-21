@@ -14,6 +14,11 @@ import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import {
+  TelegramService,
+  tgMoney,
+  tgRole,
+} from "../telegram/telegram.service.js";
+import {
   type Reconciliation,
   computeShiftTotals,
   reconcile,
@@ -128,6 +133,7 @@ export class ShiftsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: ClubAccessService,
+    private readonly telegram: TelegramService,
   ) {}
 
   /** Открытая смена клуба, если она есть. Кассовый экран показывает её в шапке. */
@@ -184,9 +190,14 @@ export class ShiftsService {
     });
     if (existing) throw new BadRequestException("В клубе уже открыта смена");
 
-    return this.prisma.shift.create({
+    const shift = await this.prisma.shift.create({
       data: { clubId, staffId: staff.id, openingFloat },
     });
+    this.telegram.notify(
+      clubId,
+      `🟢 Смена открыта (${tgRole(staff.role)}). Размен: ${tgMoney(openingFloat)}`,
+    );
+    return shift;
   }
 
   /**
@@ -225,6 +236,11 @@ export class ShiftsService {
     // Пересчитываем отчёт по закрытой смене — так дата закрытия, длительность и
     // сверка безнала в ответе совпадают с сохранённым.
     const finalReport = await this.buildReport(closed);
+    const diff = input.cashCounted - finalReport.cashExpected;
+    this.telegram.notify(
+      clubId,
+      `🔴 Смена закрыта (${tgRole(staff.role)}). Деньги в кассу: ${tgMoney(finalReport.grandTotal)}. Наличные в ящике: ${tgMoney(input.cashCounted)}${diff !== 0 ? ` (расхождение ${diff > 0 ? "+" : "−"}${tgMoney(Math.abs(diff))})` : ""}`,
+    );
     return {
       ...finalReport,
       reconciliation: reconcile(finalReport.cashExpected, input.cashCounted),
@@ -511,7 +527,7 @@ export class ShiftsService {
       dto.kind === CashMovementKind.REFUND && dto.method === PaymentMethod.CARD
         ? PaymentMethod.CARD
         : PaymentMethod.CASH;
-    return this.prisma.cashMovement.create({
+    const movement = await this.prisma.cashMovement.create({
       data: {
         clubId,
         shiftId: shift.id,
@@ -522,6 +538,17 @@ export class ShiftsService {
         reason: dto.reason?.trim() || null,
       },
     });
+    const kindLabel: Record<CashMovementKind, string> = {
+      DEPOSIT: "Приходный ордер (внесение)",
+      DROP: "Выемка",
+      EXPENSE: "Расходный ордер",
+      REFUND: method === PaymentMethod.CARD ? "Возврат картой" : "Возврат наличными",
+    };
+    this.telegram.notify(
+      clubId,
+      `🧾 ${kindLabel[dto.kind]}: ${tgMoney(dto.amount)} (${tgRole(staff.role)})${dto.reason ? ` — ${dto.reason.trim()}` : ""}`,
+    );
+    return movement;
   }
 
   private async requireShift(clubId: string, shiftId: string): Promise<Shift> {

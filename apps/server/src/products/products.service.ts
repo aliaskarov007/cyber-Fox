@@ -8,6 +8,10 @@ import { PaymentMethod, type Product, type ProductSale } from "@prisma/client";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import {
+  TelegramService,
+  tgMoney,
+} from "../telegram/telegram.service.js";
 import { bonusFor } from "../shifts/shift.rules.js";
 import type {
   CreateProductDto,
@@ -23,6 +27,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: ClubAccessService,
+    private readonly telegram: TelegramService,
   ) {}
 
   async list(staff: AuthenticatedStaff, clubId: string): Promise<Product[]> {
@@ -97,7 +102,7 @@ export class ProductsService {
       newStock = newQty;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.goodsReceipt.create({
         data: {
           clubId,
@@ -112,6 +117,11 @@ export class ProductsService {
         data: { stock: newStock, cost: newCost },
       });
     });
+    this.telegram.notify(
+      clubId,
+      `📦 Оприходование: «${product.name}» ×${dto.quantity} по ${tgMoney(dto.unitCost)}`,
+    );
+    return updated;
   }
 
   /**
@@ -140,7 +150,7 @@ export class ProductsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.goodsReceipt.create({
         data: {
           clubId,
@@ -155,6 +165,11 @@ export class ProductsService {
         data: { stock: { decrement: dto.quantity } },
       });
     });
+    this.telegram.notify(
+      clubId,
+      `➖ Списание: «${product.name}» ×${dto.quantity}`,
+    );
+    return updated;
   }
 
   /**
@@ -191,7 +206,7 @@ export class ProductsService {
 
     const total = product.price * dto.quantity;
 
-    return this.prisma.$transaction(async (tx) => {
+    const sale = await this.prisma.$transaction(async (tx) => {
       if (product.stock !== null) {
         await tx.product.update({
           where: { id: product.id },
@@ -204,7 +219,7 @@ export class ProductsService {
         orderBy: { openedAt: "desc" },
       });
 
-      const sale = await tx.productSale.create({
+      const created = await tx.productSale.create({
         data: {
           clubId,
           productId: product.id,
@@ -231,8 +246,13 @@ export class ProductsService {
         }
       }
 
-      return sale;
+      return created;
     });
+    this.telegram.notify(
+      clubId,
+      `🧃 Продажа бара: «${product.name}» ×${dto.quantity} на ${tgMoney(total)} (${dto.method === "CARD" ? "картой" : "наличными"})`,
+    );
+    return sale;
   }
 
   /**

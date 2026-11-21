@@ -16,6 +16,11 @@ import bcrypt from "bcryptjs";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { ClubAccessService } from "../common/club-access.service.js";
+import {
+  TelegramService,
+  tgMoney,
+  tgRole,
+} from "../telegram/telegram.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { discountedPrice } from "../billing/billing.rules.js";
 import { pickTopUpBonus } from "../billing/bonus.rules.js";
@@ -146,6 +151,7 @@ export class GuestsService {
     private readonly prisma: PrismaService,
     private readonly access: ClubAccessService,
     private readonly wallets: WalletService,
+    private readonly telegram: TelegramService,
   ) {}
 
   async search(
@@ -299,7 +305,7 @@ export class GuestsService {
     await this.access.requireClub(staff, clubId);
     const guest = await this.requireGuest(staff.tenantId, guestId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const wallet = await this.wallets.resolveWallet(guest.id, clubId, tx);
 
       // Пополнение записывается в клуб, где физически принят платёж: это его касса
@@ -334,6 +340,11 @@ export class GuestsService {
 
       return { balance: updated.balance };
     });
+    this.telegram.notify(
+      clubId,
+      `💰 Пополнение: ${guest.fullName} +${tgMoney(dto.amount)} (${dto.method === "CARD" ? "картой" : dto.method === "ONLINE" ? "онлайн" : "наличными"}, ${tgRole(staff.role)})`,
+    );
+    return result;
   }
 
   /**
@@ -354,7 +365,7 @@ export class GuestsService {
       throw new BadRequestException("Сумма коррекции не может быть нулевой");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const wallet = await this.wallets.resolveWallet(guest.id, clubId, tx);
       const updated = await this.wallets.record(tx, {
         walletId: wallet.id,
@@ -365,6 +376,11 @@ export class GuestsService {
       });
       return { balance: updated.balance };
     });
+    this.telegram.notify(
+      clubId,
+      `✏️ Правка баланса: ${guest.fullName} ${dto.amount > 0 ? "+" : "−"}${tgMoney(Math.abs(dto.amount))} (${tgRole(staff.role)})${dto.reason ? ` — ${dto.reason.trim()}` : ""}`,
+    );
+    return result;
   }
 
   /**
@@ -398,7 +414,7 @@ export class GuestsService {
     const validityDays = tariff.validityDays ?? club.packageValidityDays;
     const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const wallet = await this.wallets.resolveWallet(guest.id, clubId, tx);
 
       if (dto.method === "BALANCE") {
@@ -452,6 +468,11 @@ export class GuestsService {
         },
       });
     });
+    this.telegram.notify(
+      clubId,
+      `🎟 Пакет: ${guest.fullName} — «${tariff.name}» за ${tgMoney(price)} (${dto.method === "BALANCE" ? "с баланса" : dto.method === "CARD" ? "картой" : "наличными"}, ${tgRole(staff.role)})`,
+    );
+    return result;
   }
 
   /**
