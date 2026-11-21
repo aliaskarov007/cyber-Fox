@@ -20,7 +20,12 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { discountedPrice } from "../billing/billing.rules.js";
 import { pickTopUpBonus } from "../billing/bonus.rules.js";
 import { bonusFor } from "../shifts/shift.rules.js";
-import type { BuyPackageDto, CreateGuestDto, TopUpDto } from "./guests.dto.js";
+import type {
+  AdjustBalanceDto,
+  BuyPackageDto,
+  CreateGuestDto,
+  TopUpDto,
+} from "./guests.dto.js";
 import { WalletService } from "./wallet.service.js";
 
 /**
@@ -327,6 +332,37 @@ export class GuestsService {
         });
       }
 
+      return { balance: updated.balance };
+    });
+  }
+
+  /**
+   * Ручная правка баланса (владелец/управляющий). Коррекция, а не платёж: через
+   * кассу не проходит, Payment не создаётся — поэтому смену кассира и отчёт не
+   * трогает (отчёт считает платежи и движение наличных, а не это движение по
+   * кошельку). В истории гостя остаётся строкой «Коррекция баланса».
+   */
+  async adjustBalance(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    guestId: string,
+    dto: AdjustBalanceDto,
+  ): Promise<{ balance: number }> {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+    if (dto.amount === 0) {
+      throw new BadRequestException("Сумма коррекции не может быть нулевой");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const wallet = await this.wallets.resolveWallet(guest.id, clubId, tx);
+      const updated = await this.wallets.record(tx, {
+        walletId: wallet.id,
+        clubId,
+        amount: dto.amount,
+        type: TransactionType.ADJUSTMENT,
+        comment: dto.reason?.trim() || "Коррекция баланса",
+      });
       return { balance: updated.balance };
     });
   }

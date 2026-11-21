@@ -740,6 +740,17 @@ export const api = {
       body: JSON.stringify({ amount, method }),
     }),
 
+  adjustBalance: (
+    clubId: string,
+    guestId: string,
+    amount: number,
+    reason?: string,
+  ) =>
+    request<{ balance: number }>(
+      `/clubs/${clubId}/guests/${guestId}/adjust-balance`,
+      { method: "POST", body: JSON.stringify({ amount, reason }) },
+    ),
+
   buyPackage: (
     clubId: string,
     guestId: string,

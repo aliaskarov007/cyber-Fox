@@ -2,7 +2,11 @@ import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
+import { StaffRole } from "@prisma/client";
+
+import { Roles } from "../auth/guards.js";
 import {
+  AdjustBalanceDto,
   BuyPackageDto,
   CreateGuestDto,
   SetDiscountDto,
@@ -59,6 +63,18 @@ export class GuestsController {
     @Body() dto: TopUpDto,
   ) {
     return this.guests.topUp(staff, clubId, guestId, dto);
+  }
+
+  /** Ручная правка баланса (владелец/управляющий). Вне кассы и смены. */
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Post(":guestId/adjust-balance")
+  adjustBalance(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+    @Body() dto: AdjustBalanceDto,
+  ) {
+    return this.guests.adjustBalance(staff, clubId, guestId, dto);
   }
 
   @Post(":guestId/packages")

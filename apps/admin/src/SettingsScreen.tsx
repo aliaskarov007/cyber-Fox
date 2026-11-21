@@ -1004,7 +1004,7 @@ function StaffPhone({
 }
 
 /** Пороги бонуса за пополнение: пополнил ≥ X — получил Y бонусами. */
-function BonusTiersSettings({ club }: { club: Club }) {
+export function BonusTiersSettings({ club }: { club: Club }) {
   const [tiers, setTiers] = useState<BonusTier[]>([]);
   const [minTopUp, setMinTopUp] = useState("");
   const [bonus, setBonus] = useState("");

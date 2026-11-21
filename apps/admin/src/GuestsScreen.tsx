@@ -172,6 +172,10 @@ function GuestCardPanel({
   const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adjAmount, setAdjAmount] = useState("");
+  const [adjReason, setAdjReason] = useState("");
+  const [adjDone, setAdjDone] = useState<string | null>(null);
+  const canEditBalance = staff.role === "OWNER" || staff.role === "ADMIN";
 
   async function load(): Promise<void> {
     const [nextCard, nextHistory] = await Promise.all([
@@ -376,6 +380,64 @@ function GuestCardPanel({
           </div>
         )}
       </div>
+
+      {canEditBalance && (
+        <div className="section">
+          <h3>Правка баланса</h3>
+          <div className="note">
+            Коррекция владельца/управляющего. Не проходит через кассу — смену и
+            отчёт не трогает. Плюс — начислить, минус — списать (напр. −500).
+          </div>
+          {adjDone && <div className="notice">{adjDone}</div>}
+          <div className="actions">
+            <input
+              style={{ width: 120 }}
+              inputMode="decimal"
+              placeholder="± сумма, ₸"
+              value={adjAmount}
+              onChange={(e) => setAdjAmount(e.target.value)}
+              aria-label="Сумма правки баланса в тенге"
+            />
+            <input
+              placeholder="Причина"
+              value={adjReason}
+              onChange={(e) => setAdjReason(e.target.value)}
+            />
+            <button
+              disabled={busy}
+              onClick={async () => {
+                const tiyn = toTiyn(adjAmount);
+                if (!Number.isFinite(tiyn) || tiyn === 0) {
+                  setError("Укажите сумму (можно со знаком минус)");
+                  return;
+                }
+                setBusy(true);
+                setError(null);
+                setAdjDone(null);
+                try {
+                  const { balance } = await api.adjustBalance(
+                    club.id,
+                    guestId,
+                    tiyn,
+                    adjReason.trim() || undefined,
+                  );
+                  setAdjAmount("");
+                  setAdjReason("");
+                  setAdjDone(`Готово. Новый баланс: ${formatMoney(balance)}`);
+                  await load();
+                  onChanged();
+                } catch (cause) {
+                  setError((cause as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Изменить
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="section">
         <h3>Промокод</h3>

@@ -43,6 +43,20 @@ export class BuyPackageDto {
   method!: PaymentMethod;
 }
 
+/**
+ * Ручная правка баланса владельцем/управляющим. Сумма может быть
+ * отрицательной — коррекция. Не проходит через кассу: смену и отчёт не трогает.
+ */
+export class AdjustBalanceDto {
+  /** В тиын. Плюс — начислить, минус — списать. Ноль не имеет смысла. */
+  @IsInt()
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class SetPinDto {
   @Matches(/^\d{4}$/, { message: "PIN — четыре цифры" })
   pin!: string;

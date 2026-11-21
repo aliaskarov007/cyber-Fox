@@ -10,6 +10,7 @@ import {
   formatMoney,
   toTiyn,
 } from "./api.js";
+import { BonusTiersSettings } from "./SettingsScreen.js";
 
 const KIND_LABEL: Record<PromoKind, string> = {
   BALANCE: "Деньги на счёт",
@@ -71,6 +72,9 @@ export function PromosScreen({ club, staff }: { club: Club; staff: Staff }) {
   return (
     <main>
       {error && <div className="error">{error}</div>}
+
+      {/* Бонус за пополнение: порог суммы → бонус, падает на аккаунт сам. */}
+      {staff.role === "OWNER" && <BonusTiersSettings club={club} />}
 
       {canManage && (
         <PromoForm club={club} isOwner={staff.role === "OWNER"} onCreated={() => void load()} />
