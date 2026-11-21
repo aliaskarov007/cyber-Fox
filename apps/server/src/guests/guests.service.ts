@@ -384,6 +384,48 @@ export class GuestsService {
   }
 
   /**
+   * Удалить пакет с аккаунта гостя. Непользованный пакет удаляется совсем;
+   * если по нему уже играли — не рушим историю отрезков, а гасим: статус
+   * EXPIRED и ноль минут, так он исчезает из активных и из подбора при старте.
+   */
+  async deleteGuestPackage(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    guestId: string,
+    packageId: string,
+  ): Promise<{ deleted: boolean }> {
+    await this.access.requireClub(staff, clubId);
+    const guest = await this.requireGuest(staff.tenantId, guestId);
+
+    const pkg = await this.prisma.guestPackage.findUnique({
+      where: { id: packageId },
+      include: {
+        sourceTariff: { select: { name: true } },
+        _count: { select: { segments: true } },
+      },
+    });
+    if (!pkg || pkg.guestId !== guest.id || pkg.clubId !== clubId) {
+      throw new NotFoundException("Пакет не найден");
+    }
+
+    const played = pkg._count.segments > 0;
+    if (played) {
+      await this.prisma.guestPackage.update({
+        where: { id: packageId },
+        data: { status: GuestPackageStatus.EXPIRED, minutesRemaining: 0 },
+      });
+    } else {
+      await this.prisma.guestPackage.delete({ where: { id: packageId } });
+    }
+
+    this.telegram.notify(
+      clubId,
+      `🗑 Пакет удалён с аккаунта: ${guest.fullName} — «${pkg.sourceTariff.name}» (${tgRole(staff.role)})`,
+    );
+    return { deleted: true };
+  }
+
+  /**
    * Продажа пакета: минуты ложатся на аккаунт гостя и живут там до исчерпания
    * или истечения срока. В долг пакет не продаётся — долг существует, чтобы дать
    * доиграть начатое, а не чтобы кредитовать покупки.

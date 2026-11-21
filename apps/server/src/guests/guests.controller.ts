@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from "@nestjs/common";
 
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { CurrentStaff } from "../auth/current-staff.decorator.js";
@@ -85,6 +93,17 @@ export class GuestsController {
     @Body() dto: BuyPackageDto,
   ) {
     return this.guests.buyPackage(staff, clubId, guestId, dto);
+  }
+
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Delete(":guestId/packages/:packageId")
+  deletePackage(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Param("guestId") guestId: string,
+    @Param("packageId") packageId: string,
+  ) {
+    return this.guests.deleteGuestPackage(staff, clubId, guestId, packageId);
   }
 
   @Post(":guestId/pin")

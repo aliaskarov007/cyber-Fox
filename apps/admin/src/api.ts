@@ -778,6 +778,12 @@ export const api = {
       body: JSON.stringify({ tariffId, method }),
     }),
 
+  deleteGuestPackage: (clubId: string, guestId: string, packageId: string) =>
+    request<{ deleted: boolean }>(
+      `/clubs/${clubId}/guests/${guestId}/packages/${packageId}`,
+      { method: "DELETE" },
+    ),
+
   startSession: (
     clubId: string,
     body: {

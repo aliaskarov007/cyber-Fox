@@ -1170,3 +1170,14 @@ button:disabled {
   border-color: var(--danger);
   color: #fff;
 }
+
+/* --- Выбор пакета для активации --- */
+.pkg-activate {
+  display: grid;
+  gap: 10px;
+}
+.pkg-activate-title {
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}

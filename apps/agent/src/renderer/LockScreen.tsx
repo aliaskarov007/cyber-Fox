@@ -155,12 +155,15 @@ export function LockScreen({
     await login(phone, pin);
   }
 
-  async function start(tariffId?: string): Promise<void> {
+  async function start(opts?: {
+    tariffId?: string;
+    guestPackageId?: string;
+  }): Promise<void> {
     if (!card?.guest) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await client.startSession(card.guest.id, tariffId);
+      const result = await client.startSession(card.guest.id, opts);
       if (result.ok) onStarted();
       else setError(result.reason ?? "Не удалось начать сессию");
     } finally {
@@ -186,7 +189,6 @@ export function LockScreen({
 
   if (card?.guest) {
     const hasPackage = card.packagesInZone.length > 0;
-    const firstPackage = card.packagesInZone[0];
     const bonusPoints = card.guest.bonusPoints;
     return (
       <div className="card">
@@ -257,14 +259,30 @@ export function LockScreen({
           </div>
         )}
 
-        {firstPackage ? (
-          <button
-            className="primary"
-            disabled={busy || !card.ok}
-            onClick={() => void start()}
-          >
-            Играть на минутах пакета ({firstPackage.minutesRemaining} мин)
-          </button>
+        {hasPackage ? (
+          // Выбор пакета: гость сам решает, каким из своих пакетов играть.
+          <div className="pkg-activate">
+            <div className="pkg-activate-title">Чем играть</div>
+            {card.packagesInZone.map((p) => (
+              <button
+                key={p.id}
+                className="primary"
+                disabled={busy}
+                onClick={() => void start({ guestPackageId: p.id })}
+              >
+                Играть пакетом «{p.name}» — {remainingText(p.minutesRemaining)}
+              </button>
+            ))}
+            {card.perMinutePrice !== null && (
+              <button
+                className="ghost"
+                disabled={busy || !card.ok}
+                onClick={() => void start()}
+              >
+                Или по поминутному тарифу ({formatMoney(card.perMinutePrice)}/мин)
+              </button>
+            )}
+          </div>
         ) : (
           <button
             className="primary"

@@ -484,6 +484,7 @@ export class AgentService {
     computerId: string,
     guestId: string,
     tariffId: string | null,
+    guestPackageId: string | null = null,
   ) {
     const computer = await this.prisma.computer.findUnique({
       where: { id: computerId },
@@ -495,6 +496,7 @@ export class AgentService {
       computerId,
       guestId,
       tariffId,
+      guestPackageId,
       startedBy: SessionStartedBy.GUEST,
     });
   }

@@ -605,7 +605,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("session.start")
   async startSession(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { guestId: string; tariffId?: string },
+    @MessageBody()
+    body: { guestId: string; tariffId?: string; guestPackageId?: string },
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
@@ -614,6 +615,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         computerId,
         body.guestId,
         body.tariffId ?? null,
+        body.guestPackageId ?? null,
       );
       // Дальше гостя определяет сессия; после неё машина снова ничья.
       this.forgetLogin(client);

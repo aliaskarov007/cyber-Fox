@@ -3054,3 +3054,23 @@ button.link {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* --- Удаление пакета в карточке гостя --- */
+.pkg-row-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.link-danger {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--danger, #d9544f);
+  cursor: pointer;
+  font-size: 13px;
+  text-decoration: underline;
+}
+.link-danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

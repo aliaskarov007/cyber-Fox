@@ -109,6 +109,8 @@ export class SessionsService {
     computerId: string;
     guestId: string | null;
     tariffId: string | null;
+    /** Явно выбранный гостем пакет для активации (из его оставшихся). */
+    guestPackageId?: string | null;
     startedBy: SessionStartedBy;
     /** Предоплата для анонимной посадки, в тиын. */
     prepaidAmount?: number | null;
@@ -190,7 +192,26 @@ export class SessionsService {
       );
     }
 
-    const usablePackage = pickNextPackage(packages, computer.zoneId, moment);
+    // Гость мог сам выбрать, каким из своих пакетов играть. Проверяем, что он
+    // годен в этой зоне (есть минуты, не сгорел); иначе — ошибка, а не тихий
+    // переход на другой пакет: гость ждёт именно выбранный.
+    let chosenPackage = null as (typeof packages)[number] | null;
+    if (params.guestPackageId) {
+      chosenPackage =
+        packages.find(
+          (p) =>
+            p.id === params.guestPackageId &&
+            p.zoneId === computer.zoneId &&
+            p.minutesRemaining > 0 &&
+            p.expiresAt > moment.at,
+        ) ?? null;
+      if (!chosenPackage) {
+        throw new BadRequestException("Выбранный пакет недоступен в этой зоне");
+      }
+    }
+
+    const usablePackage =
+      chosenPackage ?? pickNextPackage(packages, computer.zoneId, moment);
     if (explicit) {
       segmentKind = TariffKind.PER_MINUTE;
       segmentTariffId = explicit.id;

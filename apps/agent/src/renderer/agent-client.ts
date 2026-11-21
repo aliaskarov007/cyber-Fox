@@ -468,9 +468,13 @@ export class AgentClient {
 
   startSession(
     guestId: string,
-    tariffId?: string,
+    opts?: { tariffId?: string; guestPackageId?: string },
   ): Promise<{ ok: boolean; reason?: string }> {
-    return this.request("session.start", { guestId, tariffId });
+    return this.request("session.start", {
+      guestId,
+      tariffId: opts?.tariffId,
+      guestPackageId: opts?.guestPackageId,
+    });
   }
 
   stopSession(sessionId: string): Promise<{ ok: boolean; reason?: string }> {

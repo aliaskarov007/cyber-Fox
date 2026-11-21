@@ -499,9 +499,36 @@ function GuestCardPanel({
                   {new Date(p.purchasedAt).toLocaleDateString("ru-KZ")} ·{" "}
                   {p.zoneName} · {p.minutesRemaining}/{p.minutesTotal} мин
                 </span>
-                <span>
+                <span className="pkg-row-right">
                   {formatMoney(p.pricePaid)} ·{" "}
                   {PACKAGE_STATUS[p.status] ?? p.status}
+                  {canEditBalance && (
+                    <button
+                      className="link-danger"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (
+                          !(await confirm(
+                            `Удалить пакет «${p.zoneName} · ${p.minutesRemaining}/${p.minutesTotal} мин» с аккаунта?`,
+                            { danger: true },
+                          ))
+                        )
+                          return;
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          await api.deleteGuestPackage(club.id, guestId, p.id);
+                          await load();
+                        } catch (cause) {
+                          setError((cause as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  )}
                 </span>
               </div>
             ))}
