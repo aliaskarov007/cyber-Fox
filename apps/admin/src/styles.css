@@ -3001,3 +3001,56 @@ button.link {
 .confirm-actions button {
   min-width: 100px;
 }
+
+/* --- Гибкая бронь: режим и выбор ПК --- */
+
+.res-mode {
+  display: grid;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+.res-pick {
+  display: grid;
+  gap: 10px;
+}
+.res-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.res-range input {
+  width: 72px;
+}
+.res-pcs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.res-pc {
+  min-width: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+}
+.res-pc.on {
+  border-color: var(--accent);
+  background: var(--accent-soft, rgba(225, 82, 28, 0.18));
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.res-count {
+  max-width: 280px;
+}
+.res-count input {
+  width: 120px;
+}
+.res-hint {
+  color: var(--muted);
+  font-size: 13px;
+}

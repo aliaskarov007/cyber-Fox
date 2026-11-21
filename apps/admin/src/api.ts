@@ -917,6 +917,8 @@ export const api = {
     body: {
       zoneId?: string;
       computerId?: string;
+      computerIds?: string[];
+      quantity?: number;
       guestName: string;
       guestPhone?: string;
       startsAt: string;
@@ -1891,7 +1893,12 @@ export type ReservationStatus = "BOOKED" | "ARRIVED" | "CANCELLED" | "NO_SHOW";
 export interface Reservation {
   id: string;
   zoneId: string | null;
+  zoneName: string | null;
   computerId: string | null;
+  /** Имена конкретных ПК брони (режим «выбрать ПК»). */
+  computerNames: string[];
+  /** Количество ПК для брони «на количество». null — не этот режим. */
+  quantity: number | null;
   resource: string;
   guestName: string;
   guestPhone: string | null;

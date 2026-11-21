@@ -48,14 +48,13 @@ export class ReservationsScheduler {
         warnedAt: null,
         startsAt: { gt: now, lte: soon },
       },
-      include: { club: { select: { timezone: true } } },
+      include: {
+        club: { select: { timezone: true } },
+        computers: { select: { computerId: true } },
+      },
     });
     for (const r of upcoming) {
-      const occupied = await this.occupiedComputers(
-        r.clubId,
-        r.zoneId,
-        r.computerId,
-      );
+      const occupied = await this.targetComputers(r);
       const at = this.localTime(r.startsAt, r.club.timezone);
       for (const computerId of occupied) {
         this.bus.emit("pc.message", {
@@ -82,14 +81,11 @@ export class ReservationsScheduler {
       },
       include: {
         club: { select: { timezone: true, reservationAutoLock: true } },
+        computers: { select: { computerId: true } },
       },
     });
     for (const r of started) {
-      const occupied = await this.occupiedComputers(
-        r.clubId,
-        r.zoneId,
-        r.computerId,
-      );
+      const occupied = await this.targetComputers(r);
       if (r.club.reservationAutoLock) {
         // Завершаем чужие сессии — finish ставит ПК в IDLE и блокирует агента.
         const sessions = await this.prisma.session.findMany({
@@ -119,32 +115,56 @@ export class ReservationsScheduler {
     }
   }
 
-  /** Занятые машины среди ресурса брони (сама машина или все ПК зоны). */
-  private async occupiedComputers(
-    clubId: string,
-    zoneId: string | null,
-    computerId: string | null,
-  ): Promise<string[]> {
-    const ids = computerId
-      ? [computerId]
-      : zoneId
-        ? (
-            await this.prisma.computer.findMany({
-              where: { clubId, zoneId },
-              select: { id: true },
-            })
-          ).map((c) => c.id)
-        : [];
-    if (ids.length === 0) return [];
-    const busy = await this.prisma.session.findMany({
-      where: {
-        computerId: { in: ids },
-        status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] },
-        endedAt: null,
-      },
-      select: { computerId: true },
-    });
-    return [...new Set(busy.map((s) => s.computerId))];
+  /**
+   * Какие занятые ПК нужно освободить/предупредить под эту бронь.
+   *
+   * Конкретные ПК (в т.ч. старая бронь одного ПК) — занятые среди них. Вся зона —
+   * все занятые ПК зоны. На количество N — ровно столько занятых ПК зоны,
+   * сколько не хватает до N свободных (освобождать больше незачем).
+   */
+  private async targetComputers(r: {
+    clubId: string;
+    zoneId: string | null;
+    computerId: string | null;
+    quantity: number | null;
+    computers: { computerId: string }[];
+  }): Promise<string[]> {
+    const busyIn = async (ids: string[]): Promise<string[]> => {
+      if (ids.length === 0) return [];
+      const busy = await this.prisma.session.findMany({
+        where: {
+          computerId: { in: ids },
+          status: { in: [SessionStatus.ACTIVE, SessionStatus.PAUSED] },
+          endedAt: null,
+        },
+        select: { computerId: true },
+      });
+      return [...new Set(busy.map((s) => s.computerId))];
+    };
+
+    // Конкретные ПК.
+    const specIds = r.computers.map((x) => x.computerId);
+    if (specIds.length > 0) return busyIn(specIds);
+    if (r.computerId) return busyIn([r.computerId]);
+
+    // Дальше — на уровне зоны.
+    if (!r.zoneId) return [];
+    const zonePcs = (
+      await this.prisma.computer.findMany({
+        where: { clubId: r.clubId, zoneId: r.zoneId },
+        select: { id: true },
+      })
+    ).map((c) => c.id);
+    const busy = await busyIn(zonePcs);
+
+    // На количество: освобождаем ровно столько, сколько не хватает до N свободных.
+    if (r.quantity && r.quantity > 0) {
+      const free = zonePcs.length - busy.length;
+      const need = Math.max(0, r.quantity - free);
+      return busy.slice(0, need);
+    }
+    // Вся зона.
+    return busy;
   }
 
   private localTime(date: Date, timezone: string): string {

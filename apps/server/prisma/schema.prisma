@@ -580,6 +580,7 @@ model Computer {
   sessions          Session[]
   offlineOperations OfflineOperation[]
   reservations      Reservation[]
+  reservationSeats  ReservationComputer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1010,12 +1011,23 @@ model Reservation {
   clubId String
   club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
-  /// Бронируют либо зону целиком, либо конкретную машину — ровно одно из двух.
+  /// Зона брони. Для гибкой брони она задана всегда: внутри зоны бронируют либо
+  /// всю зону, либо конкретные ПК (computers), либо количество ПК (quantity).
   zoneId String?
   zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
 
+  /// Устаревшее поле одиночной брони ПК (до гибкой брони). Новые брони на
+  /// конкретные ПК используют связь computers; это поле оставлено для старых.
   computerId String?
   computer   Computer? @relation(fields: [computerId], references: [id], onDelete: SetNull)
+
+  /// Конкретные ПК брони (режим «выбрать ПК», в т.ч. диапазон). Пусто — бронь на
+  /// всю зону или на количество.
+  computers ReservationComputer[]
+
+  /// Количество ПК для брони «на количество» без указания номеров. null — не
+  /// этот режим (вся зона или конкретные ПК).
+  quantity Int?
 
   guestName  String
   guestPhone String?
@@ -1039,6 +1051,19 @@ model Reservation {
   createdAt DateTime @default(now())
 
   @@index([clubId, startsAt])
+}
+
+/// Конкретные ПК, входящие в бронь (режим «выбрать ПК» / диапазон). Одна бронь
+/// может держать несколько ПК одной зоны; один ПК — в нескольких броней на
+/// разное время (пересечение по времени не даёт создать).
+model ReservationComputer {
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  computerId    String
+  computer      Computer    @relation(fields: [computerId], references: [id], onDelete: Cascade)
+
+  @@id([reservationId, computerId])
+  @@index([computerId])
 }
 
 /// Расход клуба для P&L: аренда, зарплаты, коммуналка, закупки и прочее.

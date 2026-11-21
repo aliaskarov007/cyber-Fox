@@ -1,5 +1,7 @@
 import { ReservationStatus } from "@prisma/client";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsISO8601,
   IsInt,
@@ -10,14 +12,31 @@ import {
 } from "class-validator";
 
 export class CreateReservationDto {
-  /** Бронируют либо зону, либо машину — одно из двух. */
+  /**
+   * Зона брони. Для гибкой брони задаётся всегда; внутри неё — либо вся зона,
+   * либо конкретные ПК (computerIds), либо количество (quantity).
+   */
   @IsOptional()
   @IsString()
   zoneId?: string;
 
+  /** Устаревшее: бронь одного ПК. Новый клиент шлёт computerIds. */
   @IsOptional()
   @IsString()
   computerId?: string;
+
+  /** Конкретные ПК зоны (режим «выбрать ПК» или диапазон). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(500)
+  computerIds?: string[];
+
+  /** Количество ПК в зоне без указания номеров (режим «на количество»). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
 
   @IsString()
   @MinLength(1)

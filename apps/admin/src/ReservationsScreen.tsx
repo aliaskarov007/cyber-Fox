@@ -39,8 +39,10 @@ function hhmm(iso: string): string {
 }
 
 /**
- * «Бронь» — брони зала на день. Кассир бронирует зону целиком или конкретную
- * машину на время; система не даёт двум броням пересечься по одному ресурсу.
+ * «Бронь» — брони зала на день. Внутри зоны кассир бронирует всю зону,
+ * конкретные ПК (в т.ч. диапазон №20–23) или просто количество ПК без номеров;
+ * несколько ПК одной зоны можно забронировать на разные имена. Система считает
+ * вместимость зоны на время и не даёт забронировать больше, чем свободно.
  */
 export function ReservationsScreen({ club }: { club: Club }) {
   const [day, setDay] = useState(todayKey());
@@ -161,6 +163,8 @@ export function ReservationsScreen({ club }: { club: Club }) {
   );
 }
 
+type ResMode = "whole" | "pick" | "count";
+
 function NewReservation({
   club,
   day,
@@ -174,7 +178,12 @@ function NewReservation({
   hall: HallCell[];
   onCreated: () => void;
 }) {
-  const [resource, setResource] = useState("");
+  const [zoneId, setZoneId] = useState("");
+  const [mode, setMode] = useState<ResMode>("whole");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [count, setCount] = useState("1");
   const [start, setStart] = useState("18:00");
   const [end, setEnd] = useState("20:00");
   const [guestName, setGuestName] = useState("");
@@ -185,19 +194,71 @@ function NewReservation({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const computers = useMemo(
+  // ПК выбранной зоны, по возрастанию номера.
+  const zonePcs = useMemo(
     () =>
       [...hall]
         .map((c) => c.computer)
+        .filter((c) => c.zone.id === zoneId)
         .sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true })),
-    [hall],
+    [hall, zoneId],
   );
+
+  // Смена зоны обнуляет выбор ПК и количество — они относятся к прежней зоне.
+  function changeZone(id: string): void {
+    setZoneId(id);
+    setPicked(new Set());
+    setRangeFrom("");
+    setRangeTo("");
+    setCount("1");
+  }
+
+  function togglePc(id: string): void {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Отметить диапазон по номерам ПК: VIP №20–23. Имена-числа попадают в выбор.
+  function markRange(): void {
+    const a = Number(rangeFrom);
+    const b = Number(rangeTo);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    setPicked((prev) => {
+      const next = new Set(prev);
+      for (const c of zonePcs) {
+        const v = Number(c.name);
+        if (Number.isFinite(v) && v >= lo && v <= hi) next.add(c.id);
+      }
+      return next;
+    });
+  }
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (!resource) {
-      setError("Выберите ресурс");
+    if (!zoneId) {
+      setError("Выберите зону");
       return;
+    }
+    if (mode === "pick" && picked.size === 0) {
+      setError("Отметьте хотя бы один ПК");
+      return;
+    }
+    if (mode === "count") {
+      const n = Number(count);
+      if (!Number.isInteger(n) || n < 1) {
+        setError("Укажите количество ПК");
+        return;
+      }
+      if (n > zonePcs.length) {
+        setError(`В зоне всего ${zonePcs.length} ПК`);
+        return;
+      }
     }
     if (!guestName.trim()) {
       setError("Укажите гостя");
@@ -209,13 +270,14 @@ function NewReservation({
       setError("Конец должен быть позже начала");
       return;
     }
-    const [kind, id] = resource.split(":");
     setBusy(true);
     setError(null);
     try {
       const sum = prepaid.trim() === "" ? 0 : toTiyn(prepaid);
       await api.createReservation(club.id, {
-        ...(kind === "zone" ? { zoneId: id } : { computerId: id }),
+        zoneId,
+        ...(mode === "pick" ? { computerIds: [...picked] } : {}),
+        ...(mode === "count" ? { quantity: Number(count) } : {}),
         guestName: guestName.trim(),
         guestPhone: guestPhone.trim() || undefined,
         startsAt: startsAt.toISOString(),
@@ -224,11 +286,13 @@ function NewReservation({
         prepaidMethod: sum > 0 && prepaidMethod ? prepaidMethod : undefined,
         note: note.trim() || undefined,
       });
+      // Имя и ПК сбрасываем — следующий гость, та же зона и время остаются.
       setGuestName("");
       setGuestPhone("");
       setPrepaid("");
       setPrepaidMethod("");
       setNote("");
+      setPicked(new Set());
       onCreated();
     } catch (cause) {
       setError((cause as Error).message);
@@ -244,26 +308,14 @@ function NewReservation({
 
       <div className="res-grid">
         <label>
-          Ресурс
-          <select
-            value={resource}
-            onChange={(e) => setResource(e.target.value)}
-          >
+          Зона
+          <select value={zoneId} onChange={(e) => changeZone(e.target.value)}>
             <option value="">— выбрать —</option>
-            <optgroup label="Зона целиком">
-              {zones.map((z) => (
-                <option key={z.id} value={`zone:${z.id}`}>
-                  {z.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Отдельный ПК">
-              {computers.map((c) => (
-                <option key={c.id} value={`pc:${c.id}`}>
-                  ПК {c.name}
-                </option>
-              ))}
-            </optgroup>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+              </option>
+            ))}
           </select>
         </label>
         <TimeField label="С" value={start} onChange={setStart} />
@@ -310,6 +362,102 @@ function NewReservation({
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
+
+      {/* Что бронируем внутри зоны: всю зону, конкретные ПК или количество. */}
+      {zoneId && (
+        <div className="res-mode">
+          <div className="seg">
+            <button
+              type="button"
+              className={mode === "whole" ? "on" : ""}
+              onClick={() => setMode("whole")}
+            >
+              Вся зона
+            </button>
+            <button
+              type="button"
+              className={mode === "pick" ? "on" : ""}
+              onClick={() => setMode("pick")}
+            >
+              Выбрать ПК
+            </button>
+            <button
+              type="button"
+              className={mode === "count" ? "on" : ""}
+              onClick={() => setMode("count")}
+            >
+              Количество
+            </button>
+          </div>
+
+          {mode === "whole" && (
+            <div className="res-hint">
+              Бронируется вся зона ({zonePcs.length} ПК).
+            </div>
+          )}
+
+          {mode === "pick" && (
+            <div className="res-pick">
+              <div className="res-range">
+                <span>Диапазон №</span>
+                <input
+                  inputMode="numeric"
+                  value={rangeFrom}
+                  placeholder="с"
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                />
+                <span>–</span>
+                <input
+                  inputMode="numeric"
+                  value={rangeTo}
+                  placeholder="по"
+                  onChange={(e) => setRangeTo(e.target.value)}
+                />
+                <button type="button" onClick={markRange}>
+                  Отметить
+                </button>
+                {picked.size > 0 && (
+                  <button type="button" onClick={() => setPicked(new Set())}>
+                    Сбросить
+                  </button>
+                )}
+              </div>
+              <div className="res-pcs">
+                {zonePcs.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`res-pc ${picked.has(c.id) ? "on" : ""}`}
+                    onClick={() => togglePc(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                {zonePcs.length === 0 && (
+                  <span className="res-hint">В этой зоне нет ПК.</span>
+                )}
+              </div>
+              {picked.size > 0 && (
+                <div className="res-hint">Выбрано ПК: {picked.size}.</div>
+              )}
+            </div>
+          )}
+
+          {mode === "count" && (
+            <label className="res-count">
+              Сколько ПК в зоне (любые)
+              <input
+                inputMode="numeric"
+                value={count}
+                onChange={(e) => setCount(e.target.value)}
+              />
+              <small className="res-hint">
+                Без указания номеров. В зоне {zonePcs.length} ПК.
+              </small>
+            </label>
+          )}
+        </div>
+      )}
 
       <button className="primary" type="submit" disabled={busy}>
         Забронировать
