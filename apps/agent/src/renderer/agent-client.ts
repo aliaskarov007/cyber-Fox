@@ -23,6 +23,10 @@ export interface PairedInfo {
   computerName: string;
   zoneName: string;
   clubName: string;
+  /** Политика простоя: NONE | REBOOT | SHUTDOWN. */
+  idlePowerAction?: string;
+  /** Через сколько минут простоя после сессии её применить. */
+  idlePowerMinutes?: number;
 }
 
 /** Слайд карусели экрана блокировки: турнир из «Ивентов» или реклама. */
@@ -197,6 +201,10 @@ declare global {
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
       warn: (minutes: number | null) => Promise<void>;
+      setIdlePolicy: (policy: {
+        action: string;
+        minutes: number;
+      }) => Promise<void>;
       serviceMode: () => Promise<{ ok: boolean }>;
       scan: () => Promise<
         Array<{ name: string; target: string; coverUrl: string }>

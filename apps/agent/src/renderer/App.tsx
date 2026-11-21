@@ -213,6 +213,12 @@ export function App() {
       onPaired: (info) => {
         setRejection(null);
         setPaired(info);
+        // Политика простоя клуба: перезагрузить/выключить ПК, если после сессии
+        // никто не сядет. Передаём в главный процесс — отсчёт он ведёт сам.
+        void window.cyberfox?.setIdlePolicy?.({
+          action: info.idlePowerAction ?? "NONE",
+          minutes: info.idlePowerMinutes ?? 10,
+        });
         // Полки нужны раньше, чем гость сядет: пустая оболочка в момент старта
         // сессии выглядит как сломанная система.
         void loadLibrary();

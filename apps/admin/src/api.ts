@@ -57,6 +57,10 @@ export interface Club {
   barOrdersFromPc: boolean;
   /** Авто-блокировка занятого ПК при наступлении брони. */
   reservationAutoLock: boolean;
+  /** Что делать с ПК при простое после сессии: NONE | REBOOT | SHUTDOWN. */
+  idlePowerAction: string;
+  /** Через сколько минут простоя применить действие. */
+  idlePowerMinutes: number;
   /** Статический QR клуба для пополнения с игрового ПК, пока банк не подключён. */
   paymentQrImageUrl: string | null;
   /** Слоган под названием клуба на экране блокировки игровых ПК. */
@@ -1015,6 +1019,8 @@ export const api = {
       bonusPercent: number;
       barOrdersFromPc: boolean;
       reservationAutoLock: boolean;
+      idlePowerAction: string;
+      idlePowerMinutes: number;
       paymentQrImageUrl: string | null;
       slogan: string | null;
       /** Пароль выхода из оболочки (Ctrl+Alt+Shift+S на ПК). Пусто — не менять. */

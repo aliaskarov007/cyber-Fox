@@ -219,6 +219,10 @@ function ClubSettings({
   const [validity, setValidity] = useState(String(club.packageValidityDays));
   const [warn, setWarn] = useState(String(club.lowBalanceWarnMinutes));
   const [bonus, setBonus] = useState(String(club.bonusPercent));
+  const [idleAction, setIdleAction] = useState(club.idlePowerAction ?? "NONE");
+  const [idleMinutes, setIdleMinutes] = useState(
+    String(club.idlePowerMinutes ?? 10),
+  );
   const [exitPassword, setExitPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +236,8 @@ function ClubSettings({
     setValidity(String(club.packageValidityDays));
     setWarn(String(club.lowBalanceWarnMinutes));
     setBonus(String(club.bonusPercent));
+    setIdleAction(club.idlePowerAction ?? "NONE");
+    setIdleMinutes(String(club.idlePowerMinutes ?? 10));
     setExitPassword("");
   }, [club]);
 
@@ -247,6 +253,8 @@ function ClubSettings({
         packageValidityDays: Number(validity),
         lowBalanceWarnMinutes: Number(warn),
         bonusPercent: Number(bonus),
+        idlePowerAction: idleAction,
+        idlePowerMinutes: Math.max(1, Number(idleMinutes) || 10),
         // Пусто — пароль выхода не трогаем; заданный непустой — ставим/меняем.
         ...(exitPassword.trim()
           ? { shellExitPassword: exitPassword.trim() }
@@ -317,6 +325,31 @@ function ClubSettings({
             onChange={(e) => setBonus(e.target.value)}
           />
         </label>
+        <label>
+          Простой ПК после сессии
+          <select
+            value={idleAction}
+            onChange={(e) => setIdleAction(e.target.value)}
+          >
+            <option value="NONE">Ничего не делать</option>
+            <option value="REBOOT">Перезагрузить</option>
+            <option value="SHUTDOWN">Выключить</option>
+          </select>
+          <small className="hint">
+            Если после завершения сессии за ПК никто не сядет, он сам
+            перезагрузится или выключится. Включается на свободной машине.
+          </small>
+        </label>
+        {idleAction !== "NONE" && (
+          <label>
+            Через сколько минут простоя
+            <input
+              inputMode="numeric"
+              value={idleMinutes}
+              onChange={(e) => setIdleMinutes(e.target.value)}
+            />
+          </label>
+        )}
         <label>
           Пароль выхода из оболочки
           <input

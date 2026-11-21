@@ -277,11 +277,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
         .catch(() => undefined);
     await client.join(agentRoom(computer.id));
     await client.join(clubAgentsRoom(computer.clubId));
+    // Политика простоя клуба: перезагрузить/выключить ПК, если после сессии за
+    // него никто не сел. Решение принимает сам агент по этим числам.
+    const clubPolicy = await this.prisma.club.findUnique({
+      where: { id: computer.clubId },
+      select: { idlePowerAction: true, idlePowerMinutes: true },
+    });
     client.emit("paired", {
       computerId: computer.id,
       computerName: computer.name,
       zoneName: computer.zone.name,
       clubName: computer.club.name,
+      idlePowerAction: clubPolicy?.idlePowerAction ?? "NONE",
+      idlePowerMinutes: clubPolicy?.idlePowerMinutes ?? 10,
     });
 
     // Агент мог перезапуститься посреди оплаченной игры: отдаём состояние

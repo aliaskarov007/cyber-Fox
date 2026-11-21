@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld("cyberfox", {
   /** Напоминание поверх игры: N минут до конца, либо null — убрать. */
   warn: (minutes: number | null): Promise<void> =>
     ipcRenderer.invoke("agent:warn", minutes),
+  /** Политика простоя клуба: что делать с ПК, если после сессии никто не сел. */
+  setIdlePolicy: (policy: { action: string; minutes: number }): Promise<void> =>
+    ipcRenderer.invoke("agent:idle-policy", policy),
   /**
    * Сервисный режим: пароль уже проверен сервером, админ обслуживает машину.
    * Агент снимает блокировку и запреты и показывает рабочий стол.

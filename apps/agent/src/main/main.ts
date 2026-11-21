@@ -52,6 +52,48 @@ let lockWindow: BrowserWindow | null = null;
  * (игру не перекрывает и клики не ворует) и со звуковым сигналом.
  */
 let warnWindow: BrowserWindow | null = null;
+
+/**
+ * Политика простоя клуба: что делать с ПК, если после сессии за него никто не
+ * сел. Приходит от сервера при привязке. Отсчёт идёт только после завершённой
+ * сессии (agent:lock), а не на свежем включении: гость доиграл и ушёл — машина
+ * освобождается, незачем ей гудеть до следующего клиента.
+ */
+let idlePowerAction = "NONE";
+let idlePowerMinutes = 10;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearIdleTimer(): void {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+}
+
+/** Запустить отсчёт простоя после освобождения ПК. */
+function armIdleTimer(): void {
+  clearIdleTimer();
+  if (idlePowerAction !== "REBOOT" && idlePowerAction !== "SHUTDOWN") return;
+  const ms = Math.max(1, idlePowerMinutes) * 60_000;
+  idleTimer = setTimeout(() => {
+    idleTimer = null;
+    // За это время мог начаться новый сеанс или сервис — тогда ничего не делаем.
+    if (unlocked || servicing) return;
+    runIdlePower();
+  }, ms);
+}
+
+/** Перезагрузить или выключить машину (Windows). Пауза 30 с на всякий случай. */
+function runIdlePower(): void {
+  if (process.platform !== "win32") return;
+  const flag = idlePowerAction === "SHUTDOWN" ? "/s" : "/r";
+  execFile(
+    "shutdown.exe",
+    [flag, "/t", "30", "/c", "Cyber-Fox: ПК свободен"],
+    { windowsHide: true },
+    () => {},
+  );
+}
 /** Экран разблокирован сервером: окно можно закрыть и отдать машину гостю. */
 let unlocked = false;
 /** Пользователь закрывает агента осознанно — только при выходе из системы. */
@@ -220,6 +262,8 @@ ipcMain.handle("agent:unlock", () => {
   if (unlocked) return;
   unlocked = true;
   setPlaying(true);
+  // Начался новый сеанс — отсчёт простоя больше не нужен.
+  clearIdleTimer();
   lockWindow?.setKiosk(false);
   lockWindow?.setAlwaysOnTop(false);
   lockWindow?.setFullScreen(true);
@@ -348,6 +392,8 @@ ipcMain.handle("agent:lock", () => {
   setPlaying(false);
   // Напоминание о минутах больше не нужно: время кончилось, поднимается экран.
   hideWarn();
+  // ПК освободился — запускаем отсчёт простоя (перезагрузка/выключение).
+  armIdleTimer();
   // Сначала закрываем игру, потом поднимаем блокировку: под ней не должно
   // остаться ничего, во что можно вернуться Alt+Tab.
   killLaunchedGames();
@@ -473,6 +519,22 @@ ipcMain.handle("agent:warn", (_event, minutes: number | null) => {
 });
 
 /**
+ * Политика простоя клуба. Приходит при привязке; только запоминаем. Отсчёт
+ * заводится при завершении сессии (agent:lock), а не здесь: на свежем включении
+ * машина не должна перезагружаться сама до первого гостя.
+ */
+ipcMain.handle(
+  "agent:idle-policy",
+  (_event, policy: { action: string; minutes: number }) => {
+    idlePowerAction = policy?.action ?? "NONE";
+    idlePowerMinutes = Math.max(1, Math.floor(policy?.minutes ?? 10));
+    // Политику сменили на «ничего» — снимаем возможный отсчёт.
+    if (idlePowerAction !== "REBOOT" && idlePowerAction !== "SHUTDOWN")
+      clearIdleTimer();
+  },
+);
+
+/**
  * Сервисный режим по паролю выхода.
  *
  * Пароль уже проверен сервером (shell.exit): админ обслуживает машину. Снимаем
@@ -486,6 +548,7 @@ ipcMain.handle("agent:service-mode", async () => {
   unlocked = false;
   setPlaying(false);
   hideWarn();
+  clearIdleTimer();
 
   // Отпускаем все перехваты клавиш, оставляя только возврат блокировки.
   releaseShortcuts();

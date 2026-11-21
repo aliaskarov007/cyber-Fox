@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -84,6 +85,21 @@ export class UpdateClubDto {
   @IsOptional()
   @IsBoolean()
   reservationAutoLock?: boolean;
+
+  /**
+   * Что делать с ПК, если после завершения сессии за него никто не сел:
+   * NONE — ничего, REBOOT — перезагрузить, SHUTDOWN — выключить.
+   */
+  @IsOptional()
+  @IsIn(["NONE", "REBOOT", "SHUTDOWN"])
+  idlePowerAction?: string;
+
+  /** Через сколько минут простоя после сессии применить действие. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  idlePowerMinutes?: number;
 
   /**
    * Картинка статического QR клуба для пополнения с игрового ПК. Адрес

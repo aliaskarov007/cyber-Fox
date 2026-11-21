@@ -235,6 +235,10 @@ model Club {
   /// Когда время брони настало, а ПК занят: true — завершить сессию и
   /// заблокировать ПК; false — только предупредить (решает кассир).
   reservationAutoLock Boolean @default(false)
+  /// Что делать с ПК, если после сессии за него никто не сел в течение
+  /// idlePowerMinutes: NONE — ничего, REBOOT — перезагрузить, SHUTDOWN — выключить.
+  idlePowerAction  String @default("NONE")
+  idlePowerMinutes Int    @default(10)
   /// Гость может заказать из бара прямо с игрового ПК и оплатить с баланса.
   /// Выключено по умолчанию: включает владелец, когда готов носить заказы к местам.
   barOrdersFromPc Boolean @default(false)
