@@ -36,7 +36,7 @@ function durationText(minutes: number): string {
  * чтобы не путать разное:
  *  • Деньги в кассу за смену — наличные + карта + онлайн, за вычетом возврата.
  *  • Касса — сверка наличных в ящике (начало, приход/расход ордера, остаток).
- *  • Выручка — чистый доход: игровое время + маржа бара.
+ *  • Выручка — всего заработано: игровое время + продажи бара; маржа отдельно.
  *  • Активность — сессии, чеки, средний чек; ниже — топ товаров.
  */
 export function DashboardScreen({ club }: { club: Club }) {
@@ -104,9 +104,9 @@ export function DashboardScreen({ club }: { club: Club }) {
     report.grandTotal > 0 ? Math.round((part / report.grandTotal) * 100) : 0;
 
   const barMargin = report.productsRevenue - report.productsCost;
-  // Чистый доход за смену: заработок с компьютеров плюс только маржа бара
-  // (не вся выручка бара — в ней сидит себестоимость товара).
-  const earned = report.sessionsRevenue + barMargin;
+  // Всего заработано за смену: игровое время + вся сумма продаж бара.
+  // Маржа бара показывается отдельной строкой, справочно.
+  const earned = report.sessionsRevenue + report.productsRevenue;
 
   return (
     <main>
@@ -233,7 +233,8 @@ export function DashboardScreen({ club }: { club: Club }) {
             </div>
           </div>
           <div className="dash-hint">
-            Чистый доход = игровое время + маржа бара.
+            Всего заработано = игровое время + продажи бара. Маржа бара —
+            отдельно, справочно.
           </div>
         </section>
 
@@ -322,8 +323,7 @@ function ZReport({
   report: ShiftReport;
   clubName: string;
 }) {
-  const earned =
-    report.sessionsRevenue + (report.productsRevenue - report.productsCost);
+  const earned = report.sessionsRevenue + report.productsRevenue;
   const fmt = (n: number): string => formatMoney(n);
   const dt = (s: string): string =>
     new Date(s).toLocaleString("ru-KZ", {
