@@ -61,7 +61,7 @@ export class NetworkController {
     @Param("clubId") clubId: string,
     @Body() dto: TelegramConnectDto,
   ) {
-    return this.network.connectTelegram(staff, clubId, dto.botToken);
+    return this.network.connectTelegram(staff, clubId, dto.botToken, dto.chatId);
   }
 
   @Get("staff")

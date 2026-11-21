@@ -31,6 +31,11 @@ export class CreateClubDto {
 export class TelegramConnectDto {
   @IsString()
   botToken!: string;
+
+  /** Chat id вручную. Пусто — найти чат автоматически по апдейтам бота. */
+  @IsOptional()
+  @IsString()
+  chatId?: string;
 }
 
 export class UpdateClubDto {

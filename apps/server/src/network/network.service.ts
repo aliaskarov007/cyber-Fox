@@ -59,6 +59,7 @@ export class NetworkService {
     staff: AuthenticatedStaff,
     clubId: string,
     botToken: string,
+    chatId?: string,
   ): Promise<{ ok: true; chatId: string } | { ok: false; error: string }> {
     const club = await this.prisma.club.findUnique({ where: { id: clubId } });
     if (!club || club.tenantId !== staff.tenantId)
@@ -69,7 +70,7 @@ export class NetworkService {
     if (staff.role === StaffRole.STAFF) {
       throw new ForbiddenException("Уведомления настраивает управляющий или владелец");
     }
-    return this.telegram.connect(clubId, botToken);
+    return this.telegram.connect(clubId, botToken, chatId);
   }
 
   async tenant(staff: AuthenticatedStaff): Promise<Tenant> {

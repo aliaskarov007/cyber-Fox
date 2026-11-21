@@ -497,12 +497,12 @@ export const api = {
 
   clubs: () => request<Club[]>("/clubs"),
 
-  connectTelegram: (clubId: string, botToken: string) =>
+  connectTelegram: (clubId: string, botToken: string, chatId?: string) =>
     request<
       { ok: true; chatId: string } | { ok: false; error: string }
     >(`/network/clubs/${clubId}/telegram/connect`, {
       method: "POST",
-      body: JSON.stringify({ botToken }),
+      body: JSON.stringify({ botToken, chatId }),
     }),
 
   zones: (clubId: string) => request<Zone[]>(`/clubs/${clubId}/zones`),

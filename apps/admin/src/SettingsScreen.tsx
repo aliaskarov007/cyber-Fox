@@ -1013,6 +1013,7 @@ function StaffPhone({
  */
 function TelegramNotifySettings({ club }: { club: Club }) {
   const [token, setToken] = useState("");
+  const [chatId, setChatId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -1027,9 +1028,14 @@ function TelegramNotifySettings({ club }: { club: Club }) {
     setError(null);
     setDone(null);
     try {
-      const result = await api.connectTelegram(club.id, token.trim());
+      const result = await api.connectTelegram(
+        club.id,
+        token.trim(),
+        chatId.trim() || undefined,
+      );
       if (result.ok) {
         setToken("");
+        setChatId("");
         setDone(
           `Подключено. Чат: ${result.chatId}. В него ушло проверочное сообщение.`,
         );
@@ -1062,9 +1068,19 @@ function TelegramNotifySettings({ club }: { club: Club }) {
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
+        <input
+          style={{ minWidth: 160 }}
+          placeholder="Chat id (необязательно)"
+          value={chatId}
+          onChange={(e) => setChatId(e.target.value)}
+        />
         <button className="primary" disabled={busy} onClick={() => void connect()}>
           {connected ? "Переподключить" : "Подключить"}
         </button>
+      </div>
+      <div className="note">
+        Если знаешь chat id — впиши его (для группы он со знаком минус, для
+        личного чата — положительное число). Пусто — найдём чат сами.
       </div>
     </section>
   );

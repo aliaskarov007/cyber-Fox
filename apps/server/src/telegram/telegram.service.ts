@@ -51,17 +51,21 @@ export class TelegramService {
   async connect(
     clubId: string,
     botToken: string,
+    manualChatId?: string,
   ): Promise<{ ok: true; chatId: string } | { ok: false; error: string }> {
     const token = botToken.trim();
     if (!token) return { ok: false, error: "Укажите токен бота" };
 
-    const chatId = await this.discoverChatId(token);
+    // Если chat id указан вручную — берём его; иначе ищем сами по апдейтам.
+    const chatId = manualChatId?.trim()
+      ? manualChatId.trim()
+      : await this.discoverChatId(token);
     if (!chatId) {
       return {
         ok: false,
         error:
-          "Не вижу чат. Добавьте бота в нужную группу и напишите там любое " +
-          "сообщение, затем нажмите «Подключить» ещё раз.",
+          "Не вижу чат. Впишите chat id вручную, или добавьте бота в нужную " +
+          "группу, напишите там любое сообщение и нажмите «Подключить» ещё раз.",
       };
     }
 
