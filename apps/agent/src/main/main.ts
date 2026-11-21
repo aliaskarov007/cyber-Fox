@@ -1,4 +1,11 @@
-import { BrowserWindow, app, globalShortcut, ipcMain, shell } from "electron";
+import {
+  BrowserWindow,
+  app,
+  globalShortcut,
+  ipcMain,
+  screen,
+  shell,
+} from "electron";
 import { exec, execFile, spawn } from "node:child_process";
 import { basename, join } from "node:path";
 
@@ -37,6 +44,14 @@ import { setPlaying, startUpdater } from "./updater.js";
 app.disableHardwareAcceleration();
 
 let lockWindow: BrowserWindow | null = null;
+/**
+ * Окно-напоминание «осталось N минут» поверх игры.
+ *
+ * Баннер в React-экране гость во время игры не видит: игра поверх него. Поэтому
+ * предупреждение — отдельное маленькое окно поверх всего, сквозное для мыши
+ * (игру не перекрывает и клики не ворует) и со звуковым сигналом.
+ */
+let warnWindow: BrowserWindow | null = null;
 /** Экран разблокирован сервером: окно можно закрыть и отдать машину гостю. */
 let unlocked = false;
 /** Пользователь закрывает агента осознанно — только при выходе из системы. */
@@ -331,12 +346,130 @@ ipcMain.handle("agent:lock", () => {
     return;
   unlocked = false;
   setPlaying(false);
+  // Напоминание о минутах больше не нужно: время кончилось, поднимается экран.
+  hideWarn();
   // Сначала закрываем игру, потом поднимаем блокировку: под ней не должно
   // остаться ничего, во что можно вернуться Alt+Tab.
   killLaunchedGames();
   holdShortcuts();
   void releaseLockdown();
   holdLockOnTop();
+});
+
+/**
+ * Содержимое окна-напоминания: карточка с числом минут и двойной сигнал через
+ * Web Audio (без звукового файла — работает на любой машине). Перезагрузка
+ * окна с новым числом повторяет сигнал, поэтому каждую минуту гость слышит его.
+ */
+function warnHtml(minutes: number): string {
+  const word =
+    minutes === 1
+      ? "минута"
+      : minutes >= 2 && minutes <= 4
+        ? "минуты"
+        : "минут";
+  const verb = minutes === 1 ? "Осталась" : "Осталось";
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><style>
+    html,body{margin:0;height:100%;background:transparent;overflow:hidden;
+      font-family:'Segoe UI',system-ui,sans-serif;-webkit-user-select:none;}
+    .card{margin:12px;padding:16px 22px;border-radius:14px;
+      background:rgba(20,24,33,.97);border:2px solid #e1521c;
+      box-shadow:0 14px 44px rgba(0,0,0,.55);color:#f2f4f8;
+      display:flex;align-items:center;gap:16px;}
+    .big{font-size:34px;font-weight:800;color:#f26430;line-height:1;min-width:46px;text-align:center;}
+    .txt{font-size:17px;line-height:1.32;}
+    .txt b{color:#fff;}
+  </style></head><body>
+    <div class="card">
+      <div class="big">${minutes}</div>
+      <div class="txt"><b>${verb} ${minutes} ${word} игры.</b><br>
+        Сверните игру (Alt+Tab) и нажмите «Пополнить» или «Пакет» — внесёте
+        онлайн с этого ПК, к кассе подходить не нужно.</div>
+    </div>
+    <script>
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        var ac = new AC();
+        function beep(at, freq) {
+          var o = ac.createOscillator(), g = ac.createGain();
+          o.type = 'sine'; o.frequency.value = freq;
+          o.connect(g); g.connect(ac.destination);
+          var t = ac.currentTime + at;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.3, t + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+          o.start(t); o.stop(t + 0.4);
+        }
+        if (ac.resume) ac.resume();
+        beep(0, 880); beep(0.24, 1175);
+      } catch (e) {}
+    </script>
+  </body></html>`;
+}
+
+/** Показать (или обновить) окно-напоминание на N минут поверх игры. */
+function showWarn(minutes: number): void {
+  const area = screen.getPrimaryDisplay().workArea;
+  const width = 600;
+  const height = 132;
+  const x = Math.round(area.x + (area.width - width) / 2);
+  const y = area.y + 24;
+
+  if (!warnWindow || warnWindow.isDestroyed()) {
+    warnWindow = new BrowserWindow({
+      width,
+      height,
+      x,
+      y,
+      frame: false,
+      transparent: true,
+      backgroundColor: "#00000000",
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false,
+      resizable: false,
+      movable: false,
+      show: false,
+      hasShadow: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    // Поверх полноэкранных игр и сквозное для мыши: не перекрывает игру и не
+    // ворует клики. Показываем без фокуса, чтобы не выдернуть гостя из игры.
+    warnWindow.setAlwaysOnTop(true, "screen-saver");
+    warnWindow.setVisibleOnAllWorkspaces(true);
+    warnWindow.setIgnoreMouseEvents(true);
+    warnWindow.on("closed", () => {
+      warnWindow = null;
+    });
+  } else {
+    warnWindow.setBounds({ x, y, width, height });
+  }
+
+  const html = `data:text/html;charset=utf-8,${encodeURIComponent(warnHtml(minutes))}`;
+  void warnWindow.loadURL(html);
+  warnWindow.showInactive();
+  warnWindow.setAlwaysOnTop(true, "screen-saver");
+}
+
+/** Убрать окно-напоминание (время пополнили или сессия закончилась). */
+function hideWarn(): void {
+  if (warnWindow && !warnWindow.isDestroyed()) {
+    warnWindow.close();
+  }
+  warnWindow = null;
+}
+
+/**
+ * Предупреждение «осталось N минут». Экран присылает число минут, когда их
+ * мало, и null — когда пополнили или сессия закрылась. Сигнал повторяется на
+ * каждое новое число (каждую минуту обратного отсчёта).
+ */
+ipcMain.handle("agent:warn", (_event, minutes: number | null) => {
+  if (minutes == null || minutes <= 0) {
+    hideWarn();
+    return;
+  }
+  showWarn(Math.ceil(minutes));
 });
 
 /**
@@ -352,6 +485,7 @@ ipcMain.handle("agent:service-mode", async () => {
   servicing = true;
   unlocked = false;
   setPlaying(false);
+  hideWarn();
 
   // Отпускаем все перехваты клавиш, оставляя только возврат блокировки.
   releaseShortcuts();

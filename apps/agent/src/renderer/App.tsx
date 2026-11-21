@@ -347,6 +347,27 @@ export function App() {
         }
       : tick;
 
+  /*
+   * Напоминание «осталось N минут» поверх игры. Баннер в этом экране во время
+   * игры не виден — игра поверх него. Поэтому последние минуты показываем
+   * отдельным окном со звуком: пока их мало и гость не в долгу, шлём число в
+   * главный процесс; оно же меняется каждую минуту, повторяя сигнал.
+   */
+  const overlayMinutes: number | null = (() => {
+    if (!displayTick || displayTick.balance < 0) return null;
+    const onPackage = displayTick.packageMinutesLeft !== null;
+    const left = onPackage
+      ? displayTick.packageMinutesLeft!
+      : (displayTick.minutesAffordable ?? 0);
+    return left > 0 && left <= WARN_MINUTES ? Math.ceil(left) : null;
+  })();
+  const lastOverlay = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastOverlay.current === overlayMinutes) return;
+    lastOverlay.current = overlayMinutes;
+    void window.cyberfox?.warn?.(overlayMinutes);
+  }, [overlayMinutes]);
+
   if (configError) {
     return (
       <div className="screen failure">

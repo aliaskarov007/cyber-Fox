@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld("cyberfox", {
     ipcRenderer.invoke("agent:save-config", settings),
   unlock: (): Promise<void> => ipcRenderer.invoke("agent:unlock"),
   lock: (): Promise<void> => ipcRenderer.invoke("agent:lock"),
+  /** Напоминание поверх игры: N минут до конца, либо null — убрать. */
+  warn: (minutes: number | null): Promise<void> =>
+    ipcRenderer.invoke("agent:warn", minutes),
   /**
    * Сервисный режим: пароль уже проверен сервером, админ обслуживает машину.
    * Агент снимает блокировку и запреты и показывает рабочий стол.

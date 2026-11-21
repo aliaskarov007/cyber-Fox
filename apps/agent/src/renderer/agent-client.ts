@@ -196,6 +196,7 @@ declare global {
       saveConfig: (settings: AgentSettings) => Promise<void>;
       unlock: () => Promise<void>;
       lock: () => Promise<void>;
+      warn: (minutes: number | null) => Promise<void>;
       serviceMode: () => Promise<{ ok: boolean }>;
       scan: () => Promise<
         Array<{ name: string; target: string; coverUrl: string }>
