@@ -61,6 +61,8 @@ export interface Club {
   paymentQrImageUrl: string | null;
   /** Слоган под названием клуба на экране блокировки игровых ПК. */
   slogan: string | null;
+  /** Id чата Telegram, если уведомления подключены (токен наружу не отдаётся). */
+  telegramChatId: string | null;
   /** Ключ клуба для бездисковых залов: кладётся в общий образ рядом с агентом. */
   enrollmentKey: string;
 }
@@ -494,6 +496,14 @@ export const api = {
     ),
 
   clubs: () => request<Club[]>("/clubs"),
+
+  connectTelegram: (clubId: string, botToken: string) =>
+    request<
+      { ok: true; chatId: string } | { ok: false; error: string }
+    >(`/network/clubs/${clubId}/telegram/connect`, {
+      method: "POST",
+      body: JSON.stringify({ botToken }),
+    }),
 
   zones: (clubId: string) => request<Zone[]>(`/clubs/${clubId}/zones`),
 

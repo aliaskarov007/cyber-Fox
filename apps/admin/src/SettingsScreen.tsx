@@ -152,6 +152,8 @@ export function SettingsScreen({
 
       {isOwner && <BonusTiersSettings club={club} />}
 
+      {isOwner && <TelegramNotifySettings club={club} />}
+
       {/*
        * Зоны и машины правит владелец или управляющий: сервер закрывает эти
        * запросы ролью. Администратору зала кнопки не показываем вовсе — нажатие,
@@ -1004,6 +1006,70 @@ function StaffPhone({
 }
 
 /** Пороги бонуса за пополнение: пополнил ≥ X — получил Y бонусами. */
+/**
+ * Подключение Telegram-уведомлений о действиях клуба. Владелец вставляет токен
+ * бота, добавляет бота в нужный чат и жмёт «Подключить» — программа сама
+ * находит chat id и шлёт проверочное сообщение. Токен наружу не возвращается.
+ */
+function TelegramNotifySettings({ club }: { club: Club }) {
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const connected = Boolean(club.telegramChatId);
+
+  async function connect(): Promise<void> {
+    if (token.trim() === "") {
+      setError("Вставьте токен бота из @BotFather");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      const result = await api.connectTelegram(club.id, token.trim());
+      if (result.ok) {
+        setToken("");
+        setDone(
+          `Подключено. Чат: ${result.chatId}. В него ушло проверочное сообщение.`,
+        );
+      } else {
+        setError(result.error);
+      }
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="zone-block">
+      <div className="zone-head">
+        <h2>Уведомления в Telegram</h2>
+      </div>
+      <div className="note">
+        {connected
+          ? `Подключено (чат ${club.telegramChatId}). Уведомления о действиях клуба приходят в этот чат. Чтобы сменить — вставьте новый токен и подключите заново.`
+          : "Создайте бота в @BotFather, добавьте его в нужный чат/группу и напишите там любое сообщение. Затем вставьте токен сюда и нажмите «Подключить» — чат найдётся сам."}
+      </div>
+      {error && <div className="error">{error}</div>}
+      {done && <div className="notice">{done}</div>}
+      <div className="actions">
+        <input
+          style={{ minWidth: 280 }}
+          placeholder="Токен бота (из @BotFather)"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+        />
+        <button className="primary" disabled={busy} onClick={() => void connect()}>
+          {connected ? "Переподключить" : "Подключить"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function BonusTiersSettings({ club }: { club: Club }) {
   const [tiers, setTiers] = useState<BonusTier[]>([]);
   const [minTopUp, setMinTopUp] = useState("");

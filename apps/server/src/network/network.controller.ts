@@ -15,6 +15,7 @@ import { Roles } from "../auth/guards.js";
 import {
   CreateClubDto,
   CreateStaffDto,
+  TelegramConnectDto,
   UpdateClubDto,
   UpdateStaffDto,
   UpdateTenantDto,
@@ -50,6 +51,17 @@ export class NetworkController {
     @Body() dto: UpdateClubDto,
   ) {
     return this.network.updateClub(staff, clubId, dto);
+  }
+
+  /** Подключить Telegram-уведомления: найти чат по токену и сохранить. */
+  @Roles(StaffRole.OWNER, StaffRole.ADMIN)
+  @Post("clubs/:clubId/telegram/connect")
+  connectTelegram(
+    @CurrentStaff() staff: AuthenticatedStaff,
+    @Param("clubId") clubId: string,
+    @Body() dto: TelegramConnectDto,
+  ) {
+    return this.network.connectTelegram(staff, clubId, dto.botToken);
   }
 
   @Get("staff")

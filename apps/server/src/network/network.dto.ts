@@ -28,6 +28,11 @@ export class CreateClubDto {
   timezone?: string;
 }
 
+export class TelegramConnectDto {
+  @IsString()
+  botToken!: string;
+}
+
 export class UpdateClubDto {
   @IsOptional()
   @IsString()

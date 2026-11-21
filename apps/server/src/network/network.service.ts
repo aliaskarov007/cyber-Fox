@@ -15,6 +15,7 @@ import bcrypt from "bcryptjs";
 import type { AuthenticatedStaff } from "../auth/auth.types.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { ScreenService } from "../screen/screen.service.js";
+import { TelegramService } from "../telegram/telegram.service.js";
 import { normalizePhone } from "../whatsapp/whatsapp.rules.js";
 import type {
   CreateClubDto,
@@ -47,7 +48,29 @@ export class NetworkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly screen: ScreenService,
+    private readonly telegram: TelegramService,
   ) {}
+
+  /**
+   * Подключить Telegram-уведомления к клубу: по токену найти чат и сохранить.
+   * Доступ — как к настройкам клуба (владелец, или управляющий своего зала).
+   */
+  async connectTelegram(
+    staff: AuthenticatedStaff,
+    clubId: string,
+    botToken: string,
+  ): Promise<{ ok: true; chatId: string } | { ok: false; error: string }> {
+    const club = await this.prisma.club.findUnique({ where: { id: clubId } });
+    if (!club || club.tenantId !== staff.tenantId)
+      throw new NotFoundException("Клуб не найден");
+    if (staff.role !== StaffRole.OWNER && staff.clubId !== clubId) {
+      throw new ForbiddenException("Нет доступа к этому клубу");
+    }
+    if (staff.role === StaffRole.STAFF) {
+      throw new ForbiddenException("Уведомления настраивает управляющий или владелец");
+    }
+    return this.telegram.connect(clubId, botToken);
+  }
 
   async tenant(staff: AuthenticatedStaff): Promise<Tenant> {
     return this.prisma.tenant.findUniqueOrThrow({
@@ -134,8 +157,8 @@ export class NetworkService {
         ...(slogan !== undefined ? { slogan: slogan?.trim() || null } : {}),
         ...(exitPasswordChange ?? {}),
       },
-      // Хэш пароля выхода наружу не отдаём.
-      omit: { shellExitPasswordHash: true },
+      // Секреты наружу не отдаём: хэш пароля оболочки и токен Telegram-бота.
+      omit: { shellExitPasswordHash: true, telegramBotToken: true },
     });
     // Название и слоган видны на экране блокировки — машины зала обновляют его сразу.
     if (updated.name !== club.name || updated.slogan !== club.slogan) {

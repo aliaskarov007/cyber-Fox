@@ -21,6 +21,7 @@ import { NetworkModule } from "./network/network.module.js";
 import { PaymentsModule } from "./payments/payments.module.js";
 import { PlatformModule } from "./platform/platform.module.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
+import { TelegramModule } from "./telegram/telegram.module.js";
 import { ProductsModule } from "./products/products.module.js";
 import { PromosModule } from "./promos/promos.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
@@ -61,6 +62,7 @@ import { WhatsAppModule } from "./whatsapp/whatsapp.module.js";
       { name: "login", ttl: 60_000, limit: 30 },
     ]),
     PrismaModule,
+    TelegramModule,
     HealthModule,
     SubscriptionModule,
     AuthModule,

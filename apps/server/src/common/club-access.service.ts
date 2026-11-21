@@ -40,8 +40,8 @@ export class ClubAccessService {
         ...(staff.clubId === null ? {} : { id: staff.clubId }),
       },
       orderBy: { name: "asc" },
-      // Хэш пароля выхода из оболочки наружу не отдаём.
-      omit: { shellExitPasswordHash: true },
+      // Секреты наружу не отдаём: хэш пароля оболочки и токен Telegram-бота.
+      omit: { shellExitPasswordHash: true, telegramBotToken: true },
     });
     return clubs as Club[];
   }
