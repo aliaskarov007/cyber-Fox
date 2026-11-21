@@ -2965,3 +2965,39 @@ button.link {
 .time-field select {
   flex: 1;
 }
+
+/* --- Подтверждение действия (Да / Нет) --- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 10, 22, 0.72);
+  backdrop-filter: blur(2px);
+}
+.confirm-box {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px 24px 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.confirm-text {
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.confirm-actions button {
+  min-width: 100px;
+}

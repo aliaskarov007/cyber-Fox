@@ -1127,3 +1127,46 @@ button:disabled {
   font-size: 13px;
   opacity: 0.6;
 }
+
+/* --- Подтверждение действия (Да / Нет) --- */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 12, 0.72);
+  backdrop-filter: blur(2px);
+}
+.confirm-box {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.confirm-text {
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--ink);
+  margin-bottom: 22px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.confirm-actions button {
+  min-width: 112px;
+  font-size: 17px;
+  padding: 12px 20px;
+}
+.confirm-actions button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}

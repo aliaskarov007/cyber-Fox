@@ -8,6 +8,7 @@ import {
   formatMoney,
   toTiyn,
 } from "./api.js";
+import { useConfirm } from "./Confirm.js";
 
 /**
  * Товары бара: завести, поменять цену, поправить остаток.
@@ -416,6 +417,7 @@ function ReceiveForm({
   const [unitCost, setUnitCost] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const qty = Number(quantity) || 0;
   const cost = unitCost.trim() === "" ? 0 : toTiyn(unitCost);
@@ -442,6 +444,12 @@ function ReceiveForm({
       setError("Укажите количество");
       return;
     }
+    if (
+      !(await confirm(
+        `Оприходовать ${qty} шт «${product.name}» по ${formatMoney(cost)}?`,
+      ))
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
@@ -521,6 +529,7 @@ function WriteOffForm({
   const [quantity, setQuantity] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const qty = Number(quantity) || 0;
   const left = product.stock ?? 0;
@@ -536,6 +545,12 @@ function WriteOffForm({
       setError(`Нельзя списать больше, чем на складе: осталось ${left}`);
       return;
     }
+    if (
+      !(await confirm(`Списать ${qty} шт «${product.name}» со склада?`, {
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     setError(null);
     try {

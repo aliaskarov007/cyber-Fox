@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { type AgentClient, type TopUpStart, formatMoney } from "./agent-client.js";
 import { Qr } from "./QrCode.js";
+import { useConfirm } from "./Confirm.js";
 
 /** Суммы в тенге, которые чаще всего пополняют на стойке. */
 const PRESETS = [500, 1000, 2000, 5000];
@@ -46,6 +47,7 @@ export function TopUpPanel({
   /** Гость ушёл с QR Kaspi «Платежи» на прежние способы. */
   const [otherWays, setOtherWays] = useState(false);
   const [hasOtherWays, setHasOtherWays] = useState(false);
+  const confirm = useConfirm();
 
   useEffect(() => {
     void client
@@ -90,6 +92,8 @@ export function TopUpPanel({
   }, [client, waitingFor, onPaid]);
 
   async function start(tenge: number): Promise<void> {
+    if (!(await confirm(`Пополнить счёт на ${formatMoney(Math.round(tenge * 100))}?`)))
+      return;
     setError(null);
     setStep({ kind: "loading" });
     try {

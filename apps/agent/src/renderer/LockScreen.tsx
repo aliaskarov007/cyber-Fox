@@ -28,6 +28,7 @@ function daysLeftText(iso: string): string {
 import { PromoField } from "./PromoField.js";
 import { TopUpPanel } from "./TopUpPanel.js";
 import { SignupScreen } from "./SignupScreen.js";
+import { useConfirm } from "./Confirm.js";
 
 /**
  * Экран блокировки: вход по телефону и PIN.
@@ -71,6 +72,7 @@ export function LockScreen({
   /* Пакеты, которые гость может купить сам в своей зоне. */
   const [packages, setPackages] = useState<BuyablePackage[]>([]);
   const [useBonus, setUseBonus] = useState(false);
+  const confirm = useConfirm();
 
   /* Деньги пришли — карточка пересчитывается: от баланса зависит, можно ли начать. */
   async function refreshCard(): Promise<void> {
@@ -106,11 +108,17 @@ export function LockScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.guest?.id]);
 
-  async function buyPackage(tariffId: string, bonus: number): Promise<void> {
+  async function buyPackage(pkg: BuyablePackage, bonus: number): Promise<void> {
+    const fromBalance = pkg.price - bonus;
+    const how =
+      bonus > 0
+        ? `${formatMoney(bonus)} бонусами и ${formatMoney(fromBalance)} с баланса`
+        : `${formatMoney(pkg.price)} с баланса`;
+    if (!(await confirm(`Купить пакет «${pkg.name}» за ${how}?`))) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await client.buyPackage(tariffId, bonus);
+      const result = await client.buyPackage(pkg.id, bonus);
       if (result.ok && result.card) {
         setCard(result.card);
         void refreshPackages();
@@ -288,7 +296,7 @@ export function LockScreen({
                   key={p.id}
                   className="pkg-option"
                   disabled={busy || !online || !p.affordable}
-                  onClick={() => void buyPackage(p.id, bonus)}
+                  onClick={() => void buyPackage(p, bonus)}
                 >
                   <span className="pkg-name">{p.name}</span>
                   <span className="pkg-meta">

@@ -16,6 +16,7 @@ import { GuestDiscountForm } from "./GuestDiscountForm.js";
 import { GuestPhoneVerify } from "./GuestPhoneVerify.js";
 import { GuestPinForm } from "./GuestPinForm.js";
 import { GuestPromoForm } from "./GuestPromoForm.js";
+import { useConfirm } from "./Confirm.js";
 
 const TRANSACTION_LABEL: Record<string, string> = {
   TOPUP: "Пополнение",
@@ -176,6 +177,7 @@ function GuestCardPanel({
   const [adjReason, setAdjReason] = useState("");
   const [adjDone, setAdjDone] = useState<string | null>(null);
   const canEditBalance = staff.role === "OWNER" || staff.role === "ADMIN";
+  const confirm = useConfirm();
 
   async function load(): Promise<void> {
     const [nextCard, nextHistory] = await Promise.all([
@@ -283,10 +285,17 @@ function GuestCardPanel({
           <button
             disabled={busy}
             onClick={async () => {
+              const tiyn = toTiyn(amount);
+              if (
+                !(await confirm(
+                  `Пополнить счёт на ${formatMoney(tiyn)} (наличными)?`,
+                ))
+              )
+                return;
               setBusy(true);
               setError(null);
               try {
-                await api.topUp(club.id, guestId, toTiyn(amount), "CASH");
+                await api.topUp(club.id, guestId, tiyn, "CASH");
                 await load();
                 onChanged();
               } catch (cause) {
@@ -301,10 +310,15 @@ function GuestCardPanel({
           <button
             disabled={busy}
             onClick={async () => {
+              const tiyn = toTiyn(amount);
+              if (
+                !(await confirm(`Пополнить счёт на ${formatMoney(tiyn)} (картой)?`))
+              )
+                return;
               setBusy(true);
               setError(null);
               try {
-                await api.topUp(club.id, guestId, toTiyn(amount), "CARD");
+                await api.topUp(club.id, guestId, tiyn, "CARD");
                 await load();
                 onChanged();
               } catch (cause) {
@@ -411,6 +425,14 @@ function GuestCardPanel({
                   setError("Укажите сумму (можно со знаком минус)");
                   return;
                 }
+                const sign = tiyn > 0 ? "начислить" : "списать";
+                if (
+                  !(await confirm(
+                    `Правка баланса: ${sign} ${formatMoney(Math.abs(tiyn))}?`,
+                    { danger: tiyn < 0 },
+                  ))
+                )
+                  return;
                 setBusy(true);
                 setError(null);
                 setAdjDone(null);

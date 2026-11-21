@@ -9,6 +9,7 @@ import {
   toTiyn,
 } from "./api.js";
 import { PcMessageBox } from "./PcMessageBox.js";
+import { useConfirm } from "./Confirm.js";
 
 /** Управление идущей сессией: продлить нельзя молча — всё пишется в отрезки. */
 export function SessionPanel({
@@ -29,8 +30,22 @@ export function SessionPanel({
   const [busy, setBusy] = useState(false);
   const [moveTo, setMoveTo] = useState("");
   const [amount, setAmount] = useState("1000");
+  const confirm = useConfirm();
 
   const session = cell.session!;
+
+  /** Пополнить счёт гостя после подтверждения суммы. */
+  async function topUp(method: "CASH" | "CARD"): Promise<void> {
+    const tiyn = toTiyn(amount);
+    const how = method === "CASH" ? "наличными" : "картой";
+    if (
+      !(await confirm(
+        `Пополнить счёт гостя на ${formatMoney(tiyn)} (${how})?`,
+      ))
+    )
+      return;
+    await run(() => api.topUp(club.id, session.guest!.id, tiyn, method));
+  }
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -201,34 +216,10 @@ export function SessionPanel({
               onChange={(e) => setAmount(e.target.value)}
               aria-label="Сумма пополнения в тенге"
             />
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(() =>
-                  api.topUp(
-                    club.id,
-                    session.guest!.id,
-                    toTiyn(amount),
-                    "CASH",
-                  ),
-                )
-              }
-            >
+            <button disabled={busy} onClick={() => void topUp("CASH")}>
               Наличными
             </button>
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(() =>
-                  api.topUp(
-                    club.id,
-                    session.guest!.id,
-                    toTiyn(amount),
-                    "CARD",
-                  ),
-                )
-              }
-            >
+            <button disabled={busy} onClick={() => void topUp("CARD")}>
               Картой
             </button>
           </div>

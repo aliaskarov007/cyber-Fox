@@ -5,6 +5,7 @@ import {
   type BuyablePackage,
   formatMoney,
 } from "./agent-client.js";
+import { useConfirm } from "./Confirm.js";
 
 /**
  * Покупка пакета гостем во время сессии — с баланса, из действующих пакетов
@@ -28,6 +29,7 @@ export function PackagePanel({
   const [useBonus, setUseBonus] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   function refresh(): void {
     void client
@@ -49,10 +51,17 @@ export function PackagePanel({
 
   async function buy(pkg: BuyablePackage): Promise<void> {
     if (busy) return;
+    const bonus = bonusFor(pkg);
+    const fromBalance = pkg.price - bonus;
+    const how =
+      bonus > 0
+        ? `${formatMoney(bonus)} бонусами и ${formatMoney(fromBalance)} с баланса`
+        : `${formatMoney(pkg.price)} с баланса`;
+    if (!(await confirm(`Купить пакет «${pkg.name}» за ${how}?`))) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await client.buyPackage(pkg.id, bonusFor(pkg));
+      const result = await client.buyPackage(pkg.id, bonus);
       if (result.ok) {
         onBought(pkg.name);
         refresh();

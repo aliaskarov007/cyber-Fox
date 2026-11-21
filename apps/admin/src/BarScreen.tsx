@@ -9,6 +9,7 @@ import {
 } from "./api.js";
 import { ProductsSection } from "./ProductsSection.js";
 import { SeatRequests } from "./SeatRequests.js";
+import { useConfirm } from "./Confirm.js";
 
 /** Строка чека: товар и сколько штук набрал кассир. */
 type CartLine = { product: Product; quantity: number };
@@ -36,6 +37,7 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
 
   const refresh = useCallback(async () => {
     setProducts(await api.products(club.id));
@@ -102,6 +104,9 @@ export function BarScreen({ club, staff }: { club: Club; staff: Staff }) {
 
   async function checkout(method: string): Promise<void> {
     if (cart.length === 0) return;
+    const how = method === "CASH" ? "наличными" : "картой";
+    if (!(await confirm(`Пробить чек на ${formatMoney(cartTotal)} (${how})?`)))
+      return;
     setBusy(true);
     setError(null);
     try {
