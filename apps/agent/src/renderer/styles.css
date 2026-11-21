@@ -696,6 +696,18 @@ button:disabled {
   font-size: 14px;
   color: var(--muted);
 }
+.pkg-bonus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-2, #b9c3da);
+  cursor: pointer;
+}
+.pkg-bonus input {
+  width: 16px;
+  height: 16px;
+}
 
 /* --- Выбор интернет-провайдера --- */
 

@@ -257,6 +257,7 @@ export function SessionBar({
           <PackagePanel
             client={client}
             disabled={offline}
+            bonusAvailable={tick.bonusPoints ?? 0}
             onBought={(name) => setPromoNote(`Пакет куплен: ${name}`)}
             onClose={() => setPanel(null)}
           />

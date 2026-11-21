@@ -13,15 +13,19 @@ import {
 export function PackagePanel({
   client,
   disabled,
+  bonusAvailable,
   onBought,
   onClose,
 }: {
   client: AgentClient;
   disabled: boolean;
+  /** Бонусов на счёте гостя, в тиын. Можно оплатить ими часть пакета. */
+  bonusAvailable: number;
   onBought: (name: string) => void;
   onClose: () => void;
 }) {
   const [packages, setPackages] = useState<BuyablePackage[]>([]);
+  const [useBonus, setUseBonus] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,12 +43,16 @@ export function PackagePanel({
       .catch(() => setError("Не удалось загрузить пакеты"));
   }, [client]);
 
+  function bonusFor(pkg: BuyablePackage): number {
+    return useBonus ? Math.min(bonusAvailable, pkg.price) : 0;
+  }
+
   async function buy(pkg: BuyablePackage): Promise<void> {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await client.buyPackage(pkg.id);
+      const result = await client.buyPackage(pkg.id, bonusFor(pkg));
       if (result.ok) {
         onBought(pkg.name);
         refresh();
@@ -69,23 +77,41 @@ export function PackagePanel({
 
       {error && <div className="banner debt">{error}</div>}
 
+      {bonusAvailable > 0 && (
+        <label className="pkg-bonus">
+          <input
+            type="checkbox"
+            checked={useBonus}
+            onChange={(e) => setUseBonus(e.target.checked)}
+          />
+          Списать бонусы ({formatMoney(bonusAvailable)}) — остальное с баланса
+        </label>
+      )}
+
       {packages.length === 0 ? (
         <p className="net-hint">В этой зоне нет пакетов для покупки.</p>
       ) : (
-        packages.map((p) => (
-          <button
-            key={p.id}
-            className="pkg-option"
-            disabled={disabled || busy || !p.affordable}
-            onClick={() => void buy(p)}
-          >
-            <span className="pkg-name">{p.name}</span>
-            <span className="pkg-meta">
-              {p.minutes} мин · {formatMoney(p.price)}
-              {!p.affordable ? " · не хватает на балансе" : ""}
-            </span>
-          </button>
-        ))
+        packages.map((p) => {
+          const bonus = bonusFor(p);
+          const fromBalance = p.price - bonus;
+          return (
+            <button
+              key={p.id}
+              className="pkg-option"
+              disabled={disabled || busy || !p.affordable}
+              onClick={() => void buy(p)}
+            >
+              <span className="pkg-name">{p.name}</span>
+              <span className="pkg-meta">
+                {p.minutes} мин · {formatMoney(p.price)}
+                {bonus > 0
+                  ? ` · бонусами ${formatMoney(bonus)} + с баланса ${formatMoney(fromBalance)}`
+                  : ""}
+                {!p.affordable ? " · не хватает средств" : ""}
+              </span>
+            </button>
+          );
+        })
       )}
     </div>
   );

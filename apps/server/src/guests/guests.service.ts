@@ -495,9 +495,12 @@ export class GuestsService {
   > {
     const guest = await this.prisma.guest.findUnique({
       where: { id: guestId },
-      select: { discountPercent: true },
+      select: { discountPercent: true, bonusPoints: true },
     });
     const wallet = await this.wallets.resolveWallet(guestId, clubId);
+    // Пакет можно оплатить балансом и бонусами вместе — значит доступным
+    // считаем, когда их сумма покрывает цену.
+    const payable = wallet.balance + (guest?.bonusPoints ?? 0);
     const tariffs = await this.prisma.tariff.findMany({
       where: { clubId, zoneId, kind: TariffKind.PACKAGE, isActive: true },
       orderBy: { packagePrice: "asc" },
@@ -514,7 +517,7 @@ export class GuestsService {
           name: t.name,
           minutes: t.packageMinutes as number,
           price,
-          affordable: wallet.balance >= price,
+          affordable: payable >= price,
         };
       });
   }
@@ -528,6 +531,7 @@ export class GuestsService {
     guestId: string,
     tariffId: string,
     zoneId: string,
+    bonusToSpend = 0,
   ): Promise<{ ok: boolean; reason?: string }> {
     const club = await this.prisma.club.findUnique({ where: { id: clubId } });
     if (!club) return { ok: false, reason: "Клуб не найден" };
@@ -556,24 +560,40 @@ export class GuestsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        const wallet = await this.wallets.resolveWallet(guestId, clubId, tx);
-        if (wallet.balance < price)
-          throw new BadRequestException(
-            "Недостаточно средств на балансе — пакет в долг не продаётся",
-          );
-        await this.wallets.record(tx, {
-          walletId: wallet.id,
-          clubId,
-          amount: -price,
-          type: TransactionType.PACKAGE_PURCHASE,
-          comment: tariff.name,
+        // Бонусы читаем внутри транзакции, чтобы не списать больше, чем есть.
+        const fresh = await tx.guest.findUniqueOrThrow({
+          where: { id: guestId },
+          select: { bonusPoints: true },
         });
-        const bonus = bonusFor(price, club.bonusPercent);
-        if (bonus > 0)
+        const spendBonus = Math.max(
+          0,
+          Math.min(Math.floor(bonusToSpend), price, fresh.bonusPoints),
+        );
+        const fromBalance = price - spendBonus;
+
+        const wallet = await this.wallets.resolveWallet(guestId, clubId, tx);
+        if (wallet.balance < fromBalance)
+          throw new BadRequestException(
+            "Недостаточно средств — пакет в долг не продаётся. Пополните счёт.",
+          );
+        if (fromBalance > 0) {
+          await this.wallets.record(tx, {
+            walletId: wallet.id,
+            clubId,
+            amount: -fromBalance,
+            type: TransactionType.PACKAGE_PURCHASE,
+            comment: tariff.name,
+          });
+        }
+        // Бонусы начисляются только с реально уплаченных денег, не с бонусов.
+        const earn = bonusFor(fromBalance, club.bonusPercent);
+        const net = earn - spendBonus;
+        if (net !== 0) {
           await tx.guest.update({
             where: { id: guestId },
-            data: { bonusPoints: { increment: bonus } },
+            data: { bonusPoints: { increment: net } },
           });
+        }
         await tx.guestPackage.create({
           data: {
             clubId,
@@ -587,6 +607,10 @@ export class GuestsService {
           },
         });
       });
+      this.telegram.notify(
+        clubId,
+        `🎟 Пакет (с ПК): ${guest.fullName} — «${tariff.name}» за ${tgMoney(price)}${bonusToSpend > 0 ? ` (часть бонусами)` : ""}`,
+      );
       return { ok: true };
     } catch (error) {
       return { ok: false, reason: (error as Error).message };

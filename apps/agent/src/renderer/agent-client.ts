@@ -384,11 +384,15 @@ export class AgentClient {
     return this.request("package.options", {});
   }
 
-  /** Гость купил пакет с баланса. Возвращается свежая карточка. */
+  /**
+   * Гость купил пакет. bonusToSpend — сколько списать бонусами (в тиын),
+   * остальное с баланса. Возвращается свежая карточка.
+   */
   buyPackage(
     tariffId: string,
+    bonusToSpend = 0,
   ): Promise<{ ok: boolean; reason?: string; card?: GuestLoginResult }> {
-    return this.request("package.buy", { tariffId });
+    return this.request("package.buy", { tariffId, bonusToSpend });
   }
 
   /** Деньги по QR зачислены. Возвращается функция отписки. */

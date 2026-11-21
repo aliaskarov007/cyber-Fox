@@ -70,6 +70,7 @@ export function LockScreen({
   const [topUpOpen, setTopUpOpen] = useState(false);
   /* Пакеты, которые гость может купить сам в своей зоне. */
   const [packages, setPackages] = useState<BuyablePackage[]>([]);
+  const [useBonus, setUseBonus] = useState(false);
 
   /* Деньги пришли — карточка пересчитывается: от баланса зависит, можно ли начать. */
   async function refreshCard(): Promise<void> {
@@ -105,11 +106,11 @@ export function LockScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.guest?.id]);
 
-  async function buyPackage(tariffId: string): Promise<void> {
+  async function buyPackage(tariffId: string, bonus: number): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      const result = await client.buyPackage(tariffId);
+      const result = await client.buyPackage(tariffId, bonus);
       if (result.ok && result.card) {
         setCard(result.card);
         void refreshPackages();
@@ -268,20 +269,39 @@ export function LockScreen({
         {packages.length > 0 && (
           <div className="pkg-buy">
             <div className="pkg-buy-title">Купить пакет</div>
-            {packages.map((p) => (
-              <button
-                key={p.id}
-                className="pkg-option"
-                disabled={busy || !online || !p.affordable}
-                onClick={() => void buyPackage(p.id)}
-              >
-                <span className="pkg-name">{p.name}</span>
-                <span className="pkg-meta">
-                  {p.minutes} мин · {formatMoney(p.price)}
-                  {!p.affordable ? " · не хватает" : ""}
-                </span>
-              </button>
-            ))}
+            {card.guest.bonusPoints > 0 && (
+              <label className="pkg-bonus">
+                <input
+                  type="checkbox"
+                  checked={useBonus}
+                  onChange={(e) => setUseBonus(e.target.checked)}
+                />
+                Списать бонусы ({formatMoney(card.guest.bonusPoints)}) — остальное
+                с баланса
+              </label>
+            )}
+            {packages.map((p) => {
+              const bonus = useBonus
+                ? Math.min(card.guest.bonusPoints, p.price)
+                : 0;
+              return (
+                <button
+                  key={p.id}
+                  className="pkg-option"
+                  disabled={busy || !online || !p.affordable}
+                  onClick={() => void buyPackage(p.id, bonus)}
+                >
+                  <span className="pkg-name">{p.name}</span>
+                  <span className="pkg-meta">
+                    {p.minutes} мин · {formatMoney(p.price)}
+                    {bonus > 0
+                      ? ` · бонусами ${formatMoney(bonus)} + с баланса ${formatMoney(p.price - bonus)}`
+                      : ""}
+                    {!p.affordable ? " · не хватает" : ""}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

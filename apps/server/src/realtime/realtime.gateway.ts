@@ -486,7 +486,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
   @SubscribeMessage("package.buy")
   async packageBuy(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { tariffId?: string },
+    @MessageBody() body: { tariffId?: string; bonusToSpend?: number },
   ) {
     const computerId = client.data.computerId as string | undefined;
     if (!computerId) return { ok: false, reason: "ПК не опознан" };
@@ -498,6 +498,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnModuleInit {
       guestId,
       body.tariffId,
       client.data.zoneId as string,
+      Math.max(0, Math.floor(body.bonusToSpend ?? 0)),
     );
     if (!result.ok) return result;
     const card = await this.agents.guestCard(computerId, guestId);
