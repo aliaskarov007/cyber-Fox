@@ -63,8 +63,10 @@ export interface ShiftReport {
   openingFloat: number;
   /** Клуб: все пополнения и пакеты за смену (любым способом). */
   clubTopUps: number;
-  /** Бар: все продажи бара за смену. */
+  /** Бар: все продажи бара за смену (любым способом, включая с баланса). */
   barSales: number;
+  /** Бар, деньги по которому физически пришли за смену (нал + карта + онлайн). */
+  barReceived: number;
   /** Итог смены = Клуб + Бар. */
   grandTotal: number;
   /** Из Итога — наличными (пополнения + бар). */
@@ -391,6 +393,13 @@ export class ShiftsService {
       .filter((p) => p.method !== PaymentMethod.BONUS)
       .reduce((sum, p) => sum + p.amount, 0);
     const barSales = productsRevenue;
+    // Бар, деньги по которому пришли этой сменой (нал + карта + онлайн). Оплата
+    // бара с баланса сюда не идёт — те деньги пришли при пополнении. Это та часть
+    // Итога, что относится к бару; остальное в Итоге — пополнения («компьютеры»).
+    const barReceived =
+      salesBy(PaymentMethod.CASH) +
+      salesBy(PaymentMethod.CARD) +
+      salesBy(PaymentMethod.ONLINE);
     // «Деньги в кассу за смену» — только то, что физически пришло этой сменой:
     // наличные + карта + онлайн. Оплата бара с баланса сюда не идёт (деньги
     // пришли прошлой сменой при пополнении). Возврат наличными уменьшает итог.
@@ -465,6 +474,7 @@ export class ShiftsService {
       openingFloat: shift.openingFloat,
       clubTopUps,
       barSales,
+      barReceived,
       grandTotal,
       cashTotal,
       onlineTotal,

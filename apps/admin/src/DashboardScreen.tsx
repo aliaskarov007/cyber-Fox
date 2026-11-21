@@ -36,7 +36,8 @@ function durationText(minutes: number): string {
  * чтобы не путать разное:
  *  • Деньги в кассу за смену — наличные + карта + онлайн, за вычетом возврата.
  *  • Касса — сверка наличных в ящике (начало, приход/расход ордера, остаток).
- *  • Выручка — всего заработано: игровое время + продажи бара; маржа отдельно.
+ *  • Компьютеры и бар — пополнения депозитов, итог и «чисто за компьютеры»
+ *    (итог − бар, пришедший этой сменой).
  *  • Активность — сессии, чеки, средний чек; ниже — топ товаров.
  */
 export function DashboardScreen({ club }: { club: Club }) {
@@ -104,9 +105,9 @@ export function DashboardScreen({ club }: { club: Club }) {
     report.grandTotal > 0 ? Math.round((part / report.grandTotal) * 100) : 0;
 
   const barMargin = report.productsRevenue - report.productsCost;
-  // Всего заработано за смену: игровое время + вся сумма продаж бара.
-  // Маржа бара показывается отдельной строкой, справочно.
-  const earned = report.sessionsRevenue + report.productsRevenue;
+  // «Чисто за компьютеры» — деньги в кассу за вычетом бара, пришедшего этой
+  // сменой (нал + карта + онлайн). Остаток Итога — это пополнения депозитов.
+  const computerRevenue = report.grandTotal - report.barReceived;
 
   return (
     <main>
@@ -211,39 +212,43 @@ export function DashboardScreen({ club }: { club: Club }) {
           </div>
         </section>
 
-        {/* ВЫРУЧКА — что клуб заработал. */}
+        {/* ВЫРУЧКА — деньги в кассу разложены на бар и компьютеры. */}
         <section className="dash-card">
-          <div className="dash-title">Выручка (заработано)</div>
+          <div className="dash-title">Компьютеры и бар</div>
           <div className="dash-rows">
             <div className="row">
-              <span className="k">Игровое время</span>
-              <span>{formatMoney(report.sessionsRevenue)}</span>
+              <span className="k">Пополнено на депозиты за смену</span>
+              <span>{formatMoney(report.clubTopUps)}</span>
             </div>
             <div className="row">
-              <span className="k">Бар</span>
-              <span>{formatMoney(report.productsRevenue)}</span>
+              <span className="k">Запущено сессий</span>
+              <span>{report.sessionsCount}</span>
             </div>
             <div className="row">
-              <span className="k">Маржа бара</span>
-              <span>{formatMoney(barMargin)}</span>
+              <span className="k">Деньги в кассу (итог)</span>
+              <span>{formatMoney(report.grandTotal)}</span>
+            </div>
+            <div className="row">
+              <span className="k">− Бар (поступило за смену)</span>
+              <span>{formatMoney(report.barReceived)}</span>
             </div>
             <div className="row dash-total">
-              <span className="k">Всего заработано за смену</span>
-              <b>{formatMoney(earned)}</b>
+              <span className="k">Чисто за компьютеры</span>
+              <b>{formatMoney(computerRevenue)}</b>
             </div>
           </div>
           <div className="dash-hint">
-            Всего заработано = игровое время + продажи бара. Маржа бара —
-            отдельно, справочно.
+            Чисто за компьютеры = деньги в кассу − бар. «Пополнено на депозиты» —
+            сколько гости внесли на счёт за смену; маржа бара {formatMoney(barMargin)}.
           </div>
         </section>
 
-        {/* Активность смены: сессии, чеки, средний чек. */}
+        {/* Активность смены: чеки, средний чек. */}
         <section className="dash-card">
           <div className="dash-title">Активность смены</div>
           <div className="dash-rows">
             <div className="row">
-              <span className="k">Сессий сыграно</span>
+              <span className="k">Запущено сессий</span>
               <span>{report.sessionsCount}</span>
             </div>
             <div className="row">
