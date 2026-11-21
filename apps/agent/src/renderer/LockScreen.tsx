@@ -179,6 +179,7 @@ export function LockScreen({
   if (card?.guest) {
     const hasPackage = card.packagesInZone.length > 0;
     const firstPackage = card.packagesInZone[0];
+    const bonusPoints = card.guest.bonusPoints;
     return (
       <div className="card">
         <h1>Здравствуйте, {card.guest.fullName}</h1>
@@ -269,21 +270,19 @@ export function LockScreen({
         {packages.length > 0 && (
           <div className="pkg-buy">
             <div className="pkg-buy-title">Купить пакет</div>
-            {card.guest.bonusPoints > 0 && (
+            {bonusPoints > 0 && (
               <label className="pkg-bonus">
                 <input
                   type="checkbox"
                   checked={useBonus}
                   onChange={(e) => setUseBonus(e.target.checked)}
                 />
-                Списать бонусы ({formatMoney(card.guest.bonusPoints)}) — остальное
+                Списать бонусы ({formatMoney(bonusPoints)}) — остальное
                 с баланса
               </label>
             )}
             {packages.map((p) => {
-              const bonus = useBonus
-                ? Math.min(card.guest.bonusPoints, p.price)
-                : 0;
+              const bonus = useBonus ? Math.min(bonusPoints, p.price) : 0;
               return (
                 <button
                   key={p.id}
